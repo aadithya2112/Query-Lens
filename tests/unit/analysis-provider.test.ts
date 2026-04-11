@@ -156,4 +156,142 @@ describe("phase-1 provider selection", () => {
     expect(geminiGenerateMock).not.toHaveBeenCalled()
     expect(payload.initialAnalysis.summary).toContain("Portfolio moved down")
   })
+
+  it("uses Gemini tool-calling to parse supported paraphrases", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+
+    geminiGenerateMock.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          name: "submit_phase1_query",
+          args: {
+            metric: "cashflow_health_score",
+            timeframe: "last_week",
+            region: "North West",
+            sector: "Hospitality",
+          },
+        },
+      ],
+    })
+    geminiGenerateMock.mockResolvedValueOnce({
+      json: {
+        headline: "North West / Hospitality cashflow health fell 5.4 points",
+        summary: "Gemini summary.",
+        supportedFollowUps: [
+          "Focus on the North West contribution to last week's drop",
+          "Focus on hospitality SMEs last week",
+          "What changed this week instead?",
+        ],
+      },
+    })
+
+    const { getPhase1Provider } = await import(
+      "@/lib/querylens/server/analysis-provider"
+    )
+
+    const provider = getPhase1Provider({ executionContext: "interactive" })
+    const result = await provider.parseQuestion(
+      "Help me understand why North West hospitality cashflow got worse last week"
+    )
+
+    expect(result.parsed).toEqual({
+      rawQuestion:
+        "Help me understand why North West hospitality cashflow got worse last week",
+      intent: "what_changed",
+      metric: "cashflow_health_score",
+      timeframe: "last_week",
+      scope: {
+        region: "north_west",
+        sector: "hospitality",
+      },
+    })
+  })
+
+  it("falls back to deterministic parsing when Gemini returns invalid scope values", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+
+    geminiGenerateMock.mockResolvedValue({
+      functionCalls: [
+        {
+          name: "submit_phase1_query",
+          args: {
+            metric: "cashflow_health_score",
+            timeframe: "last_week",
+            region: "Atlantis",
+          },
+        },
+      ],
+    })
+
+    const { getPhase1Provider } = await import(
+      "@/lib/querylens/server/analysis-provider"
+    )
+
+    const provider = getPhase1Provider({ executionContext: "interactive" })
+    const result = await provider.parseQuestion(
+      "Why did cashflow health drop last week?"
+    )
+
+    expect(result.parsed?.scope).toEqual({})
+  })
+
+  it("preserves explicit scope overrides over Gemini-extracted scope", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+
+    geminiGenerateMock.mockResolvedValue({
+      functionCalls: [
+        {
+          name: "submit_phase1_query",
+          args: {
+            metric: "cashflow_health_score",
+            timeframe: "this_week",
+            region: "Midlands",
+          },
+        },
+      ],
+    })
+
+    const { getPhase1Provider } = await import(
+      "@/lib/querylens/server/analysis-provider"
+    )
+
+    const provider = getPhase1Provider({ executionContext: "interactive" })
+    const result = await provider.parseQuestion(
+      "Why did cashflow health drop this week?",
+      {
+        region: "North West",
+      }
+    )
+
+    expect(result.parsed?.scope.region).toBe("north_west")
+  })
+
+  it("returns a guided fallback for unsupported requests when Gemini rejects them", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+
+    geminiGenerateMock.mockResolvedValue({
+      functionCalls: [
+        {
+          name: "reject_phase1_query",
+          args: {
+            reason: "Phase 1 only supports cashflow health questions for this week or last week.",
+          },
+        },
+      ],
+    })
+
+    const { getPhase1Provider } = await import(
+      "@/lib/querylens/server/analysis-provider"
+    )
+
+    const provider = getPhase1Provider({ executionContext: "interactive" })
+    const result = await provider.parseQuestion("Why did revenue drop last month?")
+
+    expect(result.parsed).toBeUndefined()
+    expect(result.fallbackReason).toContain("cashflow health")
+  })
 })

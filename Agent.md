@@ -5,7 +5,7 @@
   - `31f6f3f` database-mode parity fix
   - `41dff15` submission-ready packaging cleanup
 - Current product state: one strong phase-1 flow is implemented around `what changed` for `cashflow_health_score`, with both fixture mode and Docker-backed `database` mode working
-- Current engineering priority: choose one small next stage, most likely a narrow Gemini integration with deterministic fallback or the `breakdown` slice
+- Current engineering priority: expand the product with one new fully-tested slice, most likely `breakdown`, now that the Gemini-assisted phase-1 flow is in place
 - Keep the app as a single `Next.js` service with Dockerized `Postgres` and `MongoDB`
 - Use Bun as the primary local validation path
 - Do not present `breakdown`, `compare`, or `weekly briefing` as shipped yet

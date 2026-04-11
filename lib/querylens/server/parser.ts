@@ -11,26 +11,41 @@ export interface ParseResult {
   fallbackReason?: string
 }
 
-function normalize(value: string): string {
+export function normalizePhase1Text(value: string): string {
   return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim()
 }
 
-function resolveScopeValue(
+export function resolvePhase1ScopeValue(
   rawValue: string | undefined,
   catalog: Array<{ id: string; name: string }>
 ) {
   if (!rawValue) return undefined
 
-  const candidate = normalize(rawValue)
+  const candidate = normalizePhase1Text(rawValue)
   return catalog.find((item) => {
-    const idCandidate = normalize(item.id.replace(/_/g, " "))
-    const nameCandidate = normalize(item.name)
+    const idCandidate = normalizePhase1Text(item.id.replace(/_/g, " "))
+    const nameCandidate = normalizePhase1Text(item.name)
     return candidate === idCandidate || candidate === nameCandidate || candidate.includes(nameCandidate)
   })?.id
 }
 
+export function resolvePhase1Scope(scope: ScopeFilter) {
+  const dataset = getSeedDataset()
+  const region = resolvePhase1ScopeValue(scope.region, dataset.regions)
+  const sector = resolvePhase1ScopeValue(scope.sector, dataset.sectors)
+
+  return {
+    scope: {
+      ...(region ? { region } : {}),
+      ...(sector ? { sector } : {}),
+    },
+    invalidRegion: Boolean(scope.region && !region),
+    invalidSector: Boolean(scope.sector && !sector),
+  }
+}
+
 function resolveTimeframe(question: string): SupportedTimeframe | undefined {
-  const normalizedQuestion = normalize(question)
+  const normalizedQuestion = normalizePhase1Text(question)
 
   if (normalizedQuestion.includes("last week")) {
     return "last_week"
@@ -44,14 +59,16 @@ function resolveTimeframe(question: string): SupportedTimeframe | undefined {
 }
 
 function resolveMetric(question: string): boolean {
-  const normalizedQuestion = normalize(question)
+  const normalizedQuestion = normalizePhase1Text(question)
   const metric = getPrimaryMetricDefinition()
 
-  return metric.synonyms.some((synonym) => normalizedQuestion.includes(normalize(synonym)))
+  return metric.synonyms.some((synonym) =>
+    normalizedQuestion.includes(normalizePhase1Text(synonym))
+  )
 }
 
 function isSupportedIntent(question: string): boolean {
-  const normalizedQuestion = normalize(question)
+  const normalizedQuestion = normalizePhase1Text(question)
   return /(why|what changed|drop|dropped|decline|declined|fell|fall)/.test(
     normalizedQuestion
   )
@@ -61,8 +78,7 @@ export function parsePhase1Question(
   question: string,
   scopeOverride?: ScopeFilter
 ): ParseResult {
-  const normalizedQuestion = normalize(question)
-  const dataset = getSeedDataset()
+  const normalizedQuestion = normalizePhase1Text(question)
 
   if (!resolveMetric(question)) {
     return {
@@ -87,12 +103,15 @@ export function parsePhase1Question(
     }
   }
 
-  const region =
-    resolveScopeValue(scopeOverride?.region, dataset.regions) ??
-    resolveScopeValue(normalizedQuestion, dataset.regions)
-  const sector =
-    resolveScopeValue(scopeOverride?.sector, dataset.sectors) ??
-    resolveScopeValue(normalizedQuestion, dataset.sectors)
+  const questionScope = resolvePhase1Scope({
+    region: normalizedQuestion,
+    sector: normalizedQuestion,
+  }).scope
+  const overrideScope = resolvePhase1Scope(scopeOverride ?? {}).scope
+  const scope = {
+    ...questionScope,
+    ...overrideScope,
+  }
 
   return {
     parsed: {
@@ -100,10 +119,7 @@ export function parsePhase1Question(
       intent: "what_changed",
       metric: "cashflow_health_score",
       timeframe,
-      scope: {
-        ...(region ? { region } : {}),
-        ...(sector ? { sector } : {}),
-      },
+      scope,
     },
   }
 }

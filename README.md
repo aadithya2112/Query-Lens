@@ -22,7 +22,6 @@ These are intentionally deferred and should not be treated as shipped:
 - `breakdown` queries
 - `compare` queries
 - `weekly briefing`
-- Gemini-backed parsing
 - arbitrary file upload or open-ended source ingestion
 - raw SQL as a primary user workflow
 
@@ -37,7 +36,7 @@ These are intentionally deferred and should not be treated as shipped:
 - `Vitest`
 - `Playwright`
 - `Bun`
-- `Gemini API` via `@google/genai` for optional narrative generation
+- `Gemini API` via `@google/genai` for optional structured parsing and narrative generation
 
 ## Recommended Local Demo Path
 
@@ -63,7 +62,7 @@ The default values in `.env.example` are already set for the local Docker stack:
 - local `POSTGRES_URL`
 - local `MONGODB_URL`
 
-To enable Gemini-backed narrative generation for interactive `/api/query` requests, set:
+To enable Gemini-backed parsing and narrative generation for interactive `/api/query` requests, set:
 
 - `GEMINI_API_KEY=...`
 - optionally override `QUERYLENS_GEMINI_MODEL` if you do not want the default `gemini-2.5-flash`
@@ -167,7 +166,7 @@ QueryLens is a single `Next.js` application with an integrated server layer.
 
 - `POST /api/query` parses and validates the question, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
 - `GET /api/metrics` exposes the phase-1 metric manifest.
-- Interactive query narration can use Gemini with structured JSON output, while bootstrap, data retrieval, evidence assembly, and fallback behavior remain deterministic.
+- Interactive query parsing and narration can use Gemini with structured output and tool calling, while bootstrap, data retrieval, evidence assembly, and fallback behavior remain deterministic.
 - Fixture mode remains available as a safe fallback when live databases are not running.
 
 For the fuller diagram and request lifecycle, see [Architecture.md](./Architecture.md).
@@ -191,7 +190,7 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 
 - The current milestone supports one metric and one intent family only.
 - The seeded portfolio is synthetic and designed for demo clarity, not statistical realism.
-- Gemini currently helps only with wording the final narrative for interactive queries; parsing, scoring, evidence ranking, and fallback logic remain deterministic.
+- Gemini currently helps only with interactive parsing and wording; scoring, evidence ranking, source reads, and fallback logic remain deterministic.
 - Database mode is meant for local Docker-backed use, not public deployment.
 - The current trace/debug details are lightweight and development-oriented.
 

@@ -22,7 +22,7 @@ The original prototype was the right shell but the wrong product story. That she
 ## What Is Still Incomplete
 
 - Only the phase-1 `what changed` family is implemented. Broader flows are still intentionally deferred.
-- Live Gemini / LLM integration is still intentionally deferred.
+- Gemini-backed parsing and narrative generation now exist for interactive queries, but only inside the phase-1 `what changed` boundary.
 
 ## What Should Not Come Back
 

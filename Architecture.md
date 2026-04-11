@@ -2,7 +2,7 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase keeps retrieval and scoring deterministic over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest, while optionally using Gemini to word the final narrative for interactive queries.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase keeps retrieval and scoring deterministic over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest, while optionally using Gemini to parse interactive questions and word the final narrative.
 
 ## Current System Diagram
 
@@ -25,7 +25,7 @@ flowchart LR
     SIDE --> METRICS
 
     subgraph ORCH["Server Orchestration"]
-      PARSE["Question Parser"]
+      PARSE["Question Parser (Deterministic or Gemini)"]
       VALIDATE["Metric / Scope / Timeframe Validation"]
       ANALYZE["Driver + Evidence Assembly"]
       NARRATE["Narrative Provider (Deterministic or Gemini)"]
@@ -38,13 +38,14 @@ flowchart LR
       MG["MongoDB\ncomplaints, incidents, alerts, RM notes"]
       MANIFEST["Metric Manifest JSON"]
       FIXTURE["Fixture Dataset Fallback"]
-      GEMINI["Gemini API\nstructured narrative output"]
+      GEMINI["Gemini API\nstructured parse + narrative output"]
     end
 
     ANALYZE --> PG
     ANALYZE --> MG
     VALIDATE --> MANIFEST
     ANALYZE --> FIXTURE
+    PARSE --> GEMINI
     NARRATE --> GEMINI
 
     subgraph OPS["Local Ops"]
@@ -72,12 +73,12 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 ## Current Request Lifecycle
 
 1. The user submits a question through chat.
-2. The server parses it into the phase-1 `what changed` shape.
+2. The server parses it into the phase-1 `what changed` shape, using deterministic rules by default and Gemini tool calling when interactive AI mode is enabled.
 3. The request is validated against the supported metric, scope, and timeframe rules.
 4. The analysis layer reads weekly movement from `Postgres`.
 5. The analysis layer reads corroborating context from `MongoDB`, or falls back to fixtures if live services are unavailable.
 6. Drivers, evidence, confidence, assumptions, and chart data are assembled deterministically into a grounded response payload.
-7. For interactive requests only, the narrative provider can ask Gemini for a structured headline and summary, with deterministic fallback if Gemini is unavailable or invalid.
+7. For interactive requests only, the parser can ask Gemini for a constrained tool call and the narrative provider can ask Gemini for a structured headline and summary, with deterministic fallback if Gemini is unavailable or invalid.
 8. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
 
 ## Data Responsibilities
@@ -112,7 +113,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 ## Immediate Next Gap
 
-The current architecture is stable for the shipped phase-1 slice. The next gap is no longer infrastructure parity; it is product expansion on top of the proven path, most likely either:
+The current architecture is stable for the shipped phase-1 slice. The next gap is now product expansion on top of the proven path, most likely:
 
-- a narrow Gemini-backed provider with deterministic fallback
-- or a second deterministic query slice such as `breakdown`
+- a second query slice such as `breakdown`
+- or richer trust/debug UX around the Gemini-assisted path

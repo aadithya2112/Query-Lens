@@ -30,7 +30,7 @@
 - `POST /api/query` and `GET /api/metrics` are implemented.
 - Query handling is deterministic and constrained to the phase-1 `what changed` flow.
 - The server parses the question, validates scope and timeframe, queries data sources, ranks evidence, and renders a grounded response.
-- A provider interface exists, but phase 1 does not call a live LLM.
+- The phase-1 provider now supports optional Gemini-assisted parsing and narrative generation with deterministic fallback.
 
 ### Quality and Stability
 
@@ -48,7 +48,7 @@
    - `breakdown`
    - `compare`
    - `weekly briefing`
-   - live Gemini / LLM integration beyond the deterministic phase-1 provider
+   - richer Gemini usage beyond the current constrained parsing and narration path
 
 ## Next Fully Testable Slice
 
@@ -56,7 +56,7 @@
 
 Choose one narrow next stage and complete it end to end:
 
-- `Gemini` integration for the existing phase-1 flow, with deterministic fallback
+- a second product slice such as `breakdown`
 - or the second product slice: `breakdown` for at-risk accounts by region and sector
 
 ### Done When
@@ -67,7 +67,7 @@ Choose one narrow next stage and complete it end to end:
 
 ### Order of Work
 
-1. Pick either Gemini-with-fallback or the `breakdown` slice.
+1. Pick the next product slice, most likely `breakdown`, now that the Gemini-assisted phase-1 flow is in place.
 2. Implement only that stage without expanding into adjacent feature families.
 3. Add focused tests and one demoable gold-path flow.
 4. Re-run the full validation stack and update docs if the shipped surface changes.
