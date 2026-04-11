@@ -1,6 +1,8 @@
 export type DatasetId = "sme_portfolio"
 export type MetricId = "cashflow_health_score"
 export type SupportedTimeframe = "this_week" | "last_week"
+export type QueryIntent = "what_changed"
+export type ScopeDimension = "portfolio" | "region" | "sector"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
 export type ContextCollection =
   | "complaints"
@@ -127,13 +129,33 @@ export interface SeedDataset {
   contextEvents: Record<ContextCollection, ContextEvent[]>
 }
 
-export interface ParsedPhase1Query {
+export interface ComparisonWindow {
+  timeframe: SupportedTimeframe
+  comparisonBasis: "prior_period"
+}
+
+export interface StructuredQueryPlan {
+  datasetId: DatasetId
   rawQuestion: string
-  intent: "what_changed"
-  metric: MetricId
+  intent: QueryIntent
+  metricId: MetricId
   timeframe: SupportedTimeframe
   scope: ScopeFilter
+  scopeDimensions: ScopeDimension[]
+  comparisonWindow: ComparisonWindow
 }
+
+export interface QueryPlanFallback {
+  fallbackReason: string
+}
+
+export interface QueryPlanResult {
+  plan?: StructuredQueryPlan
+  parsed?: StructuredQueryPlan
+  fallbackReason?: string
+}
+
+export type ParsedPhase1Query = StructuredQueryPlan
 
 export interface DriverItem {
   id: string

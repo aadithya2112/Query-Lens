@@ -1,15 +1,11 @@
-import { getPrimaryDatasetMetricDefinition } from "@/lib/querylens/datasets"
 import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import type {
-  ParsedPhase1Query,
+  QueryPlanResult,
   ScopeFilter,
-  SupportedTimeframe,
 } from "@/lib/querylens/types"
 
-export interface ParseResult {
-  parsed?: ParsedPhase1Query
-  fallbackReason?: string
-}
+export type ParseResult = QueryPlanResult
 
 export function normalizePhase1Text(value: string): string {
   return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim()
@@ -44,82 +40,15 @@ export function resolvePhase1Scope(scope: ScopeFilter) {
   }
 }
 
-function resolveTimeframe(question: string): SupportedTimeframe | undefined {
-  const normalizedQuestion = normalizePhase1Text(question)
-
-  if (normalizedQuestion.includes("last week")) {
-    return "last_week"
-  }
-
-  if (normalizedQuestion.includes("this week")) {
-    return "this_week"
-  }
-
-  return undefined
-}
-
-function resolveMetric(question: string): boolean {
-  const normalizedQuestion = normalizePhase1Text(question)
-  const metric = getPrimaryDatasetMetricDefinition()
-
-  return metric.synonyms.some((synonym) =>
-    normalizedQuestion.includes(normalizePhase1Text(synonym))
-  )
-}
-
-function isSupportedIntent(question: string): boolean {
-  const normalizedQuestion = normalizePhase1Text(question)
-  return /(why|what changed|drop|dropped|decline|declined|fell|fall)/.test(
-    normalizedQuestion
-  )
-}
-
 export function parsePhase1Question(
   question: string,
   scopeOverride?: ScopeFilter
 ): ParseResult {
-  const normalizedQuestion = normalizePhase1Text(question)
-
-  if (!resolveMetric(question)) {
-    return {
-      fallbackReason:
-        "Phase 1 only supports questions about the cashflow health score right now.",
-    }
-  }
-
-  if (!isSupportedIntent(question)) {
-    return {
-      fallbackReason:
-        "Phase 1 is limited to 'what changed' questions such as why the score dropped this week or last week.",
-    }
-  }
-
-  const timeframe = resolveTimeframe(question)
-
-  if (!timeframe) {
-    return {
-      fallbackReason:
-        "Try asking about 'this week' or 'last week' so QueryLens can compare the seeded weekly windows safely.",
-    }
-  }
-
-  const questionScope = resolvePhase1Scope({
-    region: normalizedQuestion,
-    sector: normalizedQuestion,
-  }).scope
-  const overrideScope = resolvePhase1Scope(scopeOverride ?? {}).scope
-  const scope = {
-    ...questionScope,
-    ...overrideScope,
-  }
+  const result = planDeterministicQuery(question, scopeOverride)
 
   return {
-    parsed: {
-      rawQuestion: question,
-      intent: "what_changed",
-      metric: "cashflow_health_score",
-      timeframe,
-      scope,
-    },
+    plan: result.plan,
+    parsed: result.plan,
+    fallbackReason: result.fallbackReason,
   }
 }
