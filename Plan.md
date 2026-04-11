@@ -1,84 +1,89 @@
 # QueryLens Plan
 
-## Goal
+## Current Checkpoint
 
-Build a winning-worthy demo that lets judges ask natural-language questions about a synthetic SME banking portfolio and receive clear, fast, evidence-backed answers.
+- Phase 1 is implemented as a local-first vertical slice and committed at `4bdd671`.
+- The app is now branded as `QueryLens` and runs as a single `Next.js` service.
+- `Docker Compose`, seed data, `Vitest`, `Playwright`, and Bun-based build validation are in place.
+- The current shipped capability is one narrow but strong flow: `what changed` for `cashflow_health_score`.
+- The next blocker is not feature breadth. It is finishing and proving `database` mode parity with the existing `fixture` mode.
 
-## Success Criteria
+## What Is Already Done
 
-- A judge can reach a meaningful insight in under 30 seconds.
-- The product feels tailored to a NatWest-adjacent business context rather than a generic analytics toy.
-- Every answer includes visible evidence, assumptions, and metric context.
-- The app is stable to run locally and easy to explain in a short demo.
-- The repository is submission-ready with honest documentation, setup steps, and a clear architecture story.
+### Experience
 
-## Product Scope
+- The three-pane prototype shell has been repurposed into a `QueryLens` workspace.
+- Chat is the main interaction surface.
+- The center panel is now evidence-first, with trend, drivers, source evidence, assumptions, and metric framing.
+- The default first-run state is seeded with the flagship question.
 
-- Read-only web app built in `Next.js`
-- Seeded synthetic SME banking portfolio
-- `Postgres` for structured portfolio facts
-- `MongoDB` for contextual notes, alerts, and incidents
-- Natural-language query flows for:
-  - what changed
-  - breakdown
-  - compare
-  - weekly summary
+### Data and Infrastructure
 
-## Workstreams
+- `Postgres` and `MongoDB` are defined in `docker-compose.yml`.
+- One synthetic 12-week SME portfolio is seeded with a deliberate final-week downturn narrative.
+- `Postgres` stores canonical weekly and daily facts.
+- `MongoDB` stores supporting complaints, incidents, alerts, and RM notes.
+- A repo-managed manifest defines the phase-1 metric and its weighted scoring model.
 
-### 1. Product Reframe
+### Server Flow
 
-- Rename the experience from a generic `DataTalk AI` demo to `QueryLens`.
-- Rewrite all copy, prompts, and sample narratives around SME banking portfolio intelligence.
-- Tighten the feature set around high-confidence demo flows only.
+- `POST /api/query` and `GET /api/metrics` are implemented.
+- Query handling is deterministic and constrained to the phase-1 `what changed` flow.
+- The server parses the question, validates scope and timeframe, queries data sources, ranks evidence, and renders a grounded response.
+- A provider interface exists, but phase 1 does not call a live LLM.
 
-### 2. Data Foundation
+### Quality and Stability
 
-- Design a synthetic portfolio schema with believable regional, sector, and risk patterns.
-- Seed `Postgres` with balances, payments, utilization, arrears, and KPI facts.
-- Seed `MongoDB` with complaints, incidents, relationship-manager notes, and alerts.
-- Create a semantic manifest for metrics, dimensions, synonyms, and approved query templates.
+- Remote Google font fetching has been removed from the build path.
+- Bun `lint`, `test`, `build`, and the Playwright smoke flow pass in the current fixture-backed flow.
+- Docker services boot and the seed script completes successfully.
 
-### 3. Intelligence Layer
+## Remaining Tasks
 
-- Replace the mock engine with a constrained planner.
-- Use the LLM only for structured intent parsing and grounded explanation generation.
-- Validate all requests against supported metrics, dimensions, and time windows.
-- Generate evidence packages before generating narratives.
+1. Finish `database` mode parity for the flagship question.
+   - Ensure real `Postgres` weekly rows line up with the phase-1 timeframe logic.
+   - Ensure real `MongoDB` context is pulled into the same answer window.
+   - Ensure the response is grounded and non-fallback in `database` mode.
 
-### 4. Experience Redesign
+2. Lock that parity with targeted regression coverage.
+   - Add tests that catch SQL date normalization mistakes.
+   - Add an integration assertion for `sourceMode: "database"` and cross-source evidence.
 
-- Keep the three-pane shell from the prototype.
-- Convert the center panel from SQL-first to evidence-first.
-- Keep chat as the primary interaction model.
-- Add a visible trust layer for confidence, assumptions, evidence, and source lineage.
+3. Make submission docs honest and complete.
+   - Add `README.md` with setup, usage, scope, and limitations.
+   - Keep all planning and architecture notes aligned with the actual delivered phase.
 
-### 5. Infrastructure and Delivery
+4. Defer broader feature work until the above is closed.
+   - `breakdown`
+   - `compare`
+   - `weekly briefing`
+   - any extra AI orchestration beyond the deterministic phase-1 provider
 
-- Run local services with `Docker Compose`.
-- Keep the app deployable as a single `Next.js` web app.
-- Add seed scripts, environment examples, and a judge-friendly README.
+## Next Fully Testable Slice
 
-### 6. Submission Polish
+### Goal
 
-- Add screenshots and a short architecture note.
-- Prepare a concise demo script with the 4 flagship questions.
-- Document limitations honestly.
-- Ensure the repository structure is easy for judges to inspect.
+Complete and fully verify the flagship flow in real `database` mode:
+`Why did SME cashflow health drop last week?`
 
-## Phase Order
+### Done When
 
-1. Create architecture and planning docs
-2. Define data model and seed strategy
-3. Add Docker infrastructure
-4. Replace mock query engine with server-side orchestration
-5. Rework the prototype UI around the new product story
-6. Write README, demo script, and submission polish docs
+- Dockerized `Postgres` and `MongoDB` are healthy.
+- The seed script runs successfully.
+- `POST /api/query` returns a non-fallback `database` response for the flagship question.
+- The response includes at least one `postgres` evidence item and one `mongodb` evidence item.
+- Bun `lint`, `test`, and `build` remain green after the fix.
 
-## Non-Goals for v1
+### Order of Work
 
-- Arbitrary CSV upload
-- Free-form SQL editing as a main user path
-- Multi-tenant auth or user management
-- Autonomous agents that query databases without guardrails
-- A separate backend service unless a real need emerges
+1. Close the date and comparison-window mismatch in the repository layer.
+2. Re-run the direct `database` mode query until it returns the grounded narrative instead of fallback.
+3. Add regression tests for the real adapter path.
+4. Re-run the full Bun validation stack and smoke flow.
+
+## Defaults and Boundaries
+
+- Keep the app as a single `Next.js` service.
+- Keep phase 1 local-first and Docker-backed.
+- Keep fixture mode as the safe fallback when databases are unavailable.
+- Do not expand product scope until the one flagship `database` flow is completely proven.

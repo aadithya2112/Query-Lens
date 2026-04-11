@@ -1,140 +1,112 @@
 # QueryLens Architecture
 
-## Summary
+## Current Architecture Summary
 
-`QueryLens` will be a single `Next.js` application with an integrated server layer, backed by Dockerized `Postgres` and `MongoDB`. The LLM is used in a constrained role: it classifies intent, returns structured query plans, and writes grounded narratives over verified evidence.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase does not use a live LLM. Instead, it uses a deterministic provider interface over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest.
 
-## Architecture Principles
-
-- The UI must show how an answer was produced.
-- The system should prefer deterministic data access over open-ended text-to-SQL.
-- The demo should feel technically real without introducing avoidable infrastructure complexity.
-- The architecture must support a polished hackathon build and a clean story for judges.
-
-## System Diagram
+## Current System Diagram
 
 ```mermaid
 flowchart LR
-    U["Judge / User Browser"] --> A["Next.js App Router UI"]
+    U["Judge / User"] --> UI["Next.js App Router UI"]
 
-    subgraph UI["Frontend Experience"]
-      A --> H["Homepage Briefing"]
-      A --> C["Chat Thread"]
-      A --> E["Evidence Workspace"]
-      A --> T["Trace View"]
+    subgraph FE["Frontend"]
+      UI --> CHAT["Chat Panel"]
+      UI --> WORK["Evidence Workspace"]
+      UI --> SIDE["Source + Metric Sidebar"]
     end
 
-    subgraph API["Next.js Server Layer"]
-      Q["POST /api/query"]
-      B["GET /api/briefing"]
-      M["GET /api/metrics"]
-      R["GET /api/trace/:id"]
+    subgraph API["Next.js Route Handlers"]
+      QUERY["POST /api/query"]
+      METRICS["GET /api/metrics"]
     end
 
-    C --> Q
-    H --> B
-    E --> M
-    T --> R
+    CHAT --> QUERY
+    SIDE --> METRICS
 
-    subgraph ORCH["Orchestration Layer"]
-      I["Intent Parser"]
-      S["Semantic Validator"]
-      P["Deterministic Query Planner"]
-      X["Evidence Assembler"]
-      G["Confidence + Assumptions"]
-      N["Narrative Generator"]
+    subgraph ORCH["Server Orchestration"]
+      PARSE["Question Parser"]
+      VALIDATE["Metric / Scope / Timeframe Validation"]
+      ANALYZE["Driver + Evidence Assembly"]
+      NARRATE["Deterministic Narrative Provider"]
     end
 
-    Q --> I --> S --> P
-    P --> PG
-    P --> MG
-    P --> MF
-    PG --> X
-    MG --> X
-    MF --> X
-    X --> G --> N
-    N --> Q
+    QUERY --> PARSE --> VALIDATE --> ANALYZE --> NARRATE --> QUERY
 
     subgraph DATA["Data Sources"]
-      PG["Postgres\nbalances, payments, utilization, KPIs"]
-      MG["MongoDB\ncomplaints, alerts, notes, incidents"]
-      MF["Metric Manifest JSON\nmetrics, dimensions, synonyms, templates"]
+      PG["Postgres\naccounts, daily metrics, weekly metrics"]
+      MG["MongoDB\ncomplaints, incidents, alerts, RM notes"]
+      MANIFEST["Metric Manifest JSON"]
+      FIXTURE["Fixture Dataset Fallback"]
     end
 
-    subgraph AI["LLM Usage"]
-      L["Gemini / LLM\nstructured planning + grounded explanation"]
+    ANALYZE --> PG
+    ANALYZE --> MG
+    VALIDATE --> MANIFEST
+    ANALYZE --> FIXTURE
+
+    subgraph OPS["Local Ops"]
+      DC["docker-compose"]
+      SEED["seed-phase1.ts"]
     end
 
-    I -. structured output .-> L
-    N -. grounded summary .-> L
-
-    subgraph OPS["Local Infra"]
-      D["docker-compose"]
-      SEED["Seed Scripts"]
-    end
-
-    D --> PG
-    D --> MG
+    DC --> PG
+    DC --> MG
     SEED --> PG
     SEED --> MG
-    SEED --> MF
+    SEED --> MANIFEST
 ```
 
-## Primary Components
-
-### Frontend
-
-- `Homepage Briefing`: default executive overview and example prompts
-- `Chat Thread`: natural-language interaction and follow-up prompts
-- `Evidence Workspace`: chart, drivers, definitions, assumptions, and source cards
-- `Trace View`: optional technical transparency for how an answer was assembled
-
-### Server Layer
-
-- Route handlers live inside `Next.js`
-- The server owns intent validation, query planning, evidence construction, and response formatting
-- No separate API service is required in v1
-
-### Data Layer
-
-- `Postgres` stores canonical portfolio facts
-- `MongoDB` stores contextual and semi-structured supporting signals
-- A repo-managed manifest defines semantic rules and approved metrics
-
-## Request Lifecycle
-
-1. The user asks a natural-language question.
-2. The system classifies the intent and extracts structured parameters.
-3. The semantic layer validates supported metrics, dimensions, and date logic.
-4. Deterministic planners query the required sources.
-5. The evidence assembler builds supporting facts and provenance metadata.
-6. The narrative layer produces a plain-English answer from verified evidence only.
-7. The UI renders the answer alongside chart, evidence, assumptions, and follow-up prompts.
-
-## Deployment Shape
-
-### Local
-
-- `Next.js` app runs locally
-- `Postgres` and `MongoDB` run in Docker
-- seed scripts create a reproducible demo state
-
-### Hosted
-
-- One deployed `Next.js` app
-- Connected managed databases or equivalent hosted services
-- Same semantic layer and seeded data story
-
-## Default API Surface
+## Current API Surface
 
 - `POST /api/query`
-- `GET /api/briefing`
+  - input: `{ question: string, scope?: { region?: string, sector?: string } }`
+  - output: `Phase1AnalysisResponse`
 - `GET /api/metrics`
-- `GET /api/trace/:id`
+  - returns the supported phase-1 metric definition and dimensions
 
-## Design Consequences
+Deferred endpoints such as briefing or trace APIs are not part of the current shipped slice and should not be documented as implemented.
 
-- SQL should not be the centerpiece of the interface.
-- Evidence must exist before the assistant writes an answer.
-- The semantic layer is mandatory because it protects consistency and trust.
-- Cross-source answers should explicitly say when they use corroboration from multiple systems.
+## Current Request Lifecycle
+
+1. The user submits a question through chat.
+2. The server parses it into the phase-1 `what changed` shape.
+3. The request is validated against the supported metric, scope, and timeframe rules.
+4. The analysis layer reads weekly movement from `Postgres`.
+5. The analysis layer reads corroborating context from `MongoDB`, or falls back to fixtures if live services are unavailable.
+6. Drivers, evidence, confidence, assumptions, and chart data are assembled into a grounded response.
+7. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
+
+## Data Responsibilities
+
+### Postgres
+
+- Canonical structured facts
+- Weekly comparison rows used to explain score movement
+- Daily account metrics used to support believable seeded portfolio behavior
+
+### MongoDB
+
+- Contextual corroboration in the same time window
+- Complaints, incidents, alerts, and RM notes
+
+### Manifest
+
+- Metric definition for `cashflow_health_score`
+- Supported synonyms, dimensions, and allowed time windows
+
+### Fixture Fallback
+
+- Safe local fallback when database services are not configured or unavailable
+- Must behave the same as the intended `database` answer shape
+
+## Current Constraints
+
+- No separate backend service
+- No free-form SQL generation
+- No live LLM calls in phase 1
+- No upload-driven ingestion path in the main flow
+
+## Immediate Next Gap
+
+The remaining architecture gap is not a new subsystem. It is parity: the real `database` adapters must produce the same phase-1 answer shape and narrative quality as the already-working fixture mode.

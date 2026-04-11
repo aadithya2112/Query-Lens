@@ -1,10 +1,10 @@
 # Agent Notes
 
-- Build `QueryLens` as a trust-first intelligence copilot for a synthetic NatWest-adjacent SME banking portfolio.
-- Keep the app as `Next.js` full-stack in v1. Do not add a separate API service unless a concrete scaling or deployment need appears.
-- Use seeded demo data only. No user-uploaded datasets in v1.
-- Prefer `Docker Compose` for local infrastructure, with `Postgres` for canonical facts and `MongoDB` for contextual signals.
-- Preserve the strongest parts of the current three-pane prototype shell, but replace the generic SQL playground behavior and e-commerce sample data.
-- Optimize for 4 judging flows: `what changed`, `breakdown`, `compare`, and `weekly briefing`.
-- Every answer must show evidence, metric definitions, assumptions, and source transparency. Trust UX is a primary feature, not a footer detail.
-- Keep the product tone as `modern banking intelligence`: premium, calm, clear, and credible.
+- Current checkpoint commit: `4bdd671` (`feat: implement phase 1 querylens vertical slice`)
+- Current product state: one strong phase-1 flow is implemented around `what changed` for `cashflow_health_score`
+- Current engineering priority: finish and fully test `database` mode parity before expanding scope
+- Keep the app as a single `Next.js` service with Dockerized `Postgres` and `MongoDB`
+- Use Bun as the primary local validation path
+- Do not present `breakdown`, `compare`, or `weekly briefing` as shipped yet
+- Keep the trust UX central: evidence, assumptions, source transparency, and metric framing must remain visible
+- Keep documentation honest about what is implemented versus deferred

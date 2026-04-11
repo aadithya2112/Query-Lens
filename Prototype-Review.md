@@ -1,76 +1,37 @@
 # Prototype Review
 
-## Overall Assessment
+## Current Assessment
 
-The current prototype is a strong visual and interaction starting point, but it is not yet aligned with the product we want to ship. The shell is worth preserving. The domain model, trust layer, and primary workflow need substantial rework.
+The original prototype was the right shell but the wrong product story. That shell has proven worth keeping. Most of the important repositioning work is now done: the product is visibly `QueryLens`, the flow is evidence-first, and the generic SQL-playground framing has been pushed out of the main path.
 
-## What Is Working
+## What Was Worth Keeping
 
-- The three-pane layout already feels like a serious analysis product rather than a toy chat app.
-- The chat panel has strong interaction patterns: quick prompts, follow-ups, rich answer cards, and a good sense of conversational flow.
-- The right-panel answer rendering is more polished than a typical hackathon mock and can support a premium final experience.
-- The visual system already has cohesion, contrast, and motion that we can refine into a more credible banking product.
+- The three-pane layout
+- The conversational chat rhythm
+- The compact, product-like answer presentation
+- The premium visual baseline and interaction polish
 
-## What Is Not Working
+## What Has Already Been Corrected
 
-- The current story is generic `talk to data` instead of a sharp NatWest-adjacent SME intelligence story.
-- The sample data and copy are built around e-commerce and revenue analytics, which weakens relevance.
-- The trust layer is simulated. Confidence, agent steps, sources, and data quality are currently invented rather than computed from real evidence.
-- The SQL editor is too central for the audience we are targeting.
-- File upload and arbitrary source ingestion add complexity that is out of scope for the seeded demo.
-- The current `multi-agent` framing is stronger than the actual implementation and could feel gimmicky if left unchanged.
+- The app has been rebranded from the generic prototype identity to `QueryLens`.
+- The center workspace now supports the trust story: trend, drivers, source evidence, assumptions, and metric framing.
+- The left rail now emphasizes source health and the supported metric instead of upload-driven schema exploration.
+- The default path is seeded around the flagship question instead of open-ended demo prompts.
+- Linting, testing, build stability, and local font handling have been added so the milestone is actually runnable.
 
-## Technical Issues Observed
+## What Is Still Incomplete
 
-- `npm run lint` currently fails because `eslint` is not installed/configured in the repository.
-- `npm run build` failed in the current environment because `next/font/google` tries to fetch remote fonts during build.
-- The data engine is monolithic and mock-driven, which makes it hard to evolve into a trustworthy architecture cleanly.
+- Real `database` mode parity is not fully closed yet; the live adapter path still needs to be proven end to end.
+- Submission-readiness docs are still incomplete, especially `README.md`.
+- Only the phase-1 `what changed` family is implemented. Broader flows are still intentionally deferred.
 
-## Keep, Change, Remove
+## What Should Not Come Back
 
-### Keep
+- Arbitrary file upload as a default experience
+- SQL editor as the centerpiece of the product
+- Generic e-commerce or sales analytics copy
+- Overstated multi-agent or AI-theater framing that is not backed by the implementation
 
-- three-pane shell
-- conversational workflow
-- resizable chat panel
-- rich answer cards
-- compact chart and insight presentation
+## Current Recommendation
 
-### Change
-
-- rename and reposition the product as `QueryLens`
-- replace the domain with synthetic SME banking portfolio data
-- move the center panel from SQL editing to evidence and analysis
-- turn trust indicators into real computed artifacts
-- rewrite all prompts and narratives around the 4 flagship demo flows
-
-### Remove or Demote
-
-- arbitrary file upload in v1
-- SQL editor as a default user path
-- fake agent pipeline as a primary selling point
-- generic sales and product-performance examples
-
-## Recommended Modification Strategy
-
-### Stage 1
-
-- Keep the current layout shell and visual baseline.
-- Rebrand copy and update the product narrative.
-- Swap in the new domain language and flagship demo prompts.
-
-### Stage 2
-
-- Replace the mock engine with a real server-side orchestration flow.
-- Add Dockerized `Postgres` and `MongoDB`.
-- Seed the synthetic banking portfolio.
-
-### Stage 3
-
-- Rework the center workspace into an evidence-first surface.
-- Add traceability, definitions, assumptions, and corroboration status.
-- Reduce “AI theater” and increase grounded product clarity.
-
-## Final Recommendation
-
-Treat the current prototype as a strong shell, not as a product to lightly retheme. The fastest path to a winning result is to preserve the best interaction patterns while aggressively replacing the generic data and mocked intelligence with a tighter, more credible architecture.
+Treat the current codebase as a strong phase-1 product slice with one remaining platform-quality task: finish and lock the `database` mode path. After that, shift attention to submission polish and only then widen the feature set.

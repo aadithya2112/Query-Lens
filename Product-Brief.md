@@ -2,56 +2,47 @@
 
 ## Vision
 
-`QueryLens` helps non-technical stakeholders ask plain-English questions about portfolio data and receive answers they can trust immediately. The product should feel like a modern banking intelligence cockpit, not a generic AI chat wrapper or a developer SQL console.
+`QueryLens` helps non-technical stakeholders ask plain-English questions about portfolio data and receive answers they can trust immediately. It should feel like a modern banking intelligence cockpit, not a generic AI wrapper or a developer SQL console.
 
-## Core Story
+## Current Delivered Milestone
 
-The demo is centered on a synthetic NatWest-adjacent SME banking portfolio. Judges should be able to land on the app and understand, within seconds, that the product can explain:
+The current shipped milestone is intentionally narrow:
 
-- what changed in the portfolio
-- what makes up a metric
-- how one segment compares to another
-- what matters this week
+- one supported metric: `cashflow_health_score`
+- one supported intent family: `what changed`
+- one flagship question: `Why did SME cashflow health drop last week?`
+- optional phase-1 scope filters for `region` and `sector`
+- visible trust evidence from both structured facts and contextual signals
 
 ## Target User
 
-The primary demo user is an executive, portfolio lead, or business analyst who needs quick answers without manually building dashboards or writing SQL.
+The primary demo user is an executive, portfolio lead, or business analyst who needs quick answers without building dashboards or writing SQL.
 
 ## Product Promise
 
-The product should deliver 3 things in one flow:
+The product should combine three things in one short flow:
 
 - `Clarity`: plain-English answers for non-experts
-- `Trust`: transparent evidence, definitions, and assumptions
-- `Speed`: near-instant access to meaningful insights
+- `Trust`: visible evidence, definitions, and assumptions
+- `Speed`: a meaningful answer in under two minutes for a live demo
 
-## Winning Differentiators
+## Why This Still Feels Winning-Worthy
 
-- Trust is visible in the interface through evidence cards, definitions, assumptions, and traceability.
-- The demo uses multiple data systems so the solution feels technically credible rather than single-table toy analytics.
-- The experience is tightly scoped around a believable banking narrative instead of open-ended data chat.
-- The UI feels premium and productized, with a strong visual identity and a fast path to insight.
+- The story is specific and credible: synthetic SME banking intelligence rather than generic analytics chat.
+- The answer is grounded across more than one data source.
+- The interface makes the `why` legible instead of hiding it behind technical traces.
+- The architecture is realistic enough to grow without forcing hackathon-only shortcuts into the main product story.
 
-## Gold-Path Demo Questions
+## North-Star Follow-Ons
 
-1. `Why did SME cashflow health drop last week?`
-2. `What makes up at-risk accounts by region and sector?`
-3. `Compare hospitality vs retail SMEs this month.`
-4. `Give me this week's portfolio briefing.`
+These are part of the product direction, but they are not yet implemented and should not be presented as shipped:
 
-## Scope for v1
+1. `What makes up at-risk accounts by region and sector?`
+2. `Compare hospitality vs retail SMEs this month.`
+3. `Give me this week's portfolio briefing.`
 
-- Seeded synthetic data only
-- Read-only public demo
-- Natural-language query experience
-- Evidence-backed narrative answers
-- Charts and compact drill-downs
-- No arbitrary uploads
-- No unconstrained text-to-SQL
+## Experience Rules
 
-## Tone and UX Direction
-
-- Product tone: calm, premium, trustworthy
-- Visual direction: modern banking intelligence
-- Interaction model: `chat plus evidence`
-- Default posture: explain, verify, and guide instead of impressing with vague AI theatrics
+- Keep the tone calm, premium, and trustworthy.
+- Keep chat as the interaction model, but always pair it with visible evidence.
+- Prefer constrained, honest capability over broad but flimsy AI claims.
