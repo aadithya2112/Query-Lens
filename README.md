@@ -22,7 +22,7 @@ These are intentionally deferred and should not be treated as shipped:
 - `breakdown` queries
 - `compare` queries
 - `weekly briefing`
-- live LLM-backed reasoning
+- Gemini-backed parsing
 - arbitrary file upload or open-ended source ingestion
 - raw SQL as a primary user workflow
 
@@ -37,6 +37,7 @@ These are intentionally deferred and should not be treated as shipped:
 - `Vitest`
 - `Playwright`
 - `Bun`
+- `Gemini API` via `@google/genai` for optional narrative generation
 
 ## Recommended Local Demo Path
 
@@ -58,8 +59,14 @@ The default values in `.env.example` are already set for the local Docker stack:
 
 - `QUERYLENS_REFERENCE_DATE=2026-04-11`
 - `QUERYLENS_DATA_MODE=database`
+- `QUERYLENS_AI_MODE=auto`
 - local `POSTGRES_URL`
 - local `MONGODB_URL`
+
+To enable Gemini-backed narrative generation for interactive `/api/query` requests, set:
+
+- `GEMINI_API_KEY=...`
+- optionally override `QUERYLENS_GEMINI_MODEL` if you do not want the default `gemini-2.5-flash`
 
 ### 3. Start the databases
 
@@ -160,7 +167,7 @@ QueryLens is a single `Next.js` application with an integrated server layer.
 
 - `POST /api/query` parses and validates the question, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
 - `GET /api/metrics` exposes the phase-1 metric manifest.
-- The current phase uses a deterministic provider interface instead of a live LLM.
+- Interactive query narration can use Gemini with structured JSON output, while bootstrap, data retrieval, evidence assembly, and fallback behavior remain deterministic.
 - Fixture mode remains available as a safe fallback when live databases are not running.
 
 For the fuller diagram and request lifecycle, see [Architecture.md](./Architecture.md).
@@ -184,7 +191,7 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 
 - The current milestone supports one metric and one intent family only.
 - The seeded portfolio is synthetic and designed for demo clarity, not statistical realism.
-- Live LLM integration is intentionally deferred.
+- Gemini currently helps only with wording the final narrative for interactive queries; parsing, scoring, evidence ranking, and fallback logic remain deterministic.
 - Database mode is meant for local Docker-backed use, not public deployment.
 - The current trace/debug details are lightweight and development-oriented.
 

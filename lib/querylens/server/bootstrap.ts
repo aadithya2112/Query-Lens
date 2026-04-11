@@ -13,6 +13,6 @@ export async function getBootstrapPayload(): Promise<BootstrapPayload> {
     sourceHealth: await dataAccess.getSourceHealth(),
     initialAnalysis: await analyzePhase1Query({
       question: DEFAULT_FLAGSHIP_QUESTION,
-    }),
+    }, { executionContext: "bootstrap" }),
   }
 }

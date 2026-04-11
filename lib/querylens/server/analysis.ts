@@ -4,8 +4,9 @@ import { getWeekWindow } from "@/lib/querylens/reference-date"
 import { calculateConfidenceScore, calculateWeightedDriverImpact, roundTo } from "@/lib/querylens/scoring"
 import {
   DEFAULT_FLAGSHIP_QUESTION,
-  deterministicPhase1Provider,
+  getPhase1Provider,
 } from "@/lib/querylens/server/analysis-provider"
+import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   ContextEvent,
@@ -321,12 +322,16 @@ function buildFallbackResponse(args: {
 }
 
 export async function analyzePhase1Query(
-  input: QueryRequestBody
+  input: QueryRequestBody,
+  options: { executionContext?: QueryLensExecutionContext } = {}
 ): Promise<Phase1AnalysisResponse> {
   const dataAccess = await getQueryLensDataAccess()
   const metric = getPrimaryMetricDefinition()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
-  const parseResult = deterministicPhase1Provider.parseQuestion(
+  const provider = getPhase1Provider({
+    executionContext: options.executionContext ?? "interactive",
+  })
+  const parseResult = await provider.parseQuestion(
     input.question,
     input.scope
   )
@@ -381,7 +386,7 @@ export async function analyzePhase1Query(
     hasCrossSourceEvidence: evidence.some((item) => item.sourceType === "mongodb"),
   })
   const chartSpec = buildChartSpec(scopedRows, activeScopeLabel)
-  const narrative = deterministicPhase1Provider.composeNarrative({
+  const narrative = await provider.composeNarrative({
     parsed: parseResult.parsed,
     activeScopeLabel,
     currentScore: current.cashflowHealthScore,

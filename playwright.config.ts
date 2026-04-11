@@ -8,7 +8,8 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 npm run dev",
+    command:
+      "QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 QUERYLENS_AI_MODE=deterministic npm run dev",
     port: 3000,
     reuseExistingServer: true,
     timeout: 120_000,

@@ -2,7 +2,7 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase does not use a live LLM. Instead, it uses a deterministic provider interface over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase keeps retrieval and scoring deterministic over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest, while optionally using Gemini to word the final narrative for interactive queries.
 
 ## Current System Diagram
 
@@ -28,7 +28,7 @@ flowchart LR
       PARSE["Question Parser"]
       VALIDATE["Metric / Scope / Timeframe Validation"]
       ANALYZE["Driver + Evidence Assembly"]
-      NARRATE["Deterministic Narrative Provider"]
+      NARRATE["Narrative Provider (Deterministic or Gemini)"]
     end
 
     QUERY --> PARSE --> VALIDATE --> ANALYZE --> NARRATE --> QUERY
@@ -38,12 +38,14 @@ flowchart LR
       MG["MongoDB\ncomplaints, incidents, alerts, RM notes"]
       MANIFEST["Metric Manifest JSON"]
       FIXTURE["Fixture Dataset Fallback"]
+      GEMINI["Gemini API\nstructured narrative output"]
     end
 
     ANALYZE --> PG
     ANALYZE --> MG
     VALIDATE --> MANIFEST
     ANALYZE --> FIXTURE
+    NARRATE --> GEMINI
 
     subgraph OPS["Local Ops"]
       DC["docker-compose"]
@@ -74,8 +76,9 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 3. The request is validated against the supported metric, scope, and timeframe rules.
 4. The analysis layer reads weekly movement from `Postgres`.
 5. The analysis layer reads corroborating context from `MongoDB`, or falls back to fixtures if live services are unavailable.
-6. Drivers, evidence, confidence, assumptions, and chart data are assembled into a grounded response.
-7. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
+6. Drivers, evidence, confidence, assumptions, and chart data are assembled deterministically into a grounded response payload.
+7. For interactive requests only, the narrative provider can ask Gemini for a structured headline and summary, with deterministic fallback if Gemini is unavailable or invalid.
+8. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
 
 ## Data Responsibilities
 
@@ -104,7 +107,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 - No separate backend service
 - No free-form SQL generation
-- No live LLM calls in phase 1
+- No model-authored facts, SQL, or evidence retrieval
 - No upload-driven ingestion path in the main flow
 
 ## Immediate Next Gap
