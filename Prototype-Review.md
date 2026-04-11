@@ -21,9 +21,8 @@ The original prototype was the right shell but the wrong product story. That she
 
 ## What Is Still Incomplete
 
-- Real `database` mode parity is not fully closed yet; the live adapter path still needs to be proven end to end.
-- Submission-readiness docs are still incomplete, especially `README.md`.
 - Only the phase-1 `what changed` family is implemented. Broader flows are still intentionally deferred.
+- Live Gemini / LLM integration is still intentionally deferred.
 
 ## What Should Not Come Back
 
@@ -34,4 +33,4 @@ The original prototype was the right shell but the wrong product story. That she
 
 ## Current Recommendation
 
-Treat the current codebase as a strong phase-1 product slice with one remaining platform-quality task: finish and lock the `database` mode path. After that, shift attention to submission polish and only then widen the feature set.
+Treat the current codebase as a strong, honest phase-1 product slice. The next step should be one small expansion on top of the proven base, not a broad feature burst.

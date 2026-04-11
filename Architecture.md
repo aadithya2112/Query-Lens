@@ -109,4 +109,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 ## Immediate Next Gap
 
-The remaining architecture gap is not a new subsystem. It is parity: the real `database` adapters must produce the same phase-1 answer shape and narrative quality as the already-working fixture mode.
+The current architecture is stable for the shipped phase-1 slice. The next gap is no longer infrastructure parity; it is product expansion on top of the proven path, most likely either:
+
+- a narrow Gemini-backed provider with deterministic fallback
+- or a second deterministic query slice such as `breakdown`

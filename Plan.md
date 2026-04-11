@@ -6,7 +6,7 @@
 - The app is now branded as `QueryLens` and runs as a single `Next.js` service.
 - `Docker Compose`, seed data, `Vitest`, `Playwright`, and Bun-based build validation are in place.
 - The current shipped capability is one narrow but strong flow: `what changed` for `cashflow_health_score`.
-- The next blocker is not feature breadth. It is finishing and proving `database` mode parity with the existing `fixture` mode.
+- The live `database` mode path, submission-ready packaging cleanup, and root `README.md` are now complete.
 
 ## What Is Already Done
 
@@ -40,50 +40,41 @@
 
 ## Remaining Tasks
 
-1. Finish `database` mode parity for the flagship question.
-   - Ensure real `Postgres` weekly rows line up with the phase-1 timeframe logic.
-   - Ensure real `MongoDB` context is pulled into the same answer window.
-   - Ensure the response is grounded and non-fallback in `database` mode.
+1. Keep the repo honest and polished as the product grows.
+   - Keep planning and architecture notes aligned with the latest shipped stages.
+   - Keep the submission story centered on what is actually implemented.
 
-2. Lock that parity with targeted regression coverage.
-   - Add tests that catch SQL date normalization mistakes.
-   - Add an integration assertion for `sourceMode: "database"` and cross-source evidence.
-
-3. Make submission docs honest and complete.
-   - Add `README.md` with setup, usage, scope, and limitations.
-   - Keep all planning and architecture notes aligned with the actual delivered phase.
-
-4. Defer broader feature work until the above is closed.
+2. Defer broader feature work until a new stage is deliberately chosen.
    - `breakdown`
    - `compare`
    - `weekly briefing`
-   - any extra AI orchestration beyond the deterministic phase-1 provider
+   - live Gemini / LLM integration beyond the deterministic phase-1 provider
 
 ## Next Fully Testable Slice
 
 ### Goal
 
-Complete and fully verify the flagship flow in real `database` mode:
-`Why did SME cashflow health drop last week?`
+Choose one narrow next stage and complete it end to end:
+
+- `Gemini` integration for the existing phase-1 flow, with deterministic fallback
+- or the second product slice: `breakdown` for at-risk accounts by region and sector
 
 ### Done When
 
-- Dockerized `Postgres` and `MongoDB` are healthy.
-- The seed script runs successfully.
-- `POST /api/query` returns a non-fallback `database` response for the flagship question.
-- The response includes at least one `postgres` evidence item and one `mongodb` evidence item.
-- Bun `lint`, `test`, and `build` remain green after the fix.
+- the chosen stage is isolated, testable, and commit-sized
+- Bun `lint`, `test`, and `build` remain green
+- the new stage is reflected honestly in the docs and demo story
 
 ### Order of Work
 
-1. Close the date and comparison-window mismatch in the repository layer.
-2. Re-run the direct `database` mode query until it returns the grounded narrative instead of fallback.
-3. Add regression tests for the real adapter path.
-4. Re-run the full Bun validation stack and smoke flow.
+1. Pick either Gemini-with-fallback or the `breakdown` slice.
+2. Implement only that stage without expanding into adjacent feature families.
+3. Add focused tests and one demoable gold-path flow.
+4. Re-run the full validation stack and update docs if the shipped surface changes.
 
 ## Defaults and Boundaries
 
 - Keep the app as a single `Next.js` service.
 - Keep phase 1 local-first and Docker-backed.
 - Keep fixture mode as the safe fallback when databases are unavailable.
-- Do not expand product scope until the one flagship `database` flow is completely proven.
+- Do not expand product scope broadly; add one small, fully tested stage at a time.
