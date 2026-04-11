@@ -9,10 +9,8 @@ import {
   shouldUseGemini,
 } from "@/lib/querylens/server/ai-config"
 import { generateGeminiResponse } from "@/lib/querylens/server/gemini-client"
-import {
-  parsePhase1Question,
-  resolvePhase1Scope,
-} from "@/lib/querylens/server/parser"
+import { getDefaultDatasetId } from "@/lib/querylens/datasets"
+import { parsePhase1Question, resolvePhase1Scope } from "@/lib/querylens/server/parser"
 import { roundTo } from "@/lib/querylens/scoring"
 import type {
   ContextEvent,
@@ -242,6 +240,22 @@ ${question}
 `.trim()
 }
 
+function resolveScopeDimensions(scope: ScopeFilter) {
+  if (scope.region && scope.sector) {
+    return ["region", "sector"] as const
+  }
+
+  if (scope.region) {
+    return ["region"] as const
+  }
+
+  if (scope.sector) {
+    return ["sector"] as const
+  }
+
+  return ["portfolio"] as const
+}
+
 async function parseQuestionWithGemini(
   question: string,
   scopeOverride?: ScopeFilter
@@ -299,17 +313,27 @@ async function parseQuestionWithGemini(
     return undefined
   }
 
-  return {
-    parsed: {
-      rawQuestion: question,
-      intent: "what_changed" as const,
-      metric: parsedArgs.data.metric,
+  const scope = {
+    ...extractedScope.scope,
+    ...overrideScope.scope,
+  }
+  const parsed = {
+    datasetId: getDefaultDatasetId(),
+    rawQuestion: question,
+    intent: "what_changed" as const,
+    metricId: parsedArgs.data.metric,
+    timeframe: parsedArgs.data.timeframe,
+    scope,
+    scopeDimensions: [...resolveScopeDimensions(scope)],
+    comparisonWindow: {
       timeframe: parsedArgs.data.timeframe,
-      scope: {
-        ...extractedScope.scope,
-        ...overrideScope.scope,
-      },
+      comparisonBasis: "prior_period" as const,
     },
+  }
+
+  return {
+    plan: parsed,
+    parsed,
   }
 }
 

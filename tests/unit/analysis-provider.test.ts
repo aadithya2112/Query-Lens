@@ -196,14 +196,20 @@ describe("phase-1 provider selection", () => {
     )
 
     expect(result.parsed).toEqual({
+      datasetId: "sme_portfolio",
       rawQuestion:
         "Help me understand why North West hospitality cashflow got worse last week",
       intent: "what_changed",
-      metric: "cashflow_health_score",
+      metricId: "cashflow_health_score",
       timeframe: "last_week",
       scope: {
         region: "north_west",
         sector: "hospitality",
+      },
+      scopeDimensions: ["region", "sector"],
+      comparisonWindow: {
+        timeframe: "last_week",
+        comparisonBasis: "prior_period",
       },
     })
   })

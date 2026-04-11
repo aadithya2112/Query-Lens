@@ -132,11 +132,11 @@ export default function Workspace({
 
         <div className="flex items-center gap-3">
           <p className="hidden text-sm text-muted-foreground md:inline-block">
-            Metric Focus:{" "}
-            <span className="font-medium text-foreground">
-              {metric?.name || "Cashflow"}
-            </span>
-          </p>
+              Metric Focus:{" "}
+              <span className="font-medium text-foreground">
+              {metric?.label || "Cashflow"}
+              </span>
+            </p>
           <div className="h-4 w-px bg-border hidden md:block" />
           <Sheet>
             <SheetTrigger asChild>
