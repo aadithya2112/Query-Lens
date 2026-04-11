@@ -24,7 +24,19 @@ describe("/api/query Gemini narrative mode", () => {
   })
 
   it("preserves deterministic analysis and swaps in Gemini narrative fields", async () => {
-    geminiGenerateMock.mockResolvedValue({
+    geminiGenerateMock.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          name: "submit_analytics_query_plan",
+          args: {
+            intent: "what_changed",
+            metric: "cashflow_health_score",
+            timeframe: "last_week",
+          },
+        },
+      ],
+    })
+    geminiGenerateMock.mockResolvedValueOnce({
       json: {
         headline: "Portfolio cashflow health fell 1.7 points",
         summary:

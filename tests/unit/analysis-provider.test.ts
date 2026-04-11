@@ -235,7 +235,7 @@ describe("phase-1 provider selection", () => {
     })
   }, TEST_TIMEOUT)
 
-  it("falls back to deterministic parsing when Gemini returns invalid scope values", async () => {
+  it("returns a guided failure when Gemini returns invalid scope values", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
 
@@ -262,7 +262,9 @@ describe("phase-1 provider selection", () => {
       "Why did cashflow health drop last week?"
     )
 
-    expect(result.parsed?.scope).toEqual({})
+    expect(result.parsed).toBeUndefined()
+    expect(result.failureKind).toBe("guided_failure")
+    expect(result.fallbackReason).toContain("could not validate Gemini")
   }, TEST_TIMEOUT)
 
   it("preserves explicit scope overrides over Gemini-extracted scope", async () => {
