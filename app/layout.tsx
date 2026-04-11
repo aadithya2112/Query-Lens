@@ -6,7 +6,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'QueryLens — SME Cashflow Intelligence',
-  description: 'Trust-first SME cashflow analysis with seeded Postgres facts, Mongo context, and evidence-first weekly investigation.',
+  description: 'Trust-first SME cashflow analysis over a built-in sample dataset, with Postgres facts, Mongo context, and evidence-first weekly investigation.',
   generator: 'QueryLens',
   icons: {
     icon: [

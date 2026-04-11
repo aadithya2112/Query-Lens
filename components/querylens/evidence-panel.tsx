@@ -224,10 +224,10 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
             <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
                 {isBreakdown
-                  ? "The breakdown slice uses deterministic planning, account-level weekly stress rollups, and contextual Mongo evidence."
+                  ? "The breakdown slice uses validated planning, account-level weekly stress rollups, and contextual Mongo evidence."
                   : isCompare
-                    ? "The compare slice uses deterministic planning, side-by-side weekly metric rows, and contextual Mongo evidence."
-                    : "The what-changed slice uses deterministic planning, seeded weekly metrics, and contextual Mongo evidence."}
+                    ? "The compare slice uses validated planning, side-by-side weekly metric rows, and contextual Mongo evidence."
+                    : "The what-changed slice uses validated planning, sample-dataset weekly metrics, and contextual Mongo evidence."}
               </p>
               <ul className="space-y-2">
                 {analysis.evidence.map((item) => (

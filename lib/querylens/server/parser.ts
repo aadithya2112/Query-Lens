@@ -1,4 +1,4 @@
-import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import type {
   QueryPlanResult,
@@ -26,7 +26,7 @@ export function resolvePhase1ScopeValue(
 }
 
 export function resolvePhase1Scope(scope: ScopeFilter) {
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const region = resolvePhase1ScopeValue(scope.region, dataset.regions)
   const sector = resolvePhase1ScopeValue(scope.sector, dataset.sectors)
 

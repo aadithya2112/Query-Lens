@@ -135,7 +135,7 @@ export interface WeeklyAccountStressRow {
   hasOverdue: boolean
 }
 
-export interface SeedDataset {
+export interface SampleDataset {
   regions: Region[]
   sectors: Sector[]
   accounts: Account[]
@@ -143,6 +143,8 @@ export interface SeedDataset {
   weeklyMetrics: WeeklyMetricRow[]
   contextEvents: Record<ContextCollection, ContextEvent[]>
 }
+
+export type SeedDataset = SampleDataset
 
 export interface ComparisonWindow {
   timeframe: SupportedTimeframe
@@ -265,7 +267,7 @@ export interface SourceHealth {
   id: string
   name: string
   type: "postgres" | "mongodb" | "manifest"
-  status: "connected" | "seeded-fixture" | "configured"
+  status: "connected" | "sample-fixture" | "configured"
   detail: string
   recordCount?: number
 }

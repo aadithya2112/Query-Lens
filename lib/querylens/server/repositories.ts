@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb"
 import { Pool } from "pg"
 
-import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 import type {
   ContextCollection,
   ContextEvent,
@@ -99,14 +99,14 @@ class FixtureDataAccess implements QueryLensDataAccess {
   sourceMode: "fixture" = "fixture"
 
   async listWeeklyMetrics(): Promise<WeeklyMetricRow[]> {
-    return getSeedDataset().weeklyMetrics
+    return getSampleDataset().weeklyMetrics
   }
 
   async listWeeklyAccountStress(args: {
     targetStart: string
     scope: ScopeFilter
   }): Promise<WeeklyAccountStressRow[]> {
-    const dataset = getSeedDataset()
+    const dataset = getSampleDataset()
     const grouped = new Map<string, WeeklyAccountStressRow>()
 
     dataset.dailyMetrics
@@ -161,7 +161,7 @@ class FixtureDataAccess implements QueryLensDataAccess {
     targetEnd: string
     scope: ScopeFilter
   }): Promise<ContextEvent[]> {
-    const dataset = getSeedDataset()
+    const dataset = getSampleDataset()
     return CONTEXT_COLLECTIONS.flatMap((collection) => dataset.contextEvents[collection])
       .filter((event) => {
         if (event.occurredAt < `${args.targetStart}T00:00:00Z`) return false
@@ -177,14 +177,14 @@ class FixtureDataAccess implements QueryLensDataAccess {
   }
 
   async getSourceHealth(): Promise<SourceHealth[]> {
-    const dataset = getSeedDataset()
+    const dataset = getSampleDataset()
 
     return [
       {
         id: "postgres",
         name: "Postgres facts",
         type: "postgres",
-        status: "seeded-fixture",
+        status: "sample-fixture",
         detail: `${dataset.accounts.length} accounts · ${dataset.dailyMetrics.length} daily rows · ${dataset.weeklyMetrics.length} weekly rows`,
         recordCount: dataset.weeklyMetrics.length,
       },
@@ -192,7 +192,7 @@ class FixtureDataAccess implements QueryLensDataAccess {
         id: "mongodb",
         name: "Mongo context",
         type: "mongodb",
-        status: "seeded-fixture",
+        status: "sample-fixture",
         detail: `${CONTEXT_COLLECTIONS.reduce(
           (total, collection) => total + dataset.contextEvents[collection].length,
           0
@@ -450,7 +450,7 @@ async function canUseDatabaseAdapter() {
     await Promise.all([pool.query("SELECT 1"), mongo.db().command({ ping: 1 })])
     return true
   } catch (error) {
-    console.warn("QueryLens database adapters unavailable, falling back to fixtures.", error)
+    console.warn("QueryLens database adapters unavailable, falling back to the sample dataset.", error)
     return false
   }
 }

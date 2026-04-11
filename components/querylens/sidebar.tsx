@@ -65,10 +65,10 @@ export default function Sidebar({
         </div>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
           {isCompare
-            ? "A trust-first side-by-side comparison of weekly cashflow health, using seeded Postgres facts and Mongo context to explain the gap."
+            ? "A trust-first side-by-side comparison of weekly cashflow health, using the sample dataset's Postgres facts and Mongo context to explain the gap."
             : isBreakdown
-            ? "A trust-first breakdown of where weekly account stress is concentrated, using seeded Postgres facts and Mongo context side by side."
-            : "A trust-first slice for explaining why portfolio health changed, using seeded Postgres facts and Mongo context side by side."}
+            ? "A trust-first breakdown of where weekly account stress is concentrated, using the sample dataset's Postgres facts and Mongo context side by side."
+            : "A trust-first slice for explaining why portfolio health changed, using the sample dataset's Postgres facts and Mongo context side by side."}
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export default function Sidebar({
         <p className="mt-1 text-sm text-foreground">
           {analysis.sourceMode === "database"
             ? "Docker-backed databases"
-            : "Seeded fixture adapter"}
+            : "Built-in sample dataset"}
         </p>
       </section>
 

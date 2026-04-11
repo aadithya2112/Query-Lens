@@ -1,10 +1,10 @@
 import { MongoClient } from "mongodb"
 import { Pool } from "pg"
 
-import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 
 async function seedPostgres(pool: Pool) {
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
 
   await pool.query("BEGIN")
 
@@ -227,7 +227,7 @@ async function seedPostgres(pool: Pool) {
 }
 
 async function seedMongo(client: MongoClient) {
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const db = client.db()
 
   await Promise.all(
@@ -243,7 +243,7 @@ async function seedMongo(client: MongoClient) {
 
 async function main() {
   if (!process.env.POSTGRES_URL || !process.env.MONGODB_URL) {
-    throw new Error("POSTGRES_URL and MONGODB_URL must be set before seeding.")
+    throw new Error("POSTGRES_URL and MONGODB_URL must be set before loading the sample dataset.")
   }
 
   const pool = new Pool({
@@ -254,7 +254,7 @@ async function main() {
   try {
     await seedPostgres(pool)
     await seedMongo(mongoClient)
-    console.log("QueryLens phase-1 seed completed.")
+    console.log("QueryLens sample dataset load completed.")
   } finally {
     await pool.end()
     await mongoClient.close()

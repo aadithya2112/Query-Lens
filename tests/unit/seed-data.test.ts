@@ -1,8 +1,8 @@
-import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 
-describe("seed dataset", () => {
+describe("sample dataset", () => {
   it("creates a portfolio-level drop for the flagship last-week window", () => {
-    const portfolioRows = getSeedDataset().weeklyMetrics.filter(
+    const portfolioRows = getSampleDataset().weeklyMetrics.filter(
       (row) => row.recordType === "portfolio"
     )
     const previousWeek = portfolioRows.find((row) => row.weekStart === "2026-03-23")
@@ -16,7 +16,7 @@ describe("seed dataset", () => {
   })
 
   it("makes North West hospitality the sharpest last-week drag", () => {
-    const regionSectorRows = getSeedDataset().weeklyMetrics.filter(
+    const regionSectorRows = getSampleDataset().weeklyMetrics.filter(
       (row) =>
         row.recordType === "region_sector" &&
         row.regionId === "north_west" &&

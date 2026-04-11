@@ -1,4 +1,4 @@
-import { formatWeekLabel, getSeedDataset } from "@/lib/querylens/seed-data"
+import { formatWeekLabel, getSampleDataset } from "@/lib/querylens/seed-data"
 import { getWeekWindow } from "@/lib/querylens/reference-date"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
@@ -32,7 +32,7 @@ interface BreakdownBucket {
 }
 
 function getScopeLabel(scope: ScopeFilter) {
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const regionName = scope.region
     ? dataset.regions.find((region) => region.id === scope.region)?.name
     : undefined

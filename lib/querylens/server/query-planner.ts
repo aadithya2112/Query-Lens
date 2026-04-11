@@ -1,4 +1,4 @@
-import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { getDatasetDefinition, getDefaultDatasetId } from "@/lib/querylens/datasets"
 import {
   normalizePhase1Text,
@@ -124,7 +124,7 @@ function parseCompareSubjects(question: string) {
   }
 
   const [, rawLeft, rawRight] = subjectMatch
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const leftRegion = resolvePhase1ScopeValue(rawLeft, dataset.regions)
   const rightRegion = resolvePhase1ScopeValue(rawRight, dataset.regions)
   const leftSector = resolvePhase1ScopeValue(rawLeft, dataset.sectors)
@@ -185,7 +185,7 @@ function buildTimeframeCompareSpec(scope: ScopeFilter): CompareSpec | QueryPlanR
     }
   }
 
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const leftLabel = "This week"
   const rightLabel = "Last week"
 
@@ -317,7 +317,7 @@ export function planDeterministicQuery(
   if (!timeframe) {
     return {
       fallbackReason:
-        "Try asking about 'this week' or 'last week' so QueryLens can compare the seeded weekly windows safely.",
+        "Try asking about 'this week' or 'last week' so QueryLens can compare the current weekly windows safely.",
     }
   }
 

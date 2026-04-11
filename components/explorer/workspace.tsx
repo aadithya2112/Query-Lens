@@ -122,7 +122,7 @@ export default function ExplorerWorkspace({ model }: ExplorerWorkspaceProps) {
                   {model.previews.filter((preview) => preview.kind !== "query").length} objects
                 </p>
                 <p className="mt-1 text-sm text-[var(--ql-muted)]">
-                  Tables and collections are seeded locally so the workspace feels real before backend wiring starts.
+                  Tables and collections are bundled locally as sample data so the workspace feels real before backend wiring starts.
                 </p>
               </div>
             </div>

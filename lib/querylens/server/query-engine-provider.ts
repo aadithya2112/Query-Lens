@@ -1,7 +1,7 @@
 import { FunctionCallingConfigMode, type FunctionDeclaration } from "@google/genai"
 import { z } from "zod"
 
-import { getSeedDataset } from "@/lib/querylens/seed-data"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 import {
   getDefaultDatasetId,
 } from "@/lib/querylens/datasets"
@@ -373,7 +373,7 @@ function resolveCompareSpec(args: {
       return undefined
     }
 
-    const dataset = getSeedDataset()
+    const dataset = getSampleDataset()
     const scopeLabel = scope.region
       ? dataset.regions.find((region) => region.id === scope.region)?.name
       : scope.sector
@@ -401,7 +401,7 @@ function resolveCompareSpec(args: {
     return undefined
   }
 
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const catalog =
     args.data.compareDimension === "region" ? dataset.regions : dataset.sectors
   const leftValue = resolvePhase1ScopeValue(args.data.leftEntity, catalog)

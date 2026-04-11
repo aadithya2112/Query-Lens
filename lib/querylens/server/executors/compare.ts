@@ -106,7 +106,7 @@ function buildChartSpec(compareSpec: CompareSpec, left: WeeklyMetricRow, right: 
 
 function buildAssumptions(plan: StructuredQueryPlan) {
   const assumptions = [
-    "The seeded demo uses a fixed reference date of April 11, 2026.",
+    "The sample dataset uses a fixed reference date of April 11, 2026.",
     "Weeks run Monday to Sunday across the QueryLens dataset.",
   ]
 
@@ -302,7 +302,7 @@ export async function executeComparePlan(
   if (!leftRow || !rightRow) {
     return buildWhatChangedFallbackResponse({
       fallbackReason:
-        "The seeded data could not resolve both sides of that comparison safely.",
+        "The sample dataset could not resolve both sides of that comparison safely.",
       sourceMode: args.dataAccess.sourceMode,
       rows: args.weeklyRows,
     })

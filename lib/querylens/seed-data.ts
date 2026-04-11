@@ -12,9 +12,9 @@ import type {
   ContextEvent,
   DailyAccountMetric,
   Region,
+  SampleDataset,
   ScopeType,
   Sector,
-  SeedDataset,
   WeeklyMetricRow,
 } from "@/lib/querylens/types"
 
@@ -217,7 +217,7 @@ function buildDailyMetrics(accounts: Account[]): DailyAccountMetric[] {
         )
 
         // Scenario shifts make stress visible in the derived weekly score, especially
-        // for the seeded North West hospitality downturn used in the flagship demo.
+        // for the sample dataset's North West hospitality downturn used in the flagship demo.
         const effectiveLowBalanceThreshold =
           account.lowBalanceThreshold * (1 + scenario.lowBalanceShift * 2.5)
         const utilizationOverdueThreshold = clamp(
@@ -510,7 +510,7 @@ function buildContextEvents(
   }
 }
 
-export function createSeedDataset(): SeedDataset {
+export function createSampleDataset(): SampleDataset {
   const accounts = buildAccounts()
   const dailyMetrics = buildDailyMetrics(accounts)
   const weeklyMetrics = buildWeeklyMetrics(accounts, dailyMetrics)
@@ -525,15 +525,19 @@ export function createSeedDataset(): SeedDataset {
   }
 }
 
-let cachedDataset: SeedDataset | undefined
+export const createSeedDataset = createSampleDataset
 
-export function getSeedDataset(): SeedDataset {
+let cachedDataset: SampleDataset | undefined
+
+export function getSampleDataset(): SampleDataset {
   if (!cachedDataset) {
-    cachedDataset = createSeedDataset()
+    cachedDataset = createSampleDataset()
   }
 
   return cachedDataset
 }
+
+export const getSeedDataset = getSampleDataset
 
 export function formatWeekLabel(weekStart: string): string {
   return format(new Date(`${weekStart}T00:00:00`), "MMM d")

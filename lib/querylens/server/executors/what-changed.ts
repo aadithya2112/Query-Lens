@@ -1,4 +1,4 @@
-import { formatWeekLabel, getSeedDataset } from "@/lib/querylens/seed-data"
+import { formatWeekLabel, getSampleDataset } from "@/lib/querylens/seed-data"
 import { getWeekWindow } from "@/lib/querylens/reference-date"
 import {
   calculateConfidenceScore,
@@ -34,7 +34,7 @@ interface WhatChangedExecutorArgs {
 }
 
 export function getScopeLabel(scope: ScopeFilter) {
-  const dataset = getSeedDataset()
+  const dataset = getSampleDataset()
   const regionName = scope.region
     ? dataset.regions.find((region) => region.id === scope.region)?.name
     : undefined
@@ -272,7 +272,7 @@ function buildEvidence(args: {
 
 function buildAssumptions(scope: ScopeFilter) {
   const assumptions = [
-    "The seeded demo uses a fixed reference date of April 11, 2026.",
+    "The sample dataset uses a fixed reference date of April 11, 2026.",
     "Weeks run Monday to Sunday across the phase-1 dataset.",
   ]
 
@@ -301,7 +301,7 @@ export function buildWhatChangedChartSpec(
     yKey: "score" as const,
     data: series,
     explanation:
-      "The chart tracks the seeded weekly cashflow health score so the drop can be read in context, not as a one-off number.",
+      "The chart tracks the sample dataset's weekly cashflow health score so the drop can be read in context, not as a one-off number.",
   }
 }
 
@@ -352,7 +352,7 @@ export async function executeWhatChangedPlan(
   if (!current || !previous) {
     return buildWhatChangedFallbackResponse({
       fallbackReason:
-        "The seeded data could not resolve both comparison windows for that question.",
+        "The sample dataset could not resolve both comparison windows for that question.",
       sourceMode: args.dataAccess.sourceMode,
       rows: args.weeklyRows,
     })
