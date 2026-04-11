@@ -206,8 +206,6 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 
 ## Future Improvements
 
-- Make Gemini planning mandatory for interactive queries, with honest non-answer states instead of silent parsing fallback
-- Reframe the built-in portfolio as a sample dataset rather than a special seeded scenario
 - Add reusable dataset onboarding for tabular datasets
 - Add `weekly briefing`
 - Expand metric coverage beyond `cashflow_health_score`
