@@ -10,13 +10,15 @@ The current shipped milestone is intentionally narrow:
 
 - one supported metric: `cashflow_health_score`
 - one additional breakdown metric: `at_risk_account_count`
-- three supported intent families: `what changed`, `breakdown`, and `compare`
+- four supported intent families: `discovery`, `what changed`, `breakdown`, and `compare`
 - one built-in sample dataset powering the current local demo
+- one shipped vague-question path: `What data is currently stored?`
 - one flagship question: `Why did SME cashflow health drop last week?`
 - one Stage 2 breakdown question: `What makes up at-risk accounts by region and sector last week?`
 - one Stage 3 compare question: `Compare cashflow health this week vs last week.`
 - optional scope filters for `region` and `sector`
 - visible trust evidence from both structured facts and contextual signals
+- lightweight conversational memory and retrieval over dataset metadata and prior turns
 - Stage 1 foundation complete under the hood: built-in dataset abstraction, structured query plans, and a generic orchestrator
 - Gemini is now genuinely required for interactive query interpretation in the main product flow
 
@@ -26,12 +28,13 @@ To meet the full hackathon brief, `QueryLens` needs to grow from this narrow ver
 
 - reusable dataset onboarding for tabular data
 - a semantic layer / metric manifest per dataset
-- four supported intent families:
+- four challenge-critical intent families, plus discovery:
+  - `discovery`
   - `what changed`
   - `breakdown`
   - `compare`
   - `weekly briefing`
-- deterministic data execution with Gemini constrained to structured planning and wording
+- deterministic data execution with Gemini constrained to structured planning, embeddings, and wording
 
 The immediate next product step is `weekly briefing`, now that the LLM-first pivot is in place.
 
@@ -54,6 +57,7 @@ The product should combine three things in one short flow:
 - The interface makes the `why` legible instead of hiding it behind technical traces.
 - The architecture is realistic enough to grow without forcing hackathon-only shortcuts into the main product story.
 - The next stage strengthens the AI claim by making interpretation genuinely model-led while keeping trust artifacts grounded.
+- The current retrieval layer already makes the experience more conversational without turning QueryLens into an unbounded agent or text-to-SQL system.
 
 ## North-Star Follow-Ons
 

@@ -528,6 +528,35 @@ async function planQueryWithGemini(
     return undefined
   }
 
+  if (parsedArgs.data.intent === "discovery") {
+    const parsed = {
+      datasetId: getDefaultDatasetId(),
+      rawQuestion: question,
+      intent: "discovery" as const,
+      metricId: "dataset_catalog" as const,
+      timeframe: "this_week" as const,
+      scope: {},
+      scopeDimensions: ["portfolio"] as StructuredQueryPlan["scopeDimensions"],
+      comparisonWindow: {
+        timeframe: "this_week" as const,
+        comparisonBasis: "prior_period" as const,
+      },
+      discoveryFocus:
+        parsedArgs.data.discoveryFocus as DiscoveryFocus | undefined,
+    }
+
+    const validated = validateQueryPlan(parsed)
+
+    if (!validated.parsed) {
+      return undefined
+    }
+
+    return {
+      plan: validated.parsed,
+      parsed: validated.parsed,
+    }
+  }
+
   const extractedScope = resolvePhase1Scope({
     region: parsedArgs.data.region,
     sector: parsedArgs.data.sector,
@@ -549,24 +578,6 @@ async function planQueryWithGemini(
   }
 
   const parsed = (() => {
-    if (parsedArgs.data.intent === "discovery") {
-      return {
-        datasetId: getDefaultDatasetId(),
-        rawQuestion: question,
-        intent: "discovery" as const,
-        metricId: "dataset_catalog" as const,
-        timeframe: "this_week" as const,
-        scope: {},
-        scopeDimensions: ["portfolio"] as StructuredQueryPlan["scopeDimensions"],
-        comparisonWindow: {
-          timeframe: "this_week" as const,
-          comparisonBasis: "prior_period" as const,
-        },
-        discoveryFocus:
-          parsedArgs.data.discoveryFocus as DiscoveryFocus | undefined,
-      }
-    }
-
     if (parsedArgs.data.intent === "compare") {
       const compareSpec = resolveCompareSpec({
         question,

@@ -2,7 +2,7 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus the first three product slices: a built-in dataset definition, a structured query-plan model, a generic analysis orchestrator, and registered `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over the built-in sample dataset, `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini is now required for interactive query planning and remains constrained to planning and final wording.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus four product slices: a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and memory, a generic analysis orchestrator, and registered `discovery`, `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over the built-in sample dataset, `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini is required for interactive query planning and remains constrained to planning, embeddings, and final wording.
 
 ## Target Architecture Direction
 
@@ -34,28 +34,34 @@ flowchart LR
     SIDE --> METRICS
 
     subgraph ORCH["Server Orchestration"]
+      RETRIEVE["RAG Retrieval Layer"]
       PLAN["Query Planner (Gemini-first)"]
       VALIDATE["Dataset / Metric / Timeframe Validation"]
       ORCH["Analysis Orchestrator"]
       EXEC["Intent Executor"]
       NARRATE["Narrative Provider (Deterministic or Gemini)"]
+      MEMORY["Conversation Memory Persistence"]
     end
 
-    QUERY --> PLAN --> VALIDATE --> ORCH --> EXEC --> NARRATE --> QUERY
+    QUERY --> RETRIEVE --> PLAN --> VALIDATE --> ORCH --> EXEC --> NARRATE --> MEMORY --> QUERY
 
     subgraph DATA["Data Sources"]
       PG["Postgres\naccounts, daily metrics, weekly metrics"]
+      VECTOR["Postgres + pgvector\ncatalog chunks, memory chunks"]
       MG["MongoDB\ncomplaints, incidents, alerts, RM notes"]
       MANIFEST["Metric Manifest JSON"]
       SAMPLE["Built-in Sample Dataset"]
-      GEMINI["Gemini API\nstructured parse + narrative output"]
+      GEMINI["Gemini API\nstructured parse + embeddings + narrative output"]
     end
 
     EXEC --> PG
+    RETRIEVE --> VECTOR
     EXEC --> MG
+    MEMORY --> VECTOR
     VALIDATE --> MANIFEST
     EXEC --> SAMPLE
     PLAN --> GEMINI
+    RETRIEVE --> GEMINI
     NARRATE --> GEMINI
 
     subgraph OPS["Local Ops"]
@@ -73,7 +79,7 @@ flowchart LR
 ## Current API Surface
 
 - `POST /api/query`
-  - input: `{ question: string, scope?: { region?: string, sector?: string } }`
+  - input: `{ question: string, chatId?: string, scope?: { region?: string, sector?: string } }`
   - output: `Phase1AnalysisResponse`
 - `GET /api/metrics`
   - returns the supported metric definitions and dimensions for the shipped slices
@@ -83,13 +89,15 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 ## Current Request Lifecycle
 
 1. The user submits a question through chat.
-2. The server produces a structured query plan for the built-in dataset, with Gemini required for interactive planning and local validation enforcing the manifest boundaries.
-3. The plan is validated against the dataset definition, supported metric, and allowed timeframe rules.
-4. The analysis orchestrator dispatches the plan to the registered `what changed`, `breakdown`, or `compare` executor.
-5. The executor reads weekly movement or account-level stress from `Postgres` and corroborating context from `MongoDB`, or reads the built-in sample dataset when local databases are unavailable.
-6. Drivers, evidence, confidence, assumptions, and chart data are assembled deterministically into a grounded response payload.
-7. For interactive requests only, the planner requires Gemini and the narrative provider can ask Gemini for a structured headline and summary, while deterministic execution remains the source of truth for facts and evidence.
-8. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
+2. The server retrieves relevant dataset metadata and prior conversational context from `pgvector` before planning.
+3. The server produces a structured query plan for the built-in dataset, with Gemini required for interactive planning and local validation enforcing the manifest boundaries.
+4. The plan is validated against the dataset definition, supported metric, allowed timeframe rules, and discovery/compare boundaries.
+5. The analysis orchestrator dispatches the plan to the registered `discovery`, `what changed`, `breakdown`, or `compare` executor.
+6. The executor reads weekly movement or account-level stress from `Postgres` and corroborating context from `MongoDB`, or reads the built-in sample dataset when local databases are unavailable.
+7. Drivers, evidence, confidence, assumptions, discovery catalog sections, and chart data are assembled deterministically into a grounded response payload.
+8. For interactive requests only, the planner requires Gemini and the narrative provider can ask Gemini for a structured headline and summary, while deterministic execution remains the source of truth for facts and evidence.
+9. The server persists the user turn, assistant turn, and a compact memory chunk back into `pgvector` for the next request.
+10. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
 
 ## Data Responsibilities
 
@@ -98,6 +106,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 - Canonical structured facts
 - Weekly comparison rows used to explain score movement
 - Daily account metrics used to support believable sample-dataset behavior
+- `pgvector` storage for dataset catalog chunks and conversational memory chunks
 
 ### MongoDB
 
@@ -127,4 +136,4 @@ The Stage 1 foundation is now complete for the built-in dataset. The next gaps t
 
 - dataset onboarding and manifest persistence
 - the remaining intent family: `weekly briefing`
-- richer trust/debug UX around the Gemini-assisted path
+- richer trust/debug UX around the Gemini-assisted retrieval path

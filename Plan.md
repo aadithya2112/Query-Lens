@@ -5,10 +5,12 @@
 - Phase 1 is implemented as a local-first vertical slice and committed at `4bdd671`.
 - The app is now branded as `QueryLens` and runs as a single `Next.js` service.
 - `Docker Compose`, the built-in sample dataset, `Vitest`, `Playwright`, and Bun-based build validation are in place.
-- The current shipped capability now includes two narrow but strong flows:
+- The current shipped capability now includes four narrow but strong flows:
+  - `discovery` for dataset and source questions
   - `what changed` for `cashflow_health_score`
   - `breakdown` for `at_risk_account_count`
 - Stage 3 compare is now shipped for `cashflow_health_score`, covering week-over-week and peer comparisons within the current weekly windows.
+- Conversational retrieval is now shipped with `pgvector` metadata retrieval and browser/server conversation memory.
 - The live `database` mode path, submission-ready packaging cleanup, and root `README.md` are now complete.
 - Stage 1 foundation is now in place: built-in dataset abstraction, structured query plans, a generic orchestrator, and a dedicated `what changed` executor.
 
@@ -18,7 +20,9 @@
 
 - The three-pane prototype shell has been repurposed into a `QueryLens` workspace.
 - Chat is the main interaction surface.
+- The workspace now persists a browser `chatId`, visible conversation history, and the last active analysis across refreshes.
 - The center panel is now evidence-first, with intent-aware trend/breakdown views, ranked insights, source evidence, assumptions, and metric framing.
+- Broad metadata questions now render a dedicated discovery view with dataset, source, time-coverage, and suggested-question context.
 - The default first-run state is loaded with the flagship question.
 
 ### Data and Infrastructure
@@ -26,15 +30,16 @@
 - `Postgres` and `MongoDB` are defined in `docker-compose.yml`.
 - One synthetic 12-week SME portfolio is bundled as the current sample dataset, including a deliberate downturn narrative for demo clarity.
 - `Postgres` stores canonical weekly and daily facts.
+- `Postgres` now also stores `pgvector` catalog chunks and conversation-memory chunks for lightweight RAG.
 - `MongoDB` stores supporting complaints, incidents, alerts, and RM notes.
 - A repo-managed manifest defines the phase-1 metric and its weighted scoring model.
 
 ### Server Flow
 
 - `POST /api/query` and `GET /api/metrics` are implemented.
-- Query handling now serves `what changed`, `breakdown`, and `compare` through the generalized internal query engine.
+- Query handling now serves `discovery`, `what changed`, `breakdown`, and `compare` through the generalized internal query engine.
 - The server now uses a built-in dataset definition, a structured query-plan model, a generic orchestrator, and a registered intent executor.
-- Gemini-assisted planning and narrative generation remain constrained, and Gemini planning is now required for the main interactive path.
+- Gemini-assisted planning and narrative generation remain constrained, Gemini planning is now required for the main interactive path, and retrieval now feeds planning with dataset and conversation context.
 
 ### Quality and Stability
 
@@ -49,8 +54,8 @@ The current product is demoable and now honestly LLM-first for interactive quest
 - Shipped today:
   - one built-in sample dataset
   - two metrics
-  - three intent families: `what changed`, `breakdown`, and `compare`
-  - Gemini-required interactive planning and Gemini-assisted narration with deterministic data execution
+  - four intent families: `discovery`, `what changed`, `breakdown`, and `compare`
+  - Gemini-required interactive planning, Gemini embeddings for retrieval, and Gemini-assisted narration with deterministic data execution
   - Stage 1 engine foundations for future intents
 - Still required for a requirements-complete submission:
   - reusable dataset onboarding
@@ -110,9 +115,9 @@ Recommended implementation order:
    - Keep the submission story centered on what is actually implemented.
 
 2. Work through the requirements roadmap one stage at a time.
-   - dataset onboarding
-   - `weekly briefing`
-   - trust/debug polish
+  - dataset onboarding
+  - `weekly briefing`
+  - trust/debug polish and richer retrieval trace UX
 
 ## Next Fully Testable Slice
 
@@ -132,7 +137,7 @@ Use the completed compare slice and LLM-first pivot to ship the next user-visibl
 ### Order of Work
 
 1. Add a `weekly briefing` intent and executor on top of the current planner/orchestrator.
-2. Keep the current `what changed`, `breakdown`, and `compare` flows stable.
+2. Keep the current `discovery`, `what changed`, `breakdown`, and `compare` flows stable.
 3. Add focused tests and one clear briefing smoke flow.
 4. Re-run the full validation stack and update docs if the shipped surface changes.
 

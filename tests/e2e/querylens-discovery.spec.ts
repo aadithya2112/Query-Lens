@@ -12,7 +12,9 @@ test("renders the discovery flow and restores the conversation after refresh", a
   await input.press("Enter")
 
   await expect(page.getByText("Catalog and suggested paths")).toBeVisible()
-  await expect(page.getByText("Dataset overview")).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Dataset overview" })
+  ).toBeVisible()
 
   await page.reload()
 
