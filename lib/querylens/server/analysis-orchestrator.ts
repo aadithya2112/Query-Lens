@@ -1,6 +1,6 @@
 import { getPrimaryDatasetMetricDefinition } from "@/lib/querylens/datasets"
-import { getPhase1Provider } from "@/lib/querylens/server/analysis-provider"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
+import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import {
   buildWhatChangedFallbackResponse,
   executeWhatChangedPlan,
@@ -18,7 +18,7 @@ interface IntentExecutor {
     plan: StructuredQueryPlan
     weeklyRows: Awaited<ReturnType<Awaited<ReturnType<typeof getQueryLensDataAccess>>["listWeeklyMetrics"]>>
     dataAccess: Awaited<ReturnType<typeof getQueryLensDataAccess>>
-    composeNarrative: ReturnType<typeof getPhase1Provider>["composeNarrative"]
+    composeNarrative: ReturnType<typeof getQueryEngineProvider>["composeNarrative"]
   }): Promise<Phase1AnalysisResponse>
 }
 
@@ -35,10 +35,10 @@ export async function analyzeQuery(
   const dataAccess = await getQueryLensDataAccess()
   const metric = getPrimaryDatasetMetricDefinition()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
-  const provider = getPhase1Provider({
+  const provider = getQueryEngineProvider({
     executionContext: options.executionContext ?? "interactive",
   })
-  const parseResult = await provider.parseQuestion(input.question, input.scope)
+  const parseResult = await provider.planQuery(input.question, input.scope)
 
   if (!parseResult.parsed) {
     return buildWhatChangedFallbackResponse({

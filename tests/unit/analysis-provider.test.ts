@@ -164,7 +164,7 @@ describe("phase-1 provider selection", () => {
     geminiGenerateMock.mockResolvedValueOnce({
       functionCalls: [
         {
-          name: "submit_phase1_query",
+          name: "submit_analytics_query_plan",
           args: {
             metric: "cashflow_health_score",
             timeframe: "last_week",
@@ -221,7 +221,7 @@ describe("phase-1 provider selection", () => {
     geminiGenerateMock.mockResolvedValue({
       functionCalls: [
         {
-          name: "submit_phase1_query",
+          name: "submit_analytics_query_plan",
           args: {
             metric: "cashflow_health_score",
             timeframe: "last_week",
@@ -250,7 +250,7 @@ describe("phase-1 provider selection", () => {
     geminiGenerateMock.mockResolvedValue({
       functionCalls: [
         {
-          name: "submit_phase1_query",
+          name: "submit_analytics_query_plan",
           args: {
             metric: "cashflow_health_score",
             timeframe: "this_week",
@@ -282,7 +282,7 @@ describe("phase-1 provider selection", () => {
     geminiGenerateMock.mockResolvedValue({
       functionCalls: [
         {
-          name: "reject_phase1_query",
+          name: "reject_analytics_query_plan",
           args: {
             reason: "Phase 1 only supports cashflow health questions for this week or last week.",
           },

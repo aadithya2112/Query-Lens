@@ -25,7 +25,7 @@ describe("/api/query Gemini parser mode", () => {
     geminiGenerateMock.mockResolvedValueOnce({
       functionCalls: [
         {
-          name: "submit_phase1_query",
+          name: "submit_analytics_query_plan",
           args: {
             metric: "cashflow_health_score",
             timeframe: "last_week",
