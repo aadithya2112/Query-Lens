@@ -503,8 +503,8 @@ async function planQueryWithGemini(
         scope: compareSpec.mode === "timeframe" ? scope : {},
         scopeDimensions:
           compareSpec.mode === "timeframe"
-            ? [...resolveScopeDimensions(scope)]
-            : [compareSpec.dimension ?? "portfolio"],
+            ? ([...resolveScopeDimensions(scope)] as StructuredQueryPlan["scopeDimensions"])
+            : ([compareSpec.dimension ?? "portfolio"] as StructuredQueryPlan["scopeDimensions"]),
         comparisonWindow: {
           timeframe:
             compareSpec.mode === "timeframe"
@@ -523,7 +523,7 @@ async function planQueryWithGemini(
       metricId: parsedArgs.data.metric,
       timeframe: parsedArgs.data.timeframe,
       scope,
-      scopeDimensions: [...resolveScopeDimensions(scope)],
+      scopeDimensions: [...resolveScopeDimensions(scope)] as StructuredQueryPlan["scopeDimensions"],
       comparisonWindow: {
         timeframe: parsedArgs.data.timeframe,
         comparisonBasis: "prior_period" as const,

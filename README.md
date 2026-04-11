@@ -1,6 +1,6 @@
 # QueryLens
 
-QueryLens is a trust-first analytics demo for a synthetic SME banking portfolio. It lets a non-technical user ask grounded natural-language questions such as `Why did SME cashflow health drop last week?` or `What makes up at-risk accounts by region and sector last week?` and get evidence-backed answers from seeded `Postgres` facts and `MongoDB` context.
+QueryLens is a trust-first analytics demo for a synthetic SME banking portfolio. It lets a non-technical user ask grounded natural-language questions such as `Why did SME cashflow health drop last week?`, `What makes up at-risk accounts by region and sector last week?`, or `Compare cashflow health this week vs last week` and get evidence-backed answers from seeded `Postgres` facts and `MongoDB` context.
 
 The current shipped milestone is intentionally focused on one strong phase-1 flow rather than a broad but partial product. The app is designed for a short local demo where a reviewer can boot the stack, run one seeded query, and understand both the product story and the supporting architecture quickly.
 
@@ -9,10 +9,11 @@ The current shipped milestone is intentionally focused on one strong phase-1 flo
 - `QueryLens` three-pane interface with chat, evidence workspace, and source/metric sidebar
 - `what changed` analysis for `cashflow_health_score`
 - `breakdown` analysis for `at_risk_account_count`
+- `compare` analysis for `cashflow_health_score`
 - Stage 1 internal query-engine foundation:
   - built-in dataset abstraction for `sme_portfolio`
   - structured query-plan model
-  - generic orchestrator and registered `what changed` / `breakdown` executors
+  - generic orchestrator and registered `what changed` / `breakdown` / `compare` executors
 - Supported time windows: `this week` and `last week`
 - Optional phase-1 scope filters for `region` and `sector`
 - Cross-source evidence using seeded `Postgres` portfolio facts and `MongoDB` contextual signals
@@ -24,7 +25,6 @@ The current shipped milestone is intentionally focused on one strong phase-1 flo
 
 These are intentionally deferred and should not be treated as shipped:
 
-- `compare` queries
 - `weekly briefing`
 - arbitrary file upload or open-ended source ingestion
 - raw SQL as a primary user workflow
@@ -100,6 +100,7 @@ Use the seeded prompt or ask:
 ```text
 Why did SME cashflow health drop last week?
 What makes up at-risk accounts by region and sector last week?
+Compare cashflow health this week vs last week
 ```
 
 Expected result:
@@ -109,6 +110,7 @@ Expected result:
 - top drivers highlighting stress in North West hospitality
 - assumptions and confidence rendered in the center workspace
 - a separate breakdown view showing where weekly at-risk accounts are concentrated
+- a compare view showing the delta between two weekly windows or two peers
 
 ## Fixture Mode
 
@@ -128,7 +130,7 @@ This uses the same seeded story, but reads from in-repo fixtures instead of the 
 curl http://localhost:3000/api/metrics
 ```
 
-Returns the current metric manifest, including `cashflow_health_score` for `what changed` questions and `at_risk_account_count` for the Stage 2 breakdown slice.
+Returns the current metric manifest, including `cashflow_health_score` for `what changed` and `compare` questions, plus `at_risk_account_count` for the breakdown slice.
 
 ### `POST /api/query`
 
@@ -171,8 +173,8 @@ bun run test:e2e
 QueryLens is a single `Next.js` application with an integrated server layer.
 
 - `POST /api/query` parses and validates the question, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
-- The server now routes requests through a built-in dataset definition, a structured query-plan model, and a generic analysis orchestrator before executing the current `what changed` or `breakdown` intent.
-- `GET /api/metrics` exposes the current metric manifest for both shipped slices.
+- The server now routes requests through a built-in dataset definition, a structured query-plan model, and a generic analysis orchestrator before executing the current `what changed`, `breakdown`, or `compare` intent.
+- `GET /api/metrics` exposes the current metric manifest for all shipped slices.
 - Interactive query parsing and narration can use Gemini with structured output and tool calling, while bootstrap, data retrieval, evidence assembly, and fallback behavior remain deterministic.
 - Fixture mode remains available as a safe fallback when live databases are not running.
 
@@ -195,7 +197,7 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 
 ## Limitations
 
-- The current milestone supports two metrics but still only two narrow intent families.
+- The current milestone supports two metrics and three narrow intent families.
 - The seeded portfolio is synthetic and designed for demo clarity, not statistical realism.
 - Gemini currently helps only with interactive parsing and wording; scoring, evidence ranking, source reads, and fallback logic remain deterministic.
 - Database mode is meant for local Docker-backed use, not public deployment.
@@ -205,7 +207,7 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 ## Future Improvements
 
 - Add reusable dataset onboarding for tabular datasets
-- Add `compare` and `weekly briefing`
+- Add `weekly briefing`
 - Expand metric coverage beyond `cashflow_health_score`
 - Improve source health and trace detail for richer trust UX
 - Add a submission/demo script with screenshots or recorded walkthrough

@@ -8,6 +8,7 @@
 - The current shipped capability now includes two narrow but strong flows:
   - `what changed` for `cashflow_health_score`
   - `breakdown` for `at_risk_account_count`
+- Stage 3 compare is now shipped for `cashflow_health_score`, covering week-over-week and peer comparisons within the seeded weekly windows.
 - The live `database` mode path, submission-ready packaging cleanup, and root `README.md` are now complete.
 - Stage 1 foundation is now in place: built-in dataset abstraction, structured query plans, a generic orchestrator, and a dedicated `what changed` executor.
 
@@ -31,7 +32,7 @@
 ### Server Flow
 
 - `POST /api/query` and `GET /api/metrics` are implemented.
-- Query handling now serves both `what changed` and `breakdown` through the generalized internal query engine.
+- Query handling now serves `what changed`, `breakdown`, and `compare` through the generalized internal query engine.
 - The server now uses a built-in dataset definition, a structured query-plan model, a generic orchestrator, and a registered intent executor.
 - Gemini-assisted planning and narrative generation remain constrained and deterministic fallback remains intact.
 
@@ -48,12 +49,11 @@ The current product is demoable, but it does not yet satisfy the full challenge 
 - Shipped today:
   - one dataset story
   - two metrics
-  - two intent families: `what changed` and `breakdown`
+  - three intent families: `what changed`, `breakdown`, and `compare`
   - Gemini-assisted parsing and narration with deterministic data execution
   - Stage 1 engine foundations for future intents
 - Still required for a requirements-complete submission:
   - reusable dataset onboarding
-  - `compare`
   - `weekly briefing`
   - richer trust/debug UX on top of the generalized engine
 
@@ -74,13 +74,11 @@ Status: complete for the built-in SME portfolio dataset.
 
 ### Step 3. Add the Missing Product Use Cases
 
-- `compare`
 - `weekly briefing`
 
 Recommended implementation order:
 
-1. `compare`
-2. `weekly briefing`
+1. `weekly briefing`
 
 ### Step 4. Upgrade the Workspace for Multi-Intent Answers
 
@@ -102,7 +100,6 @@ Recommended implementation order:
 
 2. Work through the requirements roadmap one stage at a time.
    - dataset onboarding
-   - `compare`
    - `weekly briefing`
    - trust/debug polish
 
@@ -110,9 +107,9 @@ Recommended implementation order:
 
 ### Goal
 
-Use the completed Stage 2 breakdown slice to ship the next user-facing capability:
+Use the completed Stage 3 compare slice to ship the next user-facing capability:
 
-- `compare`, starting with one clear weekly or scoped portfolio comparison flow
+- `weekly briefing`, starting with one clear seeded portfolio briefing flow
 
 ### Done When
 
@@ -122,8 +119,8 @@ Use the completed Stage 2 breakdown slice to ship the next user-facing capabilit
 
 ### Order of Work
 
-1. Build `compare` on top of the current dataset abstraction, query-plan model, and orchestrator.
-2. Keep the current `what changed` and `breakdown` flows stable while adding the new executor and UI surface.
+1. Build `weekly briefing` on top of the current dataset abstraction, query-plan model, and orchestrator.
+2. Keep the current `what changed`, `breakdown`, and `compare` flows stable while adding the new executor and UI surface.
 3. Add focused tests and one demoable gold-path flow.
 4. Re-run the full validation stack and update docs if the shipped surface changes.
 

@@ -347,6 +347,8 @@ export function planDeterministicQuery(
         return compareSpec
       }
 
+      const resolvedCompareSpec = compareSpec as CompareSpec
+
       return validateQueryPlan({
         datasetId,
         rawQuestion: question,
@@ -356,12 +358,12 @@ export function planDeterministicQuery(
         scope: timeframeCompare ? scope : {},
         scopeDimensions: timeframeCompare
           ? [...resolveScopeDimensions(scope)]
-          : [compareSpec.dimension ?? "portfolio"],
+          : [resolvedCompareSpec.dimension ?? "portfolio"],
         comparisonWindow: {
           timeframe: timeframeCompare ? "this_week" : timeframe,
           comparisonBasis: "prior_period",
         },
-        compareSpec,
+        compareSpec: resolvedCompareSpec,
       })
     }
 

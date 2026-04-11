@@ -2,7 +2,7 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus the first Stage 2 product slice: a built-in dataset definition, a structured query-plan model, a generic analysis orchestrator, and registered `what changed` and `breakdown` executors. Retrieval remains deterministic over seeded `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini remains constrained to query planning and final wording.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus the first three product slices: a built-in dataset definition, a structured query-plan model, a generic analysis orchestrator, and registered `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over seeded `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini remains constrained to query planning and final wording.
 
 ## Target Architecture Direction
 
@@ -84,7 +84,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 1. The user submits a question through chat.
 2. The server produces a structured query plan for the built-in dataset, using deterministic rules by default and Gemini planning when interactive AI mode is enabled.
 3. The plan is validated against the dataset definition, supported metric, and allowed timeframe rules.
-4. The analysis orchestrator dispatches the plan to the registered `what changed` or `breakdown` executor.
+4. The analysis orchestrator dispatches the plan to the registered `what changed`, `breakdown`, or `compare` executor.
 5. The executor reads weekly movement or account-level stress from `Postgres` and corroborating context from `MongoDB`, or falls back to fixtures if live services are unavailable.
 6. Drivers, evidence, confidence, assumptions, and chart data are assembled deterministically into a grounded response payload.
 7. For interactive requests only, the planner can ask Gemini for a constrained structured plan and the narrative provider can ask Gemini for a structured headline and summary, with deterministic fallback if Gemini is unavailable or invalid.
@@ -125,5 +125,5 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 The Stage 1 foundation is now complete for the built-in dataset. The next gaps to meet the challenge are:
 
 - dataset onboarding and manifest persistence
-- the missing intent families: `compare` and `weekly briefing`
+- the remaining intent family: `weekly briefing`
 - richer trust/debug UX around the Gemini-assisted path

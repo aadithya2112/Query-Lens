@@ -10,9 +10,10 @@ The current shipped milestone is intentionally narrow:
 
 - one supported metric: `cashflow_health_score`
 - one additional breakdown metric: `at_risk_account_count`
-- two supported intent families: `what changed` and `breakdown`
+- three supported intent families: `what changed`, `breakdown`, and `compare`
 - one flagship question: `Why did SME cashflow health drop last week?`
 - one Stage 2 breakdown question: `What makes up at-risk accounts by region and sector last week?`
+- one Stage 3 compare question: `Compare cashflow health this week vs last week.`
 - optional scope filters for `region` and `sector`
 - visible trust evidence from both structured facts and contextual signals
 - Stage 1 foundation complete under the hood: built-in dataset abstraction, structured query plans, and a generic orchestrator
@@ -30,7 +31,7 @@ To meet the full hackathon brief, `QueryLens` needs to grow from this narrow ver
   - `weekly briefing`
 - deterministic data execution with Gemini constrained to structured planning and wording
 
-The immediate next user-visible step is `compare`, now that the Stage 2 breakdown slice is in place.
+The immediate next user-visible step is `weekly briefing`, now that the Stage 3 compare slice is in place.
 
 ## Target User
 
@@ -55,10 +56,9 @@ The product should combine three things in one short flow:
 
 These are part of the product direction, but they are not yet implemented and should not be presented as shipped:
 
-1. `What makes up at-risk accounts by region and sector?`
-2. `Compare hospitality vs retail SMEs this month.`
-3. `Give me this week's portfolio briefing.`
-4. `Ask the same style of questions against a newly onboarded tabular dataset.`
+1. `Give me this week's portfolio briefing.`
+2. `Summarize the biggest changes across the SME portfolio this week.`
+3. `Ask the same style of questions against a newly onboarded tabular dataset.`
 
 ## Experience Rules
 
