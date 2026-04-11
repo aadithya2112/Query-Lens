@@ -20,6 +20,7 @@ interface ChatPanelProps {
 
 const QUICK_PROMPTS = [
   "Why did SME cashflow health drop last week?",
+  "What makes up at-risk accounts by region and sector last week?",
   "Why did North West cashflow health drop last week?",
   "Why did hospitality cashflow health drop this week?",
 ]

@@ -49,3 +49,12 @@ export function getPrimaryDatasetMetricDefinition(
 ): MetricDefinition {
   return getDatasetDefinition(datasetId).metrics[0]
 }
+
+export function getDatasetMetricDefinition(
+  metricId: MetricDefinition["id"],
+  datasetId: DatasetId = BUILT_IN_DATASET_ID
+): MetricDefinition | undefined {
+  return getDatasetDefinition(datasetId).metrics.find(
+    (metric) => metric.id === metricId
+  )
+}

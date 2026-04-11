@@ -9,9 +9,11 @@
 The current shipped milestone is intentionally narrow:
 
 - one supported metric: `cashflow_health_score`
-- one supported intent family: `what changed`
+- one additional breakdown metric: `at_risk_account_count`
+- two supported intent families: `what changed` and `breakdown`
 - one flagship question: `Why did SME cashflow health drop last week?`
-- optional phase-1 scope filters for `region` and `sector`
+- one Stage 2 breakdown question: `What makes up at-risk accounts by region and sector last week?`
+- optional scope filters for `region` and `sector`
 - visible trust evidence from both structured facts and contextual signals
 - Stage 1 foundation complete under the hood: built-in dataset abstraction, structured query plans, and a generic orchestrator
 
@@ -28,7 +30,7 @@ To meet the full hackathon brief, `QueryLens` needs to grow from this narrow ver
   - `weekly briefing`
 - deterministic data execution with Gemini constrained to structured planning and wording
 
-The immediate next user-visible step is `breakdown`, now that the Stage 1 engine groundwork is complete.
+The immediate next user-visible step is `compare`, now that the Stage 2 breakdown slice is in place.
 
 ## Target User
 

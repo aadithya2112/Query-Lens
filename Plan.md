@@ -5,7 +5,9 @@
 - Phase 1 is implemented as a local-first vertical slice and committed at `4bdd671`.
 - The app is now branded as `QueryLens` and runs as a single `Next.js` service.
 - `Docker Compose`, seed data, `Vitest`, `Playwright`, and Bun-based build validation are in place.
-- The current shipped capability is one narrow but strong flow: `what changed` for `cashflow_health_score`.
+- The current shipped capability now includes two narrow but strong flows:
+  - `what changed` for `cashflow_health_score`
+  - `breakdown` for `at_risk_account_count`
 - The live `database` mode path, submission-ready packaging cleanup, and root `README.md` are now complete.
 - Stage 1 foundation is now in place: built-in dataset abstraction, structured query plans, a generic orchestrator, and a dedicated `what changed` executor.
 
@@ -15,7 +17,7 @@
 
 - The three-pane prototype shell has been repurposed into a `QueryLens` workspace.
 - Chat is the main interaction surface.
-- The center panel is now evidence-first, with trend, drivers, source evidence, assumptions, and metric framing.
+- The center panel is now evidence-first, with intent-aware trend/breakdown views, ranked insights, source evidence, assumptions, and metric framing.
 - The default first-run state is seeded with the flagship question.
 
 ### Data and Infrastructure
@@ -29,7 +31,7 @@
 ### Server Flow
 
 - `POST /api/query` and `GET /api/metrics` are implemented.
-- Query handling still serves the phase-1 `what changed` flow, but now runs through a generalized internal query engine.
+- Query handling now serves both `what changed` and `breakdown` through the generalized internal query engine.
 - The server now uses a built-in dataset definition, a structured query-plan model, a generic orchestrator, and a registered intent executor.
 - Gemini-assisted planning and narrative generation remain constrained and deterministic fallback remains intact.
 
@@ -45,13 +47,12 @@ The current product is demoable, but it does not yet satisfy the full challenge 
 
 - Shipped today:
   - one dataset story
-  - one metric
-  - one intent family: `what changed`
+  - two metrics
+  - two intent families: `what changed` and `breakdown`
   - Gemini-assisted parsing and narration with deterministic data execution
   - Stage 1 engine foundations for future intents
 - Still required for a requirements-complete submission:
   - reusable dataset onboarding
-  - `breakdown`
   - `compare`
   - `weekly briefing`
   - richer trust/debug UX on top of the generalized engine
@@ -73,15 +74,13 @@ Status: complete for the built-in SME portfolio dataset.
 
 ### Step 3. Add the Missing Product Use Cases
 
-- `breakdown`
 - `compare`
 - `weekly briefing`
 
 Recommended implementation order:
 
-1. `breakdown`
-2. `compare`
-3. `weekly briefing`
+1. `compare`
+2. `weekly briefing`
 
 ### Step 4. Upgrade the Workspace for Multi-Intent Answers
 
@@ -103,7 +102,6 @@ Recommended implementation order:
 
 2. Work through the requirements roadmap one stage at a time.
    - dataset onboarding
-   - `breakdown`
    - `compare`
    - `weekly briefing`
    - trust/debug polish
@@ -112,9 +110,9 @@ Recommended implementation order:
 
 ### Goal
 
-Use the completed Stage 1 foundation to ship the first new user-facing product slice:
+Use the completed Stage 2 breakdown slice to ship the next user-facing capability:
 
-- `breakdown` for at-risk accounts by region and sector
+- `compare`, starting with one clear weekly or scoped portfolio comparison flow
 
 ### Done When
 
@@ -124,8 +122,8 @@ Use the completed Stage 1 foundation to ship the first new user-facing product s
 
 ### Order of Work
 
-1. Build `breakdown` on top of the current dataset abstraction, query-plan model, and orchestrator.
-2. Keep the current flagship `what changed` flow stable while adding the new executor and UI surface.
+1. Build `compare` on top of the current dataset abstraction, query-plan model, and orchestrator.
+2. Keep the current `what changed` and `breakdown` flows stable while adding the new executor and UI surface.
 3. Add focused tests and one demoable gold-path flow.
 4. Re-run the full validation stack and update docs if the shipped surface changes.
 

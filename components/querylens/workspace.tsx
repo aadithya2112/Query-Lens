@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sheet"
 import type {
   BootstrapPayload,
+  MetricDefinition,
   Phase1AnalysisResponse,
 } from "@/lib/querylens/types"
 
@@ -41,7 +42,7 @@ function buildAssistantMessage(
 
 export default function Workspace({
   initialQuestion,
-  metric,
+  metrics,
   sourceHealth,
   initialAnalysis,
 }: BootstrapPayload) {
@@ -60,6 +61,8 @@ export default function Workspace({
   ])
   const [activeAnalysis, setActiveAnalysis] = useState(initialAnalysis)
   const [isLoading, setIsLoading] = useState(false)
+  const activeMetric =
+    metrics.find((metric) => metric.id === activeAnalysis.metric) ?? metrics[0]
 
   const handleSend = async (question: string) => {
     const trimmed = question.trim()
@@ -125,7 +128,7 @@ export default function Workspace({
           <h1 className="font-semibold text-foreground">
             QueryLens{" "}
             <span className="ml-2 font-normal text-muted-foreground">
-              Phase 1 Analysis
+              Analysis Workspace
             </span>
           </h1>
         </div>
@@ -134,7 +137,7 @@ export default function Workspace({
           <p className="hidden text-sm text-muted-foreground md:inline-block">
               Metric Focus:{" "}
               <span className="font-medium text-foreground">
-              {metric?.label || "Cashflow"}
+              {activeMetric?.label || "Cashflow"}
               </span>
             </p>
           <div className="h-4 w-px bg-border hidden md:block" />
@@ -155,7 +158,7 @@ export default function Workspace({
               <div className="mt-6">
                 <Sidebar
                   analysis={activeAnalysis}
-                  metric={metric}
+                  metric={activeMetric as MetricDefinition}
                   sourceHealth={sourceHealth}
                 />
               </div>

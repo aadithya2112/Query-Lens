@@ -40,6 +40,8 @@ export default function Sidebar({
   sourceHealth,
   analysis,
 }: SidebarProps) {
+  const isBreakdown = analysis.metric === "at_risk_account_count"
+
   return (
     <aside className="rounded-[28px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl h-fit">
       <div className="border-b border-border pb-6">
@@ -52,13 +54,16 @@ export default function Sidebar({
               QueryLens
             </p>
             <h1 className="mt-1 text-xl font-semibold text-foreground">
-              SME cashflow investigation
+              {isBreakdown
+                ? "SME risk concentration breakdown"
+                : "SME cashflow investigation"}
             </h1>
           </div>
         </div>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          A trust-first phase-1 slice for explaining why portfolio health
-          changed, using seeded Postgres facts and Mongo context side by side.
+          {isBreakdown
+            ? "A trust-first breakdown of where weekly account stress is concentrated, using seeded Postgres facts and Mongo context side by side."
+            : "A trust-first slice for explaining why portfolio health changed, using seeded Postgres facts and Mongo context side by side."}
         </p>
       </div>
 
@@ -146,8 +151,8 @@ export default function Sidebar({
         <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
           <FileCheck2 size={14} className="text-muted-foreground" />
           <p className="text-sm leading-6 text-muted-foreground">
-            Phase 1 intentionally supports one metric and one intent family so
-            the answer remains grounded.
+            QueryLens intentionally supports a narrow set of metrics and intents
+            so the answer remains grounded.
           </p>
         </div>
       </section>

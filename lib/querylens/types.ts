@@ -188,19 +188,21 @@ export interface EvidenceItem {
   queryTemplateId: string
 }
 
-export interface Phase1ChartPoint {
+export interface ChartPoint {
   label: string
-  weekStart: string
-  weekEnd: string
-  score: number
+  weekStart?: string
+  weekEnd?: string
+  score?: number
+  value?: number
+  share?: number
 }
 
 export interface ChartSpec {
-  type: "line"
+  type: "line" | "bar"
   title: string
   xKey: "label"
-  yKey: "score"
-  data: Phase1ChartPoint[]
+  yKey: "score" | "value"
+  data: ChartPoint[]
   explanation: string
 }
 
@@ -237,7 +239,7 @@ export interface SourceHealth {
 
 export interface BootstrapPayload {
   initialQuestion: string
-  metric: MetricDefinition
+  metrics: MetricDefinition[]
   sourceHealth: SourceHealth[]
   initialAnalysis: Phase1AnalysisResponse
 }

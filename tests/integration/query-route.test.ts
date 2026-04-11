@@ -43,4 +43,27 @@ describe("/api/query", () => {
     expect(payload.fallback).toBe(true)
     expect(payload.summary).toContain("cashflow health")
   })
+
+  it("returns a grounded breakdown for at-risk accounts", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "What makes up at-risk accounts by region and sector last week?",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.metric).toBe("at_risk_account_count")
+    expect(payload.sourceMode).toBe("fixture")
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.headline.toLowerCase()).toContain("at-risk")
+    expect(payload.drivers.length).toBeGreaterThanOrEqual(1)
+    expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "postgres")).toBe(true)
+  })
 })

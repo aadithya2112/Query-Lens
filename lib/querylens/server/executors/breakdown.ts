@@ -172,15 +172,14 @@ function buildChartSpec(
   dimension: BreakdownDimension
 ) {
   return {
-    type: "line" as const,
+    type: "bar" as const,
     title: `At-risk accounts by ${dimension.replace("_", " ")} for ${timeframeLabel.toLowerCase()}`,
     xKey: "label" as const,
-    yKey: "score" as const,
+    yKey: "value" as const,
     data: buckets.map((bucket) => ({
       label: bucket.label,
-      weekStart: "",
-      weekEnd: "",
-      score: bucket.atRiskAccountCount,
+      value: bucket.atRiskAccountCount,
+      share: bucket.share,
     })),
     explanation:
       "The breakdown ranks where weekly account stress is concentrated so the user can see the biggest pressure pockets first.",

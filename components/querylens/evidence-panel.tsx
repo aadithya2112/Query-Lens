@@ -46,6 +46,8 @@ function TrustBar({ analysis }: EvidencePanelProps) {
 }
 
 export default function EvidencePanel({ analysis }: EvidencePanelProps) {
+  const isBreakdown = analysis.metric === "at_risk_account_count"
+
   return (
     <section className="px-4 py-4 lg:px-6 lg:py-7 mx-auto max-w-full w-full">
       <div className="mx-auto flex max-w-6xl flex-col gap-5">
@@ -69,7 +71,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">
-                Top drivers
+                {isBreakdown ? "Top concentrations" : "Top drivers"}
               </h2>
             </div>
             <div className="mt-5 space-y-5">
@@ -171,8 +173,9 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
             </summary>
             <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
-                The phase-1 slice uses deterministic parsing, seeded weekly
-                metrics, and contextual Mongo evidence.
+                {isBreakdown
+                  ? "The breakdown slice uses deterministic planning, account-level weekly stress rollups, and contextual Mongo evidence."
+                  : "The what-changed slice uses deterministic planning, seeded weekly metrics, and contextual Mongo evidence."}
               </p>
               <ul className="space-y-2">
                 {analysis.evidence.map((item) => (
