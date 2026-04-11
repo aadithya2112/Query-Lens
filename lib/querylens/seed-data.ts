@@ -216,9 +216,22 @@ function buildDailyMetrics(accounts: Account[]): DailyAccountMetric[] {
           2
         )
 
-        const lowBalanceFlag = runningBalance < account.lowBalanceThreshold
+        // Scenario shifts make stress visible in the derived weekly score, especially
+        // for the seeded North West hospitality downturn used in the flagship demo.
+        const effectiveLowBalanceThreshold =
+          account.lowBalanceThreshold * (1 + scenario.lowBalanceShift * 2.5)
+        const utilizationOverdueThreshold = clamp(
+          0.83 - scenario.overdueShift * 0.8,
+          0.62,
+          0.83
+        )
+        const effectiveOverdueThreshold =
+          account.lowBalanceThreshold * (1 + scenario.overdueShift * 4)
+
+        const lowBalanceFlag = runningBalance < effectiveLowBalanceThreshold
         const overdueFlag =
-          runningBalance < account.lowBalanceThreshold * 0.78 || loanUtilization > 0.83
+          runningBalance < effectiveOverdueThreshold ||
+          loanUtilization > utilizationOverdueThreshold
 
         metrics.push({
           accountId: account.id,

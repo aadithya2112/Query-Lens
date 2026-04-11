@@ -17,6 +17,9 @@ describe("/api/query", () => {
 
     expect(response.status).toBe(200)
     expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.sourceMode).toBe("fixture")
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.headline.toLowerCase()).toContain("fell")
     expect(payload.drivers.length).toBeGreaterThanOrEqual(2)
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "postgres")).toBe(true)
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "mongodb")).toBe(true)
