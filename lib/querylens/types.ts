@@ -1,0 +1,196 @@
+export type MetricId = "cashflow_health_score"
+export type SupportedTimeframe = "this_week" | "last_week"
+export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
+export type ContextCollection =
+  | "complaints"
+  | "service_incidents"
+  | "risk_alerts"
+  | "rm_notes"
+
+export interface ScopeFilter {
+  region?: string
+  sector?: string
+}
+
+export interface MetricDefinition {
+  id: MetricId
+  label: string
+  description: string
+  scale: string
+  weights: {
+    inflowOutflowRatio: number
+    balanceTrend: number
+    lowBalanceExposure: number
+    overdueExposure: number
+  }
+  supportedDimensions: string[]
+  supportedTimeframes: string[]
+  synonyms: string[]
+  exampleQuestions: string[]
+}
+
+export interface MetricManifest {
+  metrics: MetricDefinition[]
+}
+
+export interface Region {
+  id: string
+  name: string
+}
+
+export interface Sector {
+  id: string
+  name: string
+}
+
+export interface Account {
+  id: string
+  businessName: string
+  regionId: string
+  sectorId: string
+  segment: "starter" | "growth" | "established"
+  lowBalanceThreshold: number
+  baseDailyInbound: number
+  baseDailyOutbound: number
+  baseBalance: number
+  baseUtilization: number
+}
+
+export interface DailyAccountMetric {
+  accountId: string
+  date: string
+  weekStart: string
+  regionId: string
+  sectorId: string
+  inboundPayments: number
+  outboundPayments: number
+  endBalance: number
+  loanUtilization: number
+  lowBalanceFlag: boolean
+  overdueFlag: boolean
+}
+
+export interface WeeklyMetricRow {
+  weekStart: string
+  weekEnd: string
+  recordType: ScopeType
+  regionId: string | null
+  sectorId: string | null
+  regionName: string | null
+  sectorName: string | null
+  accountCount: number
+  inboundPayments: number
+  outboundPayments: number
+  openingBalance: number
+  closingBalance: number
+  lowBalanceShare: number
+  overdueShare: number
+  avgUtilization: number
+  inflowOutflowScore: number
+  balanceTrendScore: number
+  lowBalanceScore: number
+  overdueScore: number
+  cashflowHealthScore: number
+}
+
+export interface ContextEvent {
+  id: string
+  collection: ContextCollection
+  occurredAt: string
+  weekStart: string
+  regionId: string | null
+  sectorId: string | null
+  regionName: string | null
+  sectorName: string | null
+  severity: "high" | "medium" | "low"
+  summary: string
+  detail: string
+}
+
+export interface SeedDataset {
+  regions: Region[]
+  sectors: Sector[]
+  accounts: Account[]
+  dailyMetrics: DailyAccountMetric[]
+  weeklyMetrics: WeeklyMetricRow[]
+  contextEvents: Record<ContextCollection, ContextEvent[]>
+}
+
+export interface ParsedPhase1Query {
+  rawQuestion: string
+  intent: "what_changed"
+  metric: MetricId
+  timeframe: SupportedTimeframe
+  scope: ScopeFilter
+}
+
+export interface DriverItem {
+  id: string
+  title: string
+  impactLabel: string
+  direction: "negative" | "positive"
+  description: string
+}
+
+export interface EvidenceItem {
+  sourceType: "postgres" | "mongodb"
+  sourceName: string
+  timeRange: string
+  scope: string
+  supportingFact: string
+  queryTemplateId: string
+}
+
+export interface Phase1ChartPoint {
+  label: string
+  weekStart: string
+  weekEnd: string
+  score: number
+}
+
+export interface ChartSpec {
+  type: "line"
+  title: string
+  xKey: "label"
+  yKey: "score"
+  data: Phase1ChartPoint[]
+  explanation: string
+}
+
+export interface Phase1AnalysisResponse {
+  headline: string
+  summary: string
+  metric: MetricId
+  timeframe: string
+  comparisonBasis: string
+  confidence: number
+  activeScope: string
+  drivers: DriverItem[]
+  chartSpec: ChartSpec
+  evidence: EvidenceItem[]
+  assumptions: string[]
+  supportedFollowUps: string[]
+  fallback?: boolean
+  sourceMode: "database" | "fixture"
+}
+
+export interface QueryRequestBody {
+  question: string
+  scope?: ScopeFilter
+}
+
+export interface SourceHealth {
+  id: string
+  name: string
+  type: "postgres" | "mongodb" | "manifest"
+  status: "connected" | "seeded-fixture" | "configured"
+  detail: string
+  recordCount?: number
+}
+
+export interface BootstrapPayload {
+  initialQuestion: string
+  metric: MetricDefinition
+  sourceHealth: SourceHealth[]
+  initialAnalysis: Phase1AnalysisResponse
+}
