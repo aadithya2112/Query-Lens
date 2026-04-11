@@ -1,3 +1,4 @@
+export type DatasetId = "sme_portfolio"
 export type MetricId = "cashflow_health_score"
 export type SupportedTimeframe = "this_week" | "last_week"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
@@ -31,6 +32,16 @@ export interface MetricDefinition {
 
 export interface MetricManifest {
   metrics: MetricDefinition[]
+}
+
+export interface DatasetDefinition {
+  id: DatasetId
+  label: string
+  description: string
+  dimensions: Array<"portfolio" | "region" | "sector">
+  metrics: MetricDefinition[]
+  supportedIntentIds: string[]
+  supportedTimeframes: SupportedTimeframe[]
 }
 
 export interface Region {

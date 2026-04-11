@@ -1,4 +1,4 @@
-import { getPrimaryMetricDefinition } from "@/lib/querylens/metric-manifest"
+import { getPrimaryDatasetMetricDefinition } from "@/lib/querylens/datasets"
 import { analyzePhase1Query } from "@/lib/querylens/server/analysis"
 import { DEFAULT_FLAGSHIP_QUESTION } from "@/lib/querylens/server/analysis-provider"
 import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
@@ -9,7 +9,7 @@ export async function getBootstrapPayload(): Promise<BootstrapPayload> {
 
   return {
     initialQuestion: DEFAULT_FLAGSHIP_QUESTION,
-    metric: getPrimaryMetricDefinition(),
+    metric: getPrimaryDatasetMetricDefinition(),
     sourceHealth: await dataAccess.getSourceHealth(),
     initialAnalysis: await analyzePhase1Query({
       question: DEFAULT_FLAGSHIP_QUESTION,

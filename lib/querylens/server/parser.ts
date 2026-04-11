@@ -1,4 +1,4 @@
-import { getPrimaryMetricDefinition } from "@/lib/querylens/metric-manifest"
+import { getPrimaryDatasetMetricDefinition } from "@/lib/querylens/datasets"
 import { getSeedDataset } from "@/lib/querylens/seed-data"
 import type {
   ParsedPhase1Query,
@@ -60,7 +60,7 @@ function resolveTimeframe(question: string): SupportedTimeframe | undefined {
 
 function resolveMetric(question: string): boolean {
   const normalizedQuestion = normalizePhase1Text(question)
-  const metric = getPrimaryMetricDefinition()
+  const metric = getPrimaryDatasetMetricDefinition()
 
   return metric.synonyms.some((synonym) =>
     normalizedQuestion.includes(normalizePhase1Text(synonym))

@@ -1,5 +1,5 @@
-import { getMetricManifest } from "@/lib/querylens/metric-manifest"
+import { getDatasetMetricManifest } from "@/lib/querylens/datasets"
 
 export async function GET() {
-  return Response.json(getMetricManifest())
+  return Response.json(getDatasetMetricManifest())
 }

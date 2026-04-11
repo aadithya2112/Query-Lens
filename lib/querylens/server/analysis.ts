@@ -1,4 +1,4 @@
-import { getPrimaryMetricDefinition } from "@/lib/querylens/metric-manifest"
+import { getPrimaryDatasetMetricDefinition } from "@/lib/querylens/datasets"
 import { formatWeekLabel, getSeedDataset } from "@/lib/querylens/seed-data"
 import { getWeekWindow } from "@/lib/querylens/reference-date"
 import { calculateConfidenceScore, calculateWeightedDriverImpact, roundTo } from "@/lib/querylens/scoring"
@@ -326,7 +326,7 @@ export async function analyzePhase1Query(
   options: { executionContext?: QueryLensExecutionContext } = {}
 ): Promise<Phase1AnalysisResponse> {
   const dataAccess = await getQueryLensDataAccess()
-  const metric = getPrimaryMetricDefinition()
+  const metric = getPrimaryDatasetMetricDefinition()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
   const provider = getPhase1Provider({
     executionContext: options.executionContext ?? "interactive",
