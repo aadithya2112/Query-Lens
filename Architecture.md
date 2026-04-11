@@ -2,7 +2,15 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase keeps retrieval and scoring deterministic over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest, while optionally using Gemini to parse interactive questions and word the final narrative.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation: a built-in dataset definition, a structured query-plan model, a generic analysis orchestrator, and a registered `what changed` executor. Retrieval and scoring remain deterministic over seeded `Postgres` facts, `MongoDB` context, and a repo-managed metric manifest, while Gemini remains constrained to query planning and final wording.
+
+## Target Architecture Direction
+
+The architecture will stay as a single `Next.js` service for the hackathon build. The major change is not service decomposition; it is generalization:
+
+- from one hard-coded phase-1 intent to a reusable query-planning layer
+- from one built-in demo dataset to manifest-backed datasets
+- from one result surface to multi-intent analytics views
 
 ## Current System Diagram
 
@@ -25,13 +33,14 @@ flowchart LR
     SIDE --> METRICS
 
     subgraph ORCH["Server Orchestration"]
-      PARSE["Question Parser (Deterministic or Gemini)"]
-      VALIDATE["Metric / Scope / Timeframe Validation"]
-      ANALYZE["Driver + Evidence Assembly"]
+      PLAN["Query Planner (Deterministic or Gemini)"]
+      VALIDATE["Dataset / Metric / Timeframe Validation"]
+      ORCH["Analysis Orchestrator"]
+      EXEC["Intent Executor"]
       NARRATE["Narrative Provider (Deterministic or Gemini)"]
     end
 
-    QUERY --> PARSE --> VALIDATE --> ANALYZE --> NARRATE --> QUERY
+    QUERY --> PLAN --> VALIDATE --> ORCH --> EXEC --> NARRATE --> QUERY
 
     subgraph DATA["Data Sources"]
       PG["Postgres\naccounts, daily metrics, weekly metrics"]
@@ -41,11 +50,11 @@ flowchart LR
       GEMINI["Gemini API\nstructured parse + narrative output"]
     end
 
-    ANALYZE --> PG
-    ANALYZE --> MG
+    EXEC --> PG
+    EXEC --> MG
     VALIDATE --> MANIFEST
-    ANALYZE --> FIXTURE
-    PARSE --> GEMINI
+    EXEC --> FIXTURE
+    PLAN --> GEMINI
     NARRATE --> GEMINI
 
     subgraph OPS["Local Ops"]
@@ -73,12 +82,12 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 ## Current Request Lifecycle
 
 1. The user submits a question through chat.
-2. The server parses it into the phase-1 `what changed` shape, using deterministic rules by default and Gemini tool calling when interactive AI mode is enabled.
-3. The request is validated against the supported metric, scope, and timeframe rules.
-4. The analysis layer reads weekly movement from `Postgres`.
-5. The analysis layer reads corroborating context from `MongoDB`, or falls back to fixtures if live services are unavailable.
+2. The server produces a structured query plan for the built-in dataset, using deterministic rules by default and Gemini planning when interactive AI mode is enabled.
+3. The plan is validated against the dataset definition, supported metric, and allowed timeframe rules.
+4. The analysis orchestrator dispatches the plan to the registered `what changed` executor.
+5. The executor reads weekly movement from `Postgres` and corroborating context from `MongoDB`, or falls back to fixtures if live services are unavailable.
 6. Drivers, evidence, confidence, assumptions, and chart data are assembled deterministically into a grounded response payload.
-7. For interactive requests only, the parser can ask Gemini for a constrained tool call and the narrative provider can ask Gemini for a structured headline and summary, with deterministic fallback if Gemini is unavailable or invalid.
+7. For interactive requests only, the planner can ask Gemini for a constrained structured plan and the narrative provider can ask Gemini for a structured headline and summary, with deterministic fallback if Gemini is unavailable or invalid.
 8. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
 
 ## Data Responsibilities
@@ -113,7 +122,8 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 ## Immediate Next Gap
 
-The current architecture is stable for the shipped phase-1 slice. The next gap is now product expansion on top of the proven path, most likely:
+The Stage 1 foundation is now complete for the built-in dataset. The next gaps to meet the challenge are:
 
-- a second query slice such as `breakdown`
-- or richer trust/debug UX around the Gemini-assisted path
+- dataset onboarding and manifest persistence
+- the missing intent families: `breakdown`, `compare`, and `weekly briefing`
+- richer trust/debug UX around the Gemini-assisted path

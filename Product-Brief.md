@@ -2,7 +2,7 @@
 
 ## Vision
 
-`QueryLens` helps non-technical stakeholders ask plain-English questions about portfolio data and receive answers they can trust immediately. It should feel like a modern banking intelligence cockpit, not a generic AI wrapper or a developer SQL console.
+`QueryLens` helps non-technical stakeholders ask plain-English questions about data and receive answers they can trust immediately. It should feel like a modern intelligence cockpit, not a generic AI wrapper or a developer SQL console.
 
 ## Current Delivered Milestone
 
@@ -13,6 +13,22 @@ The current shipped milestone is intentionally narrow:
 - one flagship question: `Why did SME cashflow health drop last week?`
 - optional phase-1 scope filters for `region` and `sector`
 - visible trust evidence from both structured facts and contextual signals
+- Stage 1 foundation complete under the hood: built-in dataset abstraction, structured query plans, and a generic orchestrator
+
+## Challenge Completion Direction
+
+To meet the full hackathon brief, `QueryLens` needs to grow from this narrow vertical slice into a reusable natural-language analytics product with:
+
+- reusable dataset onboarding for tabular data
+- a semantic layer / metric manifest per dataset
+- four supported intent families:
+  - `what changed`
+  - `breakdown`
+  - `compare`
+  - `weekly briefing`
+- deterministic data execution with Gemini constrained to structured planning and wording
+
+The immediate next user-visible step is `breakdown`, now that the Stage 1 engine groundwork is complete.
 
 ## Target User
 
@@ -40,9 +56,11 @@ These are part of the product direction, but they are not yet implemented and sh
 1. `What makes up at-risk accounts by region and sector?`
 2. `Compare hospitality vs retail SMEs this month.`
 3. `Give me this week's portfolio briefing.`
+4. `Ask the same style of questions against a newly onboarded tabular dataset.`
 
 ## Experience Rules
 
 - Keep the tone calm, premium, and trustworthy.
 - Keep chat as the interaction model, but always pair it with visible evidence.
 - Prefer constrained, honest capability over broad but flimsy AI claims.
+- Do not introduce a separate backend service for the hackathon build unless a later production need clearly forces it.

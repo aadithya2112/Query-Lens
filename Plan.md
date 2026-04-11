@@ -7,6 +7,7 @@
 - `Docker Compose`, seed data, `Vitest`, `Playwright`, and Bun-based build validation are in place.
 - The current shipped capability is one narrow but strong flow: `what changed` for `cashflow_health_score`.
 - The live `database` mode path, submission-ready packaging cleanup, and root `README.md` are now complete.
+- Stage 1 foundation is now in place: built-in dataset abstraction, structured query plans, a generic orchestrator, and a dedicated `what changed` executor.
 
 ## What Is Already Done
 
@@ -28,9 +29,9 @@
 ### Server Flow
 
 - `POST /api/query` and `GET /api/metrics` are implemented.
-- Query handling is deterministic and constrained to the phase-1 `what changed` flow.
-- The server parses the question, validates scope and timeframe, queries data sources, ranks evidence, and renders a grounded response.
-- The phase-1 provider now supports optional Gemini-assisted parsing and narrative generation with deterministic fallback.
+- Query handling still serves the phase-1 `what changed` flow, but now runs through a generalized internal query engine.
+- The server now uses a built-in dataset definition, a structured query-plan model, a generic orchestrator, and a registered intent executor.
+- Gemini-assisted planning and narrative generation remain constrained and deterministic fallback remains intact.
 
 ### Quality and Stability
 
@@ -38,26 +39,82 @@
 - Bun `lint`, `test`, `build`, and the Playwright smoke flow pass in the current fixture-backed flow.
 - Docker services boot and the seed script completes successfully.
 
+## Requirements Gap
+
+The current product is demoable, but it does not yet satisfy the full challenge brief.
+
+- Shipped today:
+  - one dataset story
+  - one metric
+  - one intent family: `what changed`
+  - Gemini-assisted parsing and narration with deterministic data execution
+  - Stage 1 engine foundations for future intents
+- Still required for a requirements-complete submission:
+  - reusable dataset onboarding
+  - `breakdown`
+  - `compare`
+  - `weekly briefing`
+  - richer trust/debug UX on top of the generalized engine
+
+## Requirements Completion Roadmap
+
+### Step 1. Generalize the Core Query Engine
+
+Status: complete for the built-in SME portfolio dataset.
+
+- Replace the phase-1-only parser contract with a reusable structured query plan.
+- Keep Gemini constrained to structured parsing and wording only.
+- Keep data retrieval deterministic and manifest-driven.
+
+### Step 2. Add Reusable Dataset Onboarding
+
+- Introduce dataset manifests, schema profiling, and a reusable onboarding path for tabular datasets.
+- Keep the current SME portfolio as the built-in default judged dataset.
+
+### Step 3. Add the Missing Product Use Cases
+
+- `breakdown`
+- `compare`
+- `weekly briefing`
+
+Recommended implementation order:
+
+1. `breakdown`
+2. `compare`
+3. `weekly briefing`
+
+### Step 4. Upgrade the Workspace for Multi-Intent Answers
+
+- Add dataset selection.
+- Render intent-specific result surfaces while keeping evidence first.
+- Expose a lightweight interpretation trace so users can see how QueryLens understood the request.
+
+### Step 5. Tighten Trust, Clarity, and Speed
+
+- Expand source attribution, assumptions, and confidence rules.
+- Add privacy-aware dataset handling for onboarded data.
+- Keep the local demo fast and honest under fallback conditions.
+
 ## Remaining Tasks
 
 1. Keep the repo honest and polished as the product grows.
    - Keep planning and architecture notes aligned with the latest shipped stages.
    - Keep the submission story centered on what is actually implemented.
 
-2. Defer broader feature work until a new stage is deliberately chosen.
+2. Work through the requirements roadmap one stage at a time.
+   - dataset onboarding
    - `breakdown`
    - `compare`
    - `weekly briefing`
-   - richer Gemini usage beyond the current constrained parsing and narration path
+   - trust/debug polish
 
 ## Next Fully Testable Slice
 
 ### Goal
 
-Choose one narrow next stage and complete it end to end:
+Use the completed Stage 1 foundation to ship the first new user-facing product slice:
 
-- a second product slice such as `breakdown`
-- or the second product slice: `breakdown` for at-risk accounts by region and sector
+- `breakdown` for at-risk accounts by region and sector
 
 ### Done When
 
@@ -67,8 +124,8 @@ Choose one narrow next stage and complete it end to end:
 
 ### Order of Work
 
-1. Pick the next product slice, most likely `breakdown`, now that the Gemini-assisted phase-1 flow is in place.
-2. Implement only that stage without expanding into adjacent feature families.
+1. Build `breakdown` on top of the current dataset abstraction, query-plan model, and orchestrator.
+2. Keep the current flagship `what changed` flow stable while adding the new executor and UI surface.
 3. Add focused tests and one demoable gold-path flow.
 4. Re-run the full validation stack and update docs if the shipped surface changes.
 
@@ -77,4 +134,5 @@ Choose one narrow next stage and complete it end to end:
 - Keep the app as a single `Next.js` service.
 - Keep phase 1 local-first and Docker-backed.
 - Keep fixture mode as the safe fallback when databases are unavailable.
-- Do not expand product scope broadly; add one small, fully tested stage at a time.
+- Do not jump to broad autonomous-agent behavior; keep Gemini constrained and the execution path deterministic.
+- Add one small, fully tested stage at a time.

@@ -8,6 +8,10 @@ The current shipped milestone is intentionally focused on one strong phase-1 flo
 
 - `QueryLens` three-pane interface with chat, evidence workspace, and source/metric sidebar
 - Phase-1 `what changed` analysis for `cashflow_health_score`
+- Stage 1 internal query-engine foundation:
+  - built-in dataset abstraction for `sme_portfolio`
+  - structured query-plan model
+  - generic orchestrator and registered `what changed` executor
 - Supported time windows: `this week` and `last week`
 - Optional phase-1 scope filters for `region` and `sector`
 - Cross-source evidence using seeded `Postgres` portfolio facts and `MongoDB` contextual signals
@@ -165,6 +169,7 @@ bun run test:e2e
 QueryLens is a single `Next.js` application with an integrated server layer.
 
 - `POST /api/query` parses and validates the question, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
+- The server now routes requests through a built-in dataset definition, a structured query-plan model, and a generic analysis orchestrator before executing the current `what changed` intent.
 - `GET /api/metrics` exposes the phase-1 metric manifest.
 - Interactive query parsing and narration can use Gemini with structured output and tool calling, while bootstrap, data retrieval, evidence assembly, and fallback behavior remain deterministic.
 - Fixture mode remains available as a safe fallback when live databases are not running.
@@ -193,9 +198,11 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 - Gemini currently helps only with interactive parsing and wording; scoring, evidence ranking, source reads, and fallback logic remain deterministic.
 - Database mode is meant for local Docker-backed use, not public deployment.
 - The current trace/debug details are lightweight and development-oriented.
+- Only one built-in dataset is supported today; reusable dataset onboarding is not implemented yet.
 
 ## Future Improvements
 
+- Add reusable dataset onboarding for tabular datasets
 - Add `breakdown`, `compare`, and `weekly briefing`
 - Expand metric coverage beyond `cashflow_health_score`
 - Improve source health and trace detail for richer trust UX

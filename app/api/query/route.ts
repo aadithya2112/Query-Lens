@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { analyzePhase1Query } from "@/lib/querylens/server/analysis"
+import { analyzeQuery } from "@/lib/querylens/server/analysis-orchestrator"
 
 const queryRequestSchema = z.object({
   question: z.string().min(1, "Question is required."),
@@ -15,7 +15,7 @@ const queryRequestSchema = z.object({
 export async function POST(request: Request) {
   try {
     const payload = queryRequestSchema.parse(await request.json())
-    const response = await analyzePhase1Query(payload)
+    const response = await analyzeQuery(payload)
     return Response.json(response)
   } catch (error) {
     if (error instanceof z.ZodError) {

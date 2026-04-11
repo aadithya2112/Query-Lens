@@ -1,14 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 const geminiGenerateMock = vi.fn()
+let POST: typeof import("@/app/api/query/route")["POST"]
 
 vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
 }))
 
 describe("/api/query Gemini narrative mode", () => {
+  beforeAll(async () => {
+    ;({ POST } = await import("@/app/api/query/route"))
+  })
+
   beforeEach(() => {
-    vi.resetModules()
     geminiGenerateMock.mockReset()
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
@@ -35,7 +39,6 @@ describe("/api/query Gemini narrative mode", () => {
       },
     })
 
-    const { POST } = await import("@/app/api/query/route")
     const request = new Request("http://localhost/api/query", {
       method: "POST",
       headers: {
