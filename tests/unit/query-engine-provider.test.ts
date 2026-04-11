@@ -28,6 +28,7 @@ describe("query engine provider", () => {
         {
           name: "submit_analytics_query_plan",
           args: {
+            intent: "what_changed",
             metric: "cashflow_health_score",
             timeframe: "last_week",
             region: "North West",

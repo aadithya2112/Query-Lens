@@ -37,11 +37,26 @@ const narrativeResponseSchema = z.object({
 })
 
 const submitWhatChangedSchema = z.object({
+  intent: z.literal("what_changed"),
   metric: z.literal("cashflow_health_score"),
   timeframe: z.enum(["this_week", "last_week"]),
   region: z.string().min(1).optional(),
   sector: z.string().min(1).optional(),
 })
+
+const submitBreakdownSchema = z.object({
+  intent: z.literal("breakdown"),
+  metric: z.literal("at_risk_account_count"),
+  timeframe: z.enum(["this_week", "last_week"]),
+  breakdownDimension: z.enum(["region", "sector", "region_sector"]),
+  region: z.string().min(1).optional(),
+  sector: z.string().min(1).optional(),
+})
+
+const submitQueryPlanSchema = z.discriminatedUnion("intent", [
+  submitWhatChangedSchema,
+  submitBreakdownSchema,
+])
 
 interface NarrativeInput {
   parsed: StructuredQueryPlan
@@ -184,15 +199,23 @@ const plannerTools: FunctionDeclaration[] = [
     parametersJsonSchema: {
       type: "object",
       additionalProperties: false,
-      required: ["metric", "timeframe"],
+      required: ["intent", "metric", "timeframe"],
       properties: {
+        intent: {
+          type: "string",
+          enum: ["what_changed", "breakdown"],
+        },
         metric: {
           type: "string",
-          enum: ["cashflow_health_score"],
+          enum: ["cashflow_health_score", "at_risk_account_count"],
         },
         timeframe: {
           type: "string",
           enum: ["this_week", "last_week"],
+        },
+        breakdownDimension: {
+          type: "string",
+          enum: ["region", "sector", "region_sector"],
         },
         region: {
           type: "string",
@@ -228,13 +251,17 @@ You must choose exactly one function call.
 
 Supported product boundaries:
 - intent: what changed
-- metric: cashflow_health_score only
-- timeframe: this_week or last_week only
-- optional scope dimensions: region and sector
+  - metric: cashflow_health_score
+  - timeframe: this_week or last_week
+- intent: breakdown
+  - metric: at_risk_account_count
+  - timeframe: this_week or last_week
+  - breakdownDimension: region, sector, or region_sector
+- optional scope filters: region and sector
 - supported regions: North West, London & South East, Midlands
 - supported sectors: Hospitality, Retail, Professional Services
 
-Reject requests about unsupported metrics, unsupported time windows, comparisons, briefings, uploads, or anything outside the phase-1 "what changed" flow.
+Reject requests about unsupported metrics, unsupported time windows, comparisons, briefings, uploads, or anything outside the current what-changed and breakdown flows.
 
 Question:
 ${question}
@@ -296,7 +323,7 @@ async function planQueryWithGemini(
     return undefined
   }
 
-  const parsedArgs = submitWhatChangedSchema.safeParse(call.args)
+  const parsedArgs = submitQueryPlanSchema.safeParse(call.args)
 
   if (!parsedArgs.success) {
     return undefined
@@ -324,7 +351,7 @@ async function planQueryWithGemini(
   const parsed = {
     datasetId: getDefaultDatasetId(),
     rawQuestion: question,
-    intent: "what_changed" as const,
+    intent: parsedArgs.data.intent,
     metricId: parsedArgs.data.metric,
     timeframe: parsedArgs.data.timeframe,
     scope,
@@ -333,6 +360,10 @@ async function planQueryWithGemini(
       timeframe: parsedArgs.data.timeframe,
       comparisonBasis: "prior_period" as const,
     },
+    breakdownDimension:
+      parsedArgs.data.intent === "breakdown"
+        ? parsedArgs.data.breakdownDimension
+        : undefined,
   }
 
   return {

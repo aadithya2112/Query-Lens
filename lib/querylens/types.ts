@@ -122,6 +122,17 @@ export interface ContextEvent {
   detail: string
 }
 
+export interface WeeklyAccountStressRow {
+  weekStart: string
+  accountId: string
+  regionId: string
+  sectorId: string
+  regionName: string
+  sectorName: string
+  lowBalanceDays: number
+  hasOverdue: boolean
+}
+
 export interface SeedDataset {
   regions: Region[]
   sectors: Sector[]

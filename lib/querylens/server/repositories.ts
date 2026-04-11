@@ -7,12 +7,17 @@ import type {
   ContextEvent,
   ScopeFilter,
   SourceHealth,
+  WeeklyAccountStressRow,
   WeeklyMetricRow,
 } from "@/lib/querylens/types"
 
 export interface QueryLensDataAccess {
   sourceMode: "database" | "fixture"
   listWeeklyMetrics(): Promise<WeeklyMetricRow[]>
+  listWeeklyAccountStress(args: {
+    targetStart: string
+    scope: ScopeFilter
+  }): Promise<WeeklyAccountStressRow[]>
   listContextEvents(args: {
     targetStart: string
     targetEnd: string
@@ -60,6 +65,17 @@ interface CountRow {
   count: number | string
 }
 
+interface WeeklyAccountStressDbRow {
+  week_start: string | Date
+  account_id: string
+  region_id: string
+  sector_id: string
+  region_name: string
+  sector_name: string
+  low_balance_days: number | string
+  has_overdue: boolean
+}
+
 function sortContextEvents(left: ContextEvent, right: ContextEvent) {
   const severityOrder = { high: 0, medium: 1, low: 2 }
   const severitySort = severityOrder[left.severity] - severityOrder[right.severity]
@@ -84,6 +100,60 @@ class FixtureDataAccess implements QueryLensDataAccess {
 
   async listWeeklyMetrics(): Promise<WeeklyMetricRow[]> {
     return getSeedDataset().weeklyMetrics
+  }
+
+  async listWeeklyAccountStress(args: {
+    targetStart: string
+    scope: ScopeFilter
+  }): Promise<WeeklyAccountStressRow[]> {
+    const dataset = getSeedDataset()
+    const grouped = new Map<string, WeeklyAccountStressRow>()
+
+    dataset.dailyMetrics
+      .filter((metric) => {
+        if (metric.weekStart !== args.targetStart) return false
+        if (args.scope.region && metric.regionId !== args.scope.region) return false
+        if (args.scope.sector && metric.sectorId !== args.scope.sector) return false
+        return true
+      })
+      .forEach((metric) => {
+        const account = dataset.accounts.find(
+          (candidate) => candidate.id === metric.accountId
+        )
+        const region = dataset.regions.find(
+          (candidate) => candidate.id === metric.regionId
+        )
+        const sector = dataset.sectors.find(
+          (candidate) => candidate.id === metric.sectorId
+        )
+
+        if (!account || !region || !sector) {
+          return
+        }
+
+        const existing = grouped.get(metric.accountId)
+
+        if (existing) {
+          existing.lowBalanceDays += metric.lowBalanceFlag ? 1 : 0
+          existing.hasOverdue = existing.hasOverdue || metric.overdueFlag
+          return
+        }
+
+        grouped.set(metric.accountId, {
+          weekStart: metric.weekStart,
+          accountId: account.id,
+          regionId: region.id,
+          sectorId: sector.id,
+          regionName: region.name,
+          sectorName: sector.name,
+          lowBalanceDays: metric.lowBalanceFlag ? 1 : 0,
+          hasOverdue: metric.overdueFlag,
+        })
+      })
+
+    return Array.from(grouped.values()).sort((left, right) =>
+      left.accountId.localeCompare(right.accountId)
+    )
   }
 
   async listContextEvents(args: {
@@ -225,6 +295,53 @@ class DatabaseDataAccess implements QueryLensDataAccess {
       overdueScore: Number(row.overdue_score),
       cashflowHealthScore: Number(row.cashflow_health_score),
     })) as WeeklyMetricRow[]
+  }
+
+  async listWeeklyAccountStress(args: {
+    targetStart: string
+    scope: ScopeFilter
+  }): Promise<WeeklyAccountStressRow[]> {
+    const pool = getPgPool()
+    const result = await pool.query<WeeklyAccountStressDbRow>(
+      `
+        SELECT
+          dam.week_start,
+          dam.account_id,
+          a.region_id,
+          a.sector_id,
+          r.name AS region_name,
+          s.name AS sector_name,
+          COUNT(*) FILTER (WHERE dam.low_balance_flag)::int AS low_balance_days,
+          BOOL_OR(dam.overdue_flag) AS has_overdue
+        FROM daily_account_metrics dam
+        INNER JOIN accounts a ON a.id = dam.account_id
+        INNER JOIN regions r ON r.id = a.region_id
+        INNER JOIN sectors s ON s.id = a.sector_id
+        WHERE dam.week_start = $1
+          AND ($2::text IS NULL OR a.region_id = $2)
+          AND ($3::text IS NULL OR a.sector_id = $3)
+        GROUP BY
+          dam.week_start,
+          dam.account_id,
+          a.region_id,
+          a.sector_id,
+          r.name,
+          s.name
+        ORDER BY dam.account_id
+      `,
+      [args.targetStart, args.scope.region ?? null, args.scope.sector ?? null]
+    )
+
+    return result.rows.map((row) => ({
+      weekStart: normalizeDateValue(row.week_start),
+      accountId: row.account_id,
+      regionId: row.region_id,
+      sectorId: row.sector_id,
+      regionName: row.region_name,
+      sectorName: row.sector_name,
+      lowBalanceDays: Number(row.low_balance_days),
+      hasOverdue: row.has_overdue,
+    }))
   }
 
   async listContextEvents(args: {

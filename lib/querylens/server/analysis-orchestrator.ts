@@ -1,6 +1,6 @@
-import { getPrimaryDatasetMetricDefinition } from "@/lib/querylens/datasets"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
+import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
 import {
   buildWhatChangedFallbackResponse,
   executeWhatChangedPlan,
@@ -23,6 +23,9 @@ interface IntentExecutor {
 }
 
 const executors: Partial<Record<QueryIntent, IntentExecutor>> = {
+  breakdown: {
+    execute: executeBreakdownPlan,
+  },
   what_changed: {
     execute: executeWhatChangedPlan,
   },
@@ -33,7 +36,6 @@ export async function analyzeQuery(
   options: { executionContext?: QueryLensExecutionContext } = {}
 ): Promise<Phase1AnalysisResponse> {
   const dataAccess = await getQueryLensDataAccess()
-  const metric = getPrimaryDatasetMetricDefinition()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
   const provider = getQueryEngineProvider({
     executionContext: options.executionContext ?? "interactive",
@@ -70,6 +72,6 @@ export async function analyzeQuery(
 
   return {
     ...response,
-    metric: metric.id,
+    metric: response.metric ?? parseResult.parsed.metricId,
   }
 }

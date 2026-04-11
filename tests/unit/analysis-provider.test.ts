@@ -42,11 +42,17 @@ describe("phase-1 provider selection", () => {
     const provider = getPhase1Provider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
       parsed: {
+        datasetId: "sme_portfolio",
         rawQuestion: "Why did SME cashflow health drop last week?",
         intent: "what_changed",
-        metric: "cashflow_health_score",
+        metricId: "cashflow_health_score",
         timeframe: "last_week",
         scope: {},
+        scopeDimensions: ["portfolio"],
+        comparisonWindow: {
+          timeframe: "last_week",
+          comparisonBasis: "prior_period",
+        },
       },
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
@@ -91,11 +97,17 @@ describe("phase-1 provider selection", () => {
     const provider = getPhase1Provider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
       parsed: {
+        datasetId: "sme_portfolio",
         rawQuestion: "Why did SME cashflow health drop last week?",
         intent: "what_changed",
-        metric: "cashflow_health_score",
+        metricId: "cashflow_health_score",
         timeframe: "last_week",
         scope: {},
+        scopeDimensions: ["portfolio"],
+        comparisonWindow: {
+          timeframe: "last_week",
+          comparisonBasis: "prior_period",
+        },
       },
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
@@ -127,11 +139,17 @@ describe("phase-1 provider selection", () => {
     const provider = getPhase1Provider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
       parsed: {
+        datasetId: "sme_portfolio",
         rawQuestion: "Why did SME cashflow health drop last week?",
         intent: "what_changed",
-        metric: "cashflow_health_score",
+        metricId: "cashflow_health_score",
         timeframe: "last_week",
         scope: {},
+        scopeDimensions: ["portfolio"],
+        comparisonWindow: {
+          timeframe: "last_week",
+          comparisonBasis: "prior_period",
+        },
       },
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
@@ -166,6 +184,7 @@ describe("phase-1 provider selection", () => {
         {
           name: "submit_analytics_query_plan",
           args: {
+            intent: "what_changed",
             metric: "cashflow_health_score",
             timeframe: "last_week",
             region: "North West",
@@ -223,6 +242,7 @@ describe("phase-1 provider selection", () => {
         {
           name: "submit_analytics_query_plan",
           args: {
+            intent: "what_changed",
             metric: "cashflow_health_score",
             timeframe: "last_week",
             region: "Atlantis",
@@ -252,6 +272,7 @@ describe("phase-1 provider selection", () => {
         {
           name: "submit_analytics_query_plan",
           args: {
+            intent: "what_changed",
             metric: "cashflow_health_score",
             timeframe: "this_week",
             region: "Midlands",

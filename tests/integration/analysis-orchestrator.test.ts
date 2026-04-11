@@ -21,4 +21,16 @@ describe("analysis orchestrator", () => {
     expect(payload.fallback).toBe(true)
     expect(payload.summary).toContain("cashflow health")
   })
+
+  it("dispatches breakdown questions through the new breakdown executor", async () => {
+    const payload = await analyzeQuery({
+      question: "What makes up at-risk accounts by region and sector last week?",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.metric).toBe("at_risk_account_count")
+    expect(payload.headline).toContain("at-risk")
+    expect(payload.drivers.length).toBeGreaterThanOrEqual(1)
+    expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
+  })
 })
