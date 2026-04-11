@@ -33,4 +33,15 @@ describe("analysis orchestrator", () => {
     expect(payload.drivers.length).toBeGreaterThanOrEqual(1)
     expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
   })
+
+  it("dispatches timeframe compare questions through the compare executor", async () => {
+    const payload = await analyzeQuery({
+      question: "Compare cashflow health this week vs last week",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.comparisonSummary?.mode).toBe("timeframe")
+    expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
+  })
 })

@@ -33,7 +33,7 @@ interface WhatChangedExecutorArgs {
   >
 }
 
-function getScopeLabel(scope: ScopeFilter) {
+export function getScopeLabel(scope: ScopeFilter) {
   const dataset = getSeedDataset()
   const regionName = scope.region
     ? dataset.regions.find((region) => region.id === scope.region)?.name
@@ -311,7 +311,7 @@ export function buildWhatChangedFallbackResponse(args: {
   rows: WeeklyMetricRow[]
 }): Phase1AnalysisResponse {
   return {
-    headline: "Phase 1 currently supports cashflow health change questions",
+    headline: "QueryLens currently supports grounded cashflow change and compare questions",
     summary: args.fallbackReason,
     metric: "cashflow_health_score",
     timeframe: "Ask about this week or last week",
@@ -331,6 +331,7 @@ export function buildWhatChangedFallbackResponse(args: {
     ],
     supportedFollowUps: [
       DEFAULT_FLAGSHIP_QUESTION,
+      "Compare cashflow health this week vs last week",
       "Why did hospitality cashflow health drop last week?",
       "Why did North West cashflow health drop this week?",
     ],

@@ -1,6 +1,7 @@
 import { FunctionCallingConfigMode, type FunctionDeclaration } from "@google/genai"
 import { z } from "zod"
 
+import { getSeedDataset } from "@/lib/querylens/seed-data"
 import {
   getDefaultDatasetId,
 } from "@/lib/querylens/datasets"
@@ -9,10 +10,17 @@ import {
   shouldUseGemini,
 } from "@/lib/querylens/server/ai-config"
 import { generateGeminiResponse } from "@/lib/querylens/server/gemini-client"
-import { resolvePhase1Scope } from "@/lib/querylens/server/parser"
-import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
+import {
+  resolvePhase1Scope,
+  resolvePhase1ScopeValue,
+} from "@/lib/querylens/server/parser"
+import {
+  planDeterministicQuery,
+  validateQueryPlan,
+} from "@/lib/querylens/server/query-planner"
 import { roundTo } from "@/lib/querylens/scoring"
 import type {
+  CompareSpec,
   ContextEvent,
   DriverItem,
   Phase1AnalysisResponse,
@@ -53,9 +61,22 @@ const submitBreakdownSchema = z.object({
   sector: z.string().min(1).optional(),
 })
 
+const submitCompareSchema = z.object({
+  intent: z.literal("compare"),
+  metric: z.literal("cashflow_health_score"),
+  timeframe: z.enum(["this_week", "last_week"]),
+  compareMode: z.enum(["timeframe", "peer"]),
+  compareDimension: z.enum(["region", "sector"]).optional(),
+  region: z.string().min(1).optional(),
+  sector: z.string().min(1).optional(),
+  leftEntity: z.string().min(1).optional(),
+  rightEntity: z.string().min(1).optional(),
+})
+
 const submitQueryPlanSchema = z.discriminatedUnion("intent", [
   submitWhatChangedSchema,
   submitBreakdownSchema,
+  submitCompareSchema,
 ])
 
 interface NarrativeInput {
@@ -203,7 +224,7 @@ const plannerTools: FunctionDeclaration[] = [
       properties: {
         intent: {
           type: "string",
-          enum: ["what_changed", "breakdown"],
+          enum: ["what_changed", "breakdown", "compare"],
         },
         metric: {
           type: "string",
@@ -217,10 +238,24 @@ const plannerTools: FunctionDeclaration[] = [
           type: "string",
           enum: ["region", "sector", "region_sector"],
         },
+        compareMode: {
+          type: "string",
+          enum: ["timeframe", "peer"],
+        },
+        compareDimension: {
+          type: "string",
+          enum: ["region", "sector"],
+        },
         region: {
           type: "string",
         },
         sector: {
+          type: "string",
+        },
+        leftEntity: {
+          type: "string",
+        },
+        rightEntity: {
           type: "string",
         },
       },
@@ -257,11 +292,16 @@ Supported product boundaries:
   - metric: at_risk_account_count
   - timeframe: this_week or last_week
   - breakdownDimension: region, sector, or region_sector
+- intent: compare
+  - metric: cashflow_health_score
+  - timeframe: this_week or last_week
+  - compareMode: timeframe or peer
+  - compareDimension: region or sector for peer compare
 - optional scope filters: region and sector
 - supported regions: North West, London & South East, Midlands
 - supported sectors: Hospitality, Retail, Professional Services
 
-Reject requests about unsupported metrics, unsupported time windows, comparisons, briefings, uploads, or anything outside the current what-changed and breakdown flows.
+Reject requests about unsupported metrics, unsupported time windows, briefings, uploads, or anything outside the current what-changed, breakdown, and compare flows.
 
 Question:
 ${question}
@@ -282,6 +322,96 @@ function resolveScopeDimensions(scope: ScopeFilter) {
   }
 
   return ["portfolio"] as const
+}
+
+function resolveCompareSpec(args: {
+  question: string
+  data: z.infer<typeof submitCompareSchema>
+  scopeOverride?: ScopeFilter
+}): CompareSpec | undefined {
+  if (args.data.compareMode === "timeframe") {
+    const extractedScope = resolvePhase1Scope({
+      region: args.data.region,
+      sector: args.data.sector,
+    })
+    const overrideScope = resolvePhase1Scope(args.scopeOverride ?? {})
+
+    if (
+      (args.data.region && extractedScope.invalidRegion) ||
+      (args.data.sector && extractedScope.invalidSector) ||
+      overrideScope.invalidRegion ||
+      overrideScope.invalidSector
+    ) {
+      return undefined
+    }
+
+    const scope = {
+      ...extractedScope.scope,
+      ...overrideScope.scope,
+    }
+
+    if (scope.region && scope.sector) {
+      return undefined
+    }
+
+    const dataset = getSeedDataset()
+    const scopeLabel = scope.region
+      ? dataset.regions.find((region) => region.id === scope.region)?.name
+      : scope.sector
+        ? dataset.sectors.find((sector) => sector.id === scope.sector)?.name
+        : undefined
+
+    return {
+      mode: "timeframe",
+      leftTimeframe: "this_week",
+      rightTimeframe: "last_week",
+      leftScope: scope,
+      rightScope: scope,
+      leftLabel: scopeLabel ? `${scopeLabel} · This week` : "This week",
+      rightLabel: scopeLabel ? `${scopeLabel} · Last week` : "Last week",
+    }
+  }
+
+  if (
+    !args.data.compareDimension ||
+    !args.data.leftEntity ||
+    !args.data.rightEntity ||
+    args.scopeOverride?.region ||
+    args.scopeOverride?.sector
+  ) {
+    return undefined
+  }
+
+  const dataset = getSeedDataset()
+  const catalog =
+    args.data.compareDimension === "region" ? dataset.regions : dataset.sectors
+  const leftValue = resolvePhase1ScopeValue(args.data.leftEntity, catalog)
+  const rightValue = resolvePhase1ScopeValue(args.data.rightEntity, catalog)
+
+  if (!leftValue || !rightValue) {
+    return undefined
+  }
+
+  const leftLabel =
+    catalog.find((item) => item.id === leftValue)?.name ?? args.data.leftEntity
+  const rightLabel =
+    catalog.find((item) => item.id === rightValue)?.name ?? args.data.rightEntity
+
+  return {
+    mode: "peer",
+    dimension: args.data.compareDimension,
+    selectedTimeframe: args.data.timeframe,
+    leftScope:
+      args.data.compareDimension === "region"
+        ? { region: leftValue }
+        : { sector: leftValue },
+    rightScope:
+      args.data.compareDimension === "region"
+        ? { region: rightValue }
+        : { sector: rightValue },
+    leftLabel,
+    rightLabel,
+  }
 }
 
 async function planQueryWithGemini(
@@ -348,27 +478,76 @@ async function planQueryWithGemini(
     ...extractedScope.scope,
     ...overrideScope.scope,
   }
-  const parsed = {
-    datasetId: getDefaultDatasetId(),
-    rawQuestion: question,
-    intent: parsedArgs.data.intent,
-    metricId: parsedArgs.data.metric,
-    timeframe: parsedArgs.data.timeframe,
-    scope,
-    scopeDimensions: [...resolveScopeDimensions(scope)],
-    comparisonWindow: {
+
+  const parsed = (() => {
+    if (parsedArgs.data.intent === "compare") {
+      const compareSpec = resolveCompareSpec({
+        question,
+        data: parsedArgs.data,
+        scopeOverride,
+      })
+
+      if (!compareSpec) {
+        return undefined
+      }
+
+      return {
+        datasetId: getDefaultDatasetId(),
+        rawQuestion: question,
+        intent: "compare" as const,
+        metricId: "cashflow_health_score" as const,
+        timeframe:
+          compareSpec.mode === "timeframe"
+            ? "this_week"
+            : parsedArgs.data.timeframe,
+        scope: compareSpec.mode === "timeframe" ? scope : {},
+        scopeDimensions:
+          compareSpec.mode === "timeframe"
+            ? [...resolveScopeDimensions(scope)]
+            : [compareSpec.dimension ?? "portfolio"],
+        comparisonWindow: {
+          timeframe:
+            compareSpec.mode === "timeframe"
+              ? "this_week"
+              : parsedArgs.data.timeframe,
+          comparisonBasis: "prior_period" as const,
+        },
+        compareSpec,
+      }
+    }
+
+    return {
+      datasetId: getDefaultDatasetId(),
+      rawQuestion: question,
+      intent: parsedArgs.data.intent,
+      metricId: parsedArgs.data.metric,
       timeframe: parsedArgs.data.timeframe,
-      comparisonBasis: "prior_period" as const,
-    },
-    breakdownDimension:
-      parsedArgs.data.intent === "breakdown"
-        ? parsedArgs.data.breakdownDimension
-        : undefined,
+      scope,
+      scopeDimensions: [...resolveScopeDimensions(scope)],
+      comparisonWindow: {
+        timeframe: parsedArgs.data.timeframe,
+        comparisonBasis: "prior_period" as const,
+      },
+      breakdownDimension:
+        parsedArgs.data.intent === "breakdown"
+          ? parsedArgs.data.breakdownDimension
+          : undefined,
+    }
+  })()
+
+  if (!parsed) {
+    return undefined
+  }
+
+  const validated = validateQueryPlan(parsed)
+
+  if (!validated.parsed) {
+    return undefined
   }
 
   return {
-    plan: parsed,
-    parsed,
+    plan: validated.parsed,
+    parsed: validated.parsed,
   }
 }
 

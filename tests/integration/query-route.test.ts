@@ -66,4 +66,71 @@ describe("/api/query", () => {
     expect(payload.drivers.length).toBeGreaterThanOrEqual(1)
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "postgres")).toBe(true)
   })
+
+  it("returns a grounded timeframe compare for cashflow health", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "Compare cashflow health this week vs last week",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.comparisonSummary?.mode).toBe("timeframe")
+    expect(payload.comparisonSummary?.leftLabel).toContain("This week")
+    expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "postgres")).toBe(true)
+    expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "mongodb")).toBe(true)
+  })
+
+  it("returns a grounded region peer compare for cashflow health", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "Compare North West vs London & South East cashflow health last week",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.comparisonSummary?.mode).toBe("peer")
+    expect(payload.comparisonSummary?.leftLabel).toBe("North West")
+    expect(payload.comparisonSummary?.rightLabel).toBe("London & South East")
+  })
+
+  it("returns a grounded sector peer compare for cashflow health", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "Compare hospitality vs retail cashflow health this week",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.comparisonSummary?.mode).toBe("peer")
+    expect(payload.comparisonSummary?.leftLabel).toBe("Hospitality")
+    expect(payload.comparisonSummary?.rightLabel).toBe("Retail")
+  })
 })

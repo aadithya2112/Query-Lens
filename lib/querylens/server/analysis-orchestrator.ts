@@ -1,5 +1,6 @@
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
+import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
 import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
 import {
   buildWhatChangedFallbackResponse,
@@ -23,6 +24,9 @@ interface IntentExecutor {
 }
 
 const executors: Partial<Record<QueryIntent, IntentExecutor>> = {
+  compare: {
+    execute: executeComparePlan,
+  },
   breakdown: {
     execute: executeBreakdownPlan,
   },

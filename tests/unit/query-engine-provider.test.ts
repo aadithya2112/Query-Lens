@@ -8,7 +8,6 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
 
 describe("query engine provider", () => {
   beforeEach(() => {
-    vi.resetModules()
     geminiGenerateMock.mockReset()
     process.env.QUERYLENS_GEMINI_MODEL = "gemini-2.5-flash"
   })
@@ -49,6 +48,45 @@ describe("query engine provider", () => {
     expect(result.parsed?.datasetId).toBe("sme_portfolio")
     expect(result.parsed?.metricId).toBe("cashflow_health_score")
     expect(result.parsed?.scope.region).toBe("north_west")
+  })
+
+  it("normalizes Gemini compare plans through the generic provider seam", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+
+    geminiGenerateMock.mockResolvedValue({
+      functionCalls: [
+        {
+          name: "submit_analytics_query_plan",
+          args: {
+            intent: "compare",
+            metric: "cashflow_health_score",
+            timeframe: "last_week",
+            compareMode: "peer",
+            compareDimension: "region",
+            leftEntity: "North West",
+            rightEntity: "London & South East",
+          },
+        },
+      ],
+    })
+
+    const { getQueryEngineProvider } = await import(
+      "@/lib/querylens/server/query-engine-provider"
+    )
+
+    const provider = getQueryEngineProvider({ executionContext: "interactive" })
+    const result = await provider.planQuery(
+      "Compare North West vs London & South East cashflow health last week"
+    )
+
+    expect(result.parsed?.intent).toBe("compare")
+    expect(result.parsed?.compareSpec).toMatchObject({
+      mode: "peer",
+      dimension: "region",
+      leftLabel: "North West",
+      rightLabel: "London & South East",
+    })
   })
 
   it("falls back to deterministic narrative when Gemini output is invalid", async () => {
