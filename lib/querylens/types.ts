@@ -1,9 +1,10 @@
 export type DatasetId = "sme_portfolio"
-export type MetricId = "cashflow_health_score"
+export type MetricId = "cashflow_health_score" | "at_risk_account_count"
 export type SupportedTimeframe = "this_week" | "last_week"
-export type QueryIntent = "what_changed"
+export type QueryIntent = "what_changed" | "breakdown"
 export type ScopeDimension = "portfolio" | "region" | "sector"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
+export type BreakdownDimension = "region" | "sector" | "region_sector"
 export type ContextCollection =
   | "complaints"
   | "service_incidents"
@@ -20,6 +21,7 @@ export interface MetricDefinition {
   label: string
   description: string
   scale: string
+  supportedIntents: QueryIntent[]
   weights: {
     inflowOutflowRatio: number
     balanceTrend: number
@@ -143,6 +145,7 @@ export interface StructuredQueryPlan {
   scope: ScopeFilter
   scopeDimensions: ScopeDimension[]
   comparisonWindow: ComparisonWindow
+  breakdownDimension?: BreakdownDimension
 }
 
 export interface QueryPlanFallback {

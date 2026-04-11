@@ -5,6 +5,7 @@
       "label": "Cashflow health score",
       "description": "Weekly stability score for the SME portfolio combining payment coverage, balance direction, low-balance exposure, and overdue exposure.",
       "scale": "0-100",
+      "supportedIntents": ["what_changed"],
       "weights": {
         "inflowOutflowRatio": 0.4,
         "balanceTrend": 0.25,
@@ -24,6 +25,33 @@
         "Why did SME cashflow health drop last week?",
         "Why did cash flow health drop last week in the North West?",
         "Why did hospitality cashflow health drop this week?"
+      ]
+    },
+    {
+      "id": "at_risk_account_count",
+      "label": "At-risk account count",
+      "description": "Weekly count of accounts showing sustained cashflow stress, based on low-balance days or overdue exposure within the selected week.",
+      "scale": "account count",
+      "supportedIntents": ["breakdown"],
+      "weights": {
+        "inflowOutflowRatio": 0.4,
+        "balanceTrend": 0.25,
+        "lowBalanceExposure": 0.2,
+        "overdueExposure": 0.15
+      },
+      "supportedDimensions": ["region", "sector", "region_sector"],
+      "supportedTimeframes": ["this week", "last week"],
+      "synonyms": [
+        "at risk accounts",
+        "at-risk accounts",
+        "risky accounts",
+        "stressed accounts",
+        "accounts at risk"
+      ],
+      "exampleQuestions": [
+        "What makes up at-risk accounts by region and sector last week?",
+        "Break down at-risk accounts by region this week.",
+        "Show the at-risk account split by sector last week."
       ]
     }
   ]

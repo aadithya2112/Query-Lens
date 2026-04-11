@@ -22,7 +22,7 @@ interface IntentExecutor {
   }): Promise<Phase1AnalysisResponse>
 }
 
-const executors: Record<QueryIntent, IntentExecutor> = {
+const executors: Partial<Record<QueryIntent, IntentExecutor>> = {
   what_changed: {
     execute: executeWhatChangedPlan,
   },

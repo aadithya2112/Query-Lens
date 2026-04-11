@@ -15,7 +15,7 @@ const BUILT_IN_DATASET: DatasetDefinition = {
     "Synthetic SME banking portfolio with weekly cashflow health facts and corroborating context signals.",
   dimensions: ["portfolio", "region", "sector"],
   metrics: getMetricManifest().metrics,
-  supportedIntentIds: ["what_changed"],
+  supportedIntentIds: ["what_changed", "breakdown"],
   supportedTimeframes: ["this_week", "last_week"],
 }
 
