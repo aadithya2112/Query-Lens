@@ -1,12 +1,26 @@
 export type DatasetId = "sme_portfolio"
-export type MetricId = "cashflow_health_score" | "at_risk_account_count"
+export type MetricId =
+  | "cashflow_health_score"
+  | "at_risk_account_count"
+  | "dataset_catalog"
 export type SupportedTimeframe = "this_week" | "last_week"
-export type QueryIntent = "what_changed" | "breakdown" | "compare"
+export type QueryIntent =
+  | "what_changed"
+  | "breakdown"
+  | "compare"
+  | "discovery"
 export type ScopeDimension = "portfolio" | "region" | "sector"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
 export type BreakdownDimension = "region" | "sector" | "region_sector"
 export type CompareMode = "timeframe" | "peer"
 export type CompareDimension = "region" | "sector"
+export type DiscoveryFocus =
+  | "overview"
+  | "metrics"
+  | "sources"
+  | "dimensions"
+  | "time_coverage"
+  | "questions"
 export type ContextCollection =
   | "complaints"
   | "service_incidents"
@@ -174,6 +188,7 @@ export interface StructuredQueryPlan {
   comparisonWindow: ComparisonWindow
   breakdownDimension?: BreakdownDimension
   compareSpec?: CompareSpec
+  discoveryFocus?: DiscoveryFocus
 }
 
 export interface QueryPlanFallback {
@@ -240,7 +255,29 @@ export interface ComparisonSummary {
   tie?: boolean
 }
 
+export interface DiscoverySummary {
+  datasetLabel: string
+  sourceLabels: string[]
+  metricCount: number
+  timeCoverage: string
+  dimensionLabels: string[]
+}
+
+export interface CatalogSection {
+  id: string
+  title: string
+  summary: string
+  items: string[]
+}
+
+export interface RetrievalTrace {
+  datasetMatches: string[]
+  memoryMatches: string[]
+  recentMessagesCount: number
+}
+
 export interface Phase1AnalysisResponse {
+  intent: QueryIntent
   headline: string
   summary: string
   metric: MetricId
@@ -254,12 +291,17 @@ export interface Phase1AnalysisResponse {
   assumptions: string[]
   supportedFollowUps: string[]
   comparisonSummary?: ComparisonSummary
+  discoverySummary?: DiscoverySummary
+  catalogSections?: CatalogSection[]
+  conversationContextUsed?: boolean
+  retrievalTrace?: RetrievalTrace
   fallback?: boolean
   sourceMode: "database" | "fixture"
 }
 
 export interface QueryRequestBody {
   question: string
+  chatId?: string
   scope?: ScopeFilter
 }
 
@@ -277,4 +319,26 @@ export interface BootstrapPayload {
   metrics: MetricDefinition[]
   sourceHealth: SourceHealth[]
   initialAnalysis: Phase1AnalysisResponse
+}
+
+export interface RetrievalMatch {
+  id: string
+  title: string
+  content: string
+  score: number
+  kind: string
+}
+
+export interface StoredConversationMessage {
+  id: string
+  chatId: string
+  role: "user" | "assistant"
+  text: string
+  createdAt: string
+}
+
+export interface RetrievalContext {
+  datasetMatches: RetrievalMatch[]
+  memoryMatches: RetrievalMatch[]
+  recentMessages: StoredConversationMessage[]
 }

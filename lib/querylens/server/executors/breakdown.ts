@@ -278,6 +278,7 @@ export async function executeBreakdownPlan(
       )}.`
 
   return {
+    intent: "breakdown",
     headline,
     summary,
     metric: "at_risk_account_count",

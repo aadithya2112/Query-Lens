@@ -311,6 +311,7 @@ export function buildWhatChangedFallbackResponse(args: {
   rows: WeeklyMetricRow[]
 }): Phase1AnalysisResponse {
   return {
+    intent: "what_changed",
     headline: "QueryLens could not complete that request safely",
     summary: args.fallbackReason,
     metric: "cashflow_health_score",
@@ -393,6 +394,7 @@ export async function executeWhatChangedPlan(
   })
 
   return {
+    intent: "what_changed",
     headline: narrative.headline,
     summary: narrative.summary,
     metric: args.plan.metricId,

@@ -335,6 +335,7 @@ export async function executeComparePlan(
     : `${comparisonSummary.winnerLabel} leads by ${comparisonSummary.delta.toFixed(1)} points in the selected compare view. QueryLens highlights where payment coverage, balance resilience, and stress indicators create the clearest separation.`
 
   return {
+    intent: "compare",
     headline,
     summary,
     metric: "cashflow_health_score",

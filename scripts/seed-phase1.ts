@@ -2,6 +2,14 @@ import { MongoClient } from "mongodb"
 import { Pool } from "pg"
 
 import { getSampleDataset } from "@/lib/querylens/seed-data"
+import {
+  buildDatasetCatalogChunks,
+} from "@/lib/querylens/server/retrieval"
+import {
+  embedTexts,
+  EMBEDDING_DIMENSIONS,
+  formatVectorLiteral,
+} from "@/lib/querylens/server/embedding-service"
 
 async function seedPostgres(pool: Pool) {
   const dataset = getSampleDataset()
@@ -10,6 +18,12 @@ async function seedPostgres(pool: Pool) {
 
   try {
     await pool.query(`
+      CREATE EXTENSION IF NOT EXISTS vector;
+
+      DROP TABLE IF EXISTS conversation_memory_chunks;
+      DROP TABLE IF EXISTS conversation_messages;
+      DROP TABLE IF EXISTS conversation_threads;
+      DROP TABLE IF EXISTS dataset_catalog_chunks;
       DROP TABLE IF EXISTS daily_account_metrics;
       DROP TABLE IF EXISTS weekly_portfolio_metrics;
       DROP TABLE IF EXISTS accounts;
@@ -80,8 +94,46 @@ async function seedPostgres(pool: Pool) {
         cashflow_health_score NUMERIC NOT NULL
       );
 
+      CREATE TABLE dataset_catalog_chunks (
+        id TEXT PRIMARY KEY,
+        chunk_kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        embedding vector(${EMBEDDING_DIMENSIONS}) NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE conversation_threads (
+        chat_id TEXT PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE conversation_messages (
+        id BIGSERIAL PRIMARY KEY,
+        chat_id TEXT NOT NULL REFERENCES conversation_threads(chat_id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        message_text TEXT NOT NULL,
+        intent TEXT,
+        metric_id TEXT,
+        active_scope TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE conversation_memory_chunks (
+        id BIGSERIAL PRIMARY KEY,
+        chat_id TEXT NOT NULL REFERENCES conversation_threads(chat_id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        source_message_ids BIGINT[] NOT NULL DEFAULT '{}',
+        embedding vector(${EMBEDDING_DIMENSIONS}) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       CREATE INDEX daily_account_metrics_week_idx ON daily_account_metrics (week_start, region_id, sector_id);
       CREATE INDEX weekly_portfolio_metrics_scope_idx ON weekly_portfolio_metrics (week_start, record_type, region_id, sector_id);
+      CREATE INDEX conversation_messages_chat_idx ON conversation_messages (chat_id, created_at DESC);
+      CREATE INDEX conversation_memory_chat_idx ON conversation_memory_chunks (chat_id, created_at DESC);
     `)
 
     for (const region of dataset.regions) {
@@ -215,6 +267,28 @@ async function seedPostgres(pool: Pool) {
           metric.lowBalanceScore,
           metric.overdueScore,
           metric.cashflowHealthScore,
+        ]
+      )
+    }
+
+    const catalogChunks = buildDatasetCatalogChunks()
+    const catalogEmbeddings = await embedTexts({
+      texts: catalogChunks.map((chunk) => chunk.content),
+      task: "document",
+    })
+
+    for (const [index, chunk] of catalogChunks.entries()) {
+      await pool.query(
+        `
+          INSERT INTO dataset_catalog_chunks (id, chunk_kind, title, content, embedding)
+          VALUES ($1, $2, $3, $4, $5::vector)
+        `,
+        [
+          chunk.id,
+          chunk.kind,
+          chunk.title,
+          chunk.content,
+          formatVectorLiteral(catalogEmbeddings[index]),
         ]
       )
     }
