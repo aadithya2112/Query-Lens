@@ -4,15 +4,15 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --ql-bg: #09111a;
-  --ql-panel: rgba(13, 20, 30, 0.84);
-  --ql-panel-solid: #101924;
+  --ql-bg: #09090b;
+  --ql-panel: rgba(24, 24, 27, 0.84);
+  --ql-panel-solid: #18181b;
   --ql-border: rgba(255, 255, 255, 0.08);
-  --ql-text: #edf2f8;
-  --ql-muted: #97a4b5;
-  --ql-accent: #c9a76a;
-  --ql-success: #7cc2a1;
-  --ql-warn: #d8a17e;
+  --ql-text: #fafafa;
+  --ql-muted: #a1a1aa;
+  --ql-accent: #ffffff;
+  --ql-success: #4ade80;
+  --ql-warn: #fbbf24;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

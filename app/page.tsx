@@ -19,6 +19,14 @@ export default function Home() {
             </Button>
             <Button
               asChild
+              variant="secondary"
+              size="lg"
+              className="h-12 px-8 text-base"
+            >
+              <Link href="/explorer">Explorer View</Link>
+            </Button>
+            <Button
+              asChild
               variant="outline"
               size="lg"
               className="h-12 px-8 text-base"

@@ -1,13 +1,36 @@
-'use client'
+"use client"
 
 import { startTransition, useState } from "react"
 
-import ChatPanel, { type ConversationMessage } from "@/components/querylens/chat-panel"
+import { Activity, Settings2 } from "lucide-react"
+
+import ChatPanel, {
+  type ConversationMessage,
+} from "@/components/querylens/chat-panel"
 import EvidencePanel from "@/components/querylens/evidence-panel"
 import Sidebar from "@/components/querylens/sidebar"
-import type { BootstrapPayload, Phase1AnalysisResponse } from "@/lib/querylens/types"
+import { Button } from "@/components/ui/button"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
+} from "@/components/ui/sheet"
+import type {
+  BootstrapPayload,
+  Phase1AnalysisResponse,
+} from "@/lib/querylens/types"
 
-function buildAssistantMessage(analysis: Phase1AnalysisResponse): ConversationMessage {
+function buildAssistantMessage(
+  analysis: Phase1AnalysisResponse,
+): ConversationMessage {
   return {
     id: `assistant-${Date.now()}`,
     role: "assistant",
@@ -71,7 +94,10 @@ export default function Workspace({
       const analysis = (await response.json()) as Phase1AnalysisResponse
 
       startTransition(() => {
-        setMessages((currentMessages) => [...currentMessages, buildAssistantMessage(analysis)])
+        setMessages((currentMessages) => [
+          ...currentMessages,
+          buildAssistantMessage(analysis),
+        ])
         setActiveAnalysis(analysis)
       })
     } catch (error) {
@@ -92,30 +118,76 @@ export default function Workspace({
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(201,167,106,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(72,101,130,0.16),transparent_24%),linear-gradient(180deg,#071019_0%,#0b121b_45%,#0d131c_100%)] text-[var(--ql-text)]">
-      <header className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(7,11,18,0.68)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1800px] items-center justify-between px-4 py-5 lg:px-6">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--ql-accent)]">
-              QueryLens
-            </p>
-            <h1 className="mt-1 text-lg font-semibold text-white lg:text-xl">
-              Cross-source “what changed” vertical slice
-            </h1>
-          </div>
-          <div className="hidden text-right lg:block">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--ql-muted)]">
-              Phase 1
-            </p>
-            <p className="mt-1 text-sm text-white">Trust-first SME cashflow analysis</p>
-          </div>
+    <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
+      <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/60">
+        <div className="flex items-center gap-3">
+          <Activity className="h-5 w-5 text-foreground" />
+          <h1 className="font-semibold text-foreground">
+            QueryLens{" "}
+            <span className="ml-2 font-normal text-muted-foreground">
+              Phase 1 Analysis
+            </span>
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <p className="hidden text-sm text-muted-foreground md:inline-block">
+            Metric Focus:{" "}
+            <span className="font-medium text-foreground">
+              {metric?.name || "Cashflow"}
+            </span>
+          </p>
+          <div className="h-4 w-px bg-border hidden md:block" />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline-block">Source context</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:w-[400px] overflow-y-auto border-border bg-background sm:max-w-md">
+              <SheetHeader>
+                <SheetTitle>Analysis Context</SheetTitle>
+                <SheetDescription>
+                  Health data and underlying metric logic.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-6">
+                <Sidebar
+                  analysis={activeAnalysis}
+                  metric={metric}
+                  sourceHealth={sourceHealth}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1800px] lg:grid-cols-[290px,minmax(0,1fr),430px]">
-        <Sidebar analysis={activeAnalysis} metric={metric} sourceHealth={sourceHealth} />
-        <EvidencePanel analysis={activeAnalysis} />
-        <ChatPanel isLoading={isLoading} messages={messages} onSend={handleSend} />
+      <div className="flex-1 overflow-hidden min-h-0">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanel
+            defaultSize={65}
+            minSize={40}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+          >
+            <ChatPanel
+              isLoading={isLoading}
+              messages={messages}
+              onSend={handleSend}
+            />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel
+            defaultSize={35}
+            minSize={25}
+            className="h-full min-h-0 overflow-y-auto bg-muted/10"
+          >
+            <div className="h-full overflow-y-auto">
+              <EvidencePanel analysis={activeAnalysis} />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   )
