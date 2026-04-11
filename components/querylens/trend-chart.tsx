@@ -20,8 +20,9 @@ interface TrendChartProps {
 }
 
 export default function TrendChart({ analysis }: TrendChartProps) {
-  const isBreakdown = analysis.chartSpec.type === "bar"
-  const featuredPoint = isBreakdown
+  const isBarChart = analysis.chartSpec.type === "bar"
+  const isCompare = Boolean(analysis.comparisonSummary)
+  const featuredPoint = isBarChart
     ? analysis.chartSpec.data[0]
     : analysis.chartSpec.data.at(-1)
 
@@ -30,7 +31,7 @@ export default function TrendChart({ analysis }: TrendChartProps) {
       <div className="mb-5 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[var(--ql-accent)]">
-            {isBreakdown ? "Breakdown View" : "Weekly Trend"}
+            {isCompare ? "Compare View" : isBarChart ? "Breakdown View" : "Weekly Trend"}
           </p>
           <h2 className="mt-2 text-xl font-semibold text-white">
             {analysis.chartSpec.title}
@@ -43,7 +44,7 @@ export default function TrendChart({ analysis }: TrendChartProps) {
 
       <div className="h-72 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          {isBreakdown ? (
+          {isBarChart ? (
             <BarChart
               data={analysis.chartSpec.data}
               margin={{ top: 12, right: 12, left: -18, bottom: 0 }}
@@ -82,6 +83,9 @@ export default function TrendChart({ analysis }: TrendChartProps) {
                 }}
                 formatter={(value: number, _name, item) => {
                   const share = Number(item.payload.share ?? 0)
+                  if (isCompare) {
+                    return [`${value.toFixed(1)}`, "Score"]
+                  }
                   return [`${value} accounts (${share.toFixed(1)}%)`, "At-risk"]
                 }}
                 labelFormatter={(label) => `${label}`}
@@ -170,12 +174,18 @@ export default function TrendChart({ analysis }: TrendChartProps) {
       {featuredPoint && (
         <div className="mt-4 flex items-center justify-between border-t border-[rgba(201,167,106,0.14)] pt-4">
           <p className="text-sm text-[var(--ql-muted)]">
-            {isBreakdown ? "Largest bucket:" : "Latest plotted window:"}{" "}
+            {isCompare
+              ? "Leading side:"
+              : isBarChart
+                ? "Largest bucket:"
+                : "Latest plotted window:"}{" "}
             <span className="font-medium text-white">{featuredPoint.label}</span>
           </p>
           <p className="font-mono text-xs text-[var(--ql-accent)]">
-            {isBreakdown
-              ? `${Number(featuredPoint.value ?? 0).toFixed(0)} at-risk`
+            {isCompare
+              ? `score ${Number(featuredPoint.value ?? 0).toFixed(1)}`
+              : isBarChart
+                ? `${Number(featuredPoint.value ?? 0).toFixed(0)} at-risk`
               : `score ${Number(featuredPoint.score ?? 0).toFixed(1)}`}
           </p>
         </div>

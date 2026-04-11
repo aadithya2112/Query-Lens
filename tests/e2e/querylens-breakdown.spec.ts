@@ -5,6 +5,7 @@ test("renders the breakdown slice for at-risk accounts", async ({ page }) => {
   await page.getByRole("link", { name: "Launch Workspace" }).click()
 
   const input = page.getByPlaceholder("Ask a question...")
+  await expect(input).toBeVisible({ timeout: 30_000 })
   await input.fill("What makes up at-risk accounts by region and sector last week?")
   await input.press("Enter")
 

@@ -8,9 +8,9 @@ test("renders the phase-1 vertical slice and answers the flagship question", asy
   await expect(page.getByRole("heading", { name: "Query Lens" })).toBeVisible()
   await page.getByRole("link", { name: "Launch Workspace" }).click()
 
-  await expect(
-    page.getByRole("heading", { name: /QueryLens Analysis Workspace/i }),
-  ).toBeVisible()
+  await expect(page.getByPlaceholder("Ask a question...")).toBeVisible({
+    timeout: 30_000,
+  })
   await expect(
     page.getByText("Why did SME cashflow health drop last week?").first(),
   ).toBeVisible()

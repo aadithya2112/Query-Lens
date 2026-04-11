@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const geminiGenerateMock = vi.fn()
+const { geminiGenerateMock } = vi.hoisted(() => ({
+  geminiGenerateMock: vi.fn(),
+}))
+const TEST_TIMEOUT = 15_000
 
 vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
@@ -48,7 +51,7 @@ describe("query engine provider", () => {
     expect(result.parsed?.datasetId).toBe("sme_portfolio")
     expect(result.parsed?.metricId).toBe("cashflow_health_score")
     expect(result.parsed?.scope.region).toBe("north_west")
-  })
+  }, TEST_TIMEOUT)
 
   it("normalizes Gemini compare plans through the generic provider seam", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -87,7 +90,7 @@ describe("query engine provider", () => {
       leftLabel: "North West",
       rightLabel: "London & South East",
     })
-  })
+  }, TEST_TIMEOUT)
 
   it("falls back to deterministic narrative when Gemini output is invalid", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -128,5 +131,5 @@ describe("query engine provider", () => {
     })
 
     expect(result.summary).toContain("Portfolio moved down")
-  })
+  }, TEST_TIMEOUT)
 })

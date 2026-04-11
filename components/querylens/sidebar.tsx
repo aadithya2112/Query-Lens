@@ -41,6 +41,7 @@ export default function Sidebar({
   analysis,
 }: SidebarProps) {
   const isBreakdown = analysis.metric === "at_risk_account_count"
+  const isCompare = Boolean(analysis.comparisonSummary)
 
   return (
     <aside className="rounded-[28px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl h-fit">
@@ -54,14 +55,18 @@ export default function Sidebar({
               QueryLens
             </p>
             <h1 className="mt-1 text-xl font-semibold text-foreground">
-              {isBreakdown
+              {isCompare
+                ? "SME cashflow compare"
+                : isBreakdown
                 ? "SME risk concentration breakdown"
                 : "SME cashflow investigation"}
             </h1>
           </div>
         </div>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          {isBreakdown
+          {isCompare
+            ? "A trust-first side-by-side comparison of weekly cashflow health, using seeded Postgres facts and Mongo context to explain the gap."
+            : isBreakdown
             ? "A trust-first breakdown of where weekly account stress is concentrated, using seeded Postgres facts and Mongo context side by side."
             : "A trust-first slice for explaining why portfolio health changed, using seeded Postgres facts and Mongo context side by side."}
         </p>

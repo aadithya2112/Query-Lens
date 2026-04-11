@@ -9,6 +9,50 @@ interface EvidencePanelProps {
   analysis: Phase1AnalysisResponse
 }
 
+function ComparisonCards({ analysis }: EvidencePanelProps) {
+  const summary = analysis.comparisonSummary
+
+  if (!summary) {
+    return null
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          {summary.leftLabel}
+        </p>
+        <p className="mt-3 text-3xl font-semibold text-foreground">
+          {summary.leftValue.toFixed(1)}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Cashflow health score</p>
+      </div>
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          {summary.rightLabel}
+        </p>
+        <p className="mt-3 text-3xl font-semibold text-foreground">
+          {summary.rightValue.toFixed(1)}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Cashflow health score</p>
+      </div>
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Delta
+        </p>
+        <p className="mt-3 text-3xl font-semibold text-foreground">
+          {summary.delta.toFixed(1)}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {summary.tie
+            ? "No clear leader in the selected compare view"
+            : `${summary.winnerLabel} leads`}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function TrustBar({ analysis }: EvidencePanelProps) {
   const width = `${analysis.confidence}%`
 
@@ -47,6 +91,7 @@ function TrustBar({ analysis }: EvidencePanelProps) {
 
 export default function EvidencePanel({ analysis }: EvidencePanelProps) {
   const isBreakdown = analysis.metric === "at_risk_account_count"
+  const isCompare = Boolean(analysis.comparisonSummary)
 
   return (
     <section className="px-4 py-4 lg:px-6 lg:py-7 mx-auto max-w-full w-full">
@@ -64,6 +109,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
         </div>
 
         <TrustBar analysis={analysis} />
+        <ComparisonCards analysis={analysis} />
         <TrendChart analysis={analysis} />
 
         <div className="flex flex-col gap-5">
@@ -71,7 +117,11 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">
-                {isBreakdown ? "Top concentrations" : "Top drivers"}
+                {isBreakdown
+                  ? "Top concentrations"
+                  : isCompare
+                    ? "Top differences"
+                    : "Top drivers"}
               </h2>
             </div>
             <div className="mt-5 space-y-5">
@@ -175,7 +225,9 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
               <p>
                 {isBreakdown
                   ? "The breakdown slice uses deterministic planning, account-level weekly stress rollups, and contextual Mongo evidence."
-                  : "The what-changed slice uses deterministic planning, seeded weekly metrics, and contextual Mongo evidence."}
+                  : isCompare
+                    ? "The compare slice uses deterministic planning, side-by-side weekly metric rows, and contextual Mongo evidence."
+                    : "The what-changed slice uses deterministic planning, seeded weekly metrics, and contextual Mongo evidence."}
               </p>
               <ul className="space-y-2">
                 {analysis.evidence.map((item) => (

@@ -5,7 +5,7 @@ import { POST } from "@/app/api/query/route"
 const runIfDatabase =
   process.env.POSTGRES_URL && process.env.MONGODB_URL ? it : it.skip
 
-describe.sequential("/api/query database mode", () => {
+describe("/api/query database mode", () => {
   runIfDatabase(
     "returns a grounded database-backed analysis for the flagship question",
     async () => {

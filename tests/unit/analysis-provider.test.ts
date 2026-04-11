@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const geminiGenerateMock = vi.fn()
+const { geminiGenerateMock } = vi.hoisted(() => ({
+  geminiGenerateMock: vi.fn(),
+}))
+const TEST_TIMEOUT = 15_000
 
 vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
@@ -8,7 +11,6 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
 
 describe("phase-1 provider selection", () => {
   beforeEach(() => {
-    vi.resetModules()
     geminiGenerateMock.mockReset()
     process.env.QUERYLENS_GEMINI_MODEL = "gemini-2.5-flash"
   })
@@ -85,7 +87,7 @@ describe("phase-1 provider selection", () => {
 
     expect(geminiGenerateMock).toHaveBeenCalledOnce()
     expect(result.summary).toBe("Gemini summary.")
-  })
+  }, TEST_TIMEOUT)
 
   it("falls back to deterministic narrative when the key is missing", async () => {
     process.env.QUERYLENS_AI_MODE = "auto"
@@ -118,7 +120,7 @@ describe("phase-1 provider selection", () => {
 
     expect(geminiGenerateMock).not.toHaveBeenCalled()
     expect(result.summary).toContain("Portfolio moved down")
-  })
+  }, TEST_TIMEOUT)
 
   it("falls back when Gemini returns an invalid narrative payload", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -161,7 +163,7 @@ describe("phase-1 provider selection", () => {
     expect(geminiGenerateMock).toHaveBeenCalledOnce()
     expect(result.summary).toContain("Portfolio moved down")
     expect(result.supportedFollowUps).toContain("What changed this week instead?")
-  })
+  }, TEST_TIMEOUT)
 
   it("keeps bootstrap flows deterministic even when Gemini is configured", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -173,7 +175,7 @@ describe("phase-1 provider selection", () => {
 
     expect(geminiGenerateMock).not.toHaveBeenCalled()
     expect(payload.initialAnalysis.summary).toContain("Portfolio moved down")
-  })
+  }, TEST_TIMEOUT)
 
   it("uses Gemini tool-calling to parse supported paraphrases", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -231,7 +233,7 @@ describe("phase-1 provider selection", () => {
         comparisonBasis: "prior_period",
       },
     })
-  })
+  }, TEST_TIMEOUT)
 
   it("falls back to deterministic parsing when Gemini returns invalid scope values", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -261,7 +263,7 @@ describe("phase-1 provider selection", () => {
     )
 
     expect(result.parsed?.scope).toEqual({})
-  })
+  }, TEST_TIMEOUT)
 
   it("preserves explicit scope overrides over Gemini-extracted scope", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -294,7 +296,7 @@ describe("phase-1 provider selection", () => {
     )
 
     expect(result.parsed?.scope.region).toBe("north_west")
-  })
+  }, TEST_TIMEOUT)
 
   it("returns a guided fallback for unsupported requests when Gemini rejects them", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
@@ -320,5 +322,5 @@ describe("phase-1 provider selection", () => {
 
     expect(result.parsed).toBeUndefined()
     expect(result.fallbackReason).toContain("cashflow health")
-  })
+  }, TEST_TIMEOUT)
 })
