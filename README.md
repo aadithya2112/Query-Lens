@@ -40,7 +40,7 @@ These are intentionally deferred and should not be treated as shipped:
 - `Vitest`
 - `Playwright`
 - `Bun`
-- `Gemini API` via `@google/genai` for structured planning and narrative generation
+- `Gemini API` via `@google/genai` for required interactive planning and narrative generation
 
 ## Recommended Local Demo Path
 
@@ -62,11 +62,11 @@ The default values in `.env.example` are already set for the local Docker stack:
 
 - `QUERYLENS_REFERENCE_DATE=2026-04-11`
 - `QUERYLENS_DATA_MODE=database`
-- `QUERYLENS_AI_MODE=auto`
+- `QUERYLENS_AI_MODE=gemini`
 - local `POSTGRES_URL`
 - local `MONGODB_URL`
 
-To enable Gemini-backed parsing and narrative generation for interactive `/api/query` requests, set:
+Interactive `/api/query` requests now require Gemini. Set:
 
 - `GEMINI_API_KEY=...`
 - optionally override `QUERYLENS_GEMINI_MODEL` if you do not want the default `gemini-2.5-flash`
@@ -175,7 +175,7 @@ QueryLens is a single `Next.js` application with an integrated server layer.
 - `POST /api/query` interprets the question, validates it against the current dataset and manifest, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
 - The server now routes requests through a built-in dataset definition, a structured query-plan model, and a generic analysis orchestrator before executing the current `what changed`, `breakdown`, or `compare` intent.
 - `GET /api/metrics` exposes the current metric manifest for all shipped slices.
-- Interactive query parsing and narration currently use Gemini with structured output and tool calling when configured. The next stage makes Gemini planning mandatory for interactive questions while keeping data retrieval and evidence assembly deterministic.
+- Interactive query parsing now requires Gemini planning for supported questions, while data retrieval, evidence assembly, charting, and confidence remain deterministic and grounded.
 - Fixture mode remains available as a safe fallback when live databases are not running.
 
 For the fuller diagram and request lifecycle, see [Architecture.md](./Architecture.md).
@@ -199,7 +199,7 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 
 - The current milestone supports two metrics and three narrow intent families.
 - The sample portfolio is synthetic and designed for demo clarity, not statistical realism.
-- The current engine still contains deterministic parsing/fallback behavior that will be removed from the main interactive path in the next stage.
+- Interactive queries require Gemini to interpret supported questions. Deterministic parsing remains only as a developer and test harness mode.
 - Database mode is meant for local Docker-backed use, not public deployment.
 - The current trace/debug details are lightweight and development-oriented.
 - Only one built-in dataset is supported today; reusable dataset onboarding is not implemented yet.

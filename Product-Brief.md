@@ -18,13 +18,12 @@ The current shipped milestone is intentionally narrow:
 - optional scope filters for `region` and `sector`
 - visible trust evidence from both structured facts and contextual signals
 - Stage 1 foundation complete under the hood: built-in dataset abstraction, structured query plans, and a generic orchestrator
-- current gap: interactive parsing still has deterministic fallback behavior, so the LLM is not yet truly required in the main product flow
+- Gemini is now genuinely required for interactive query interpretation in the main product flow
 
 ## Challenge Completion Direction
 
 To meet the full hackathon brief, `QueryLens` needs to grow from this narrow vertical slice into a reusable natural-language analytics product with:
 
-- an LLM-first interactive planning path
 - reusable dataset onboarding for tabular data
 - a semantic layer / metric manifest per dataset
 - four supported intent families:
@@ -34,7 +33,7 @@ To meet the full hackathon brief, `QueryLens` needs to grow from this narrow ver
   - `weekly briefing`
 - deterministic data execution with Gemini constrained to structured planning and wording
 
-The immediate next product step is the LLM-first pivot: keep the sample dataset, but make Gemini interpretation mandatory for interactive queries so the app no longer works because of hard-coded parsing.
+The immediate next product step is `weekly briefing`, now that the LLM-first pivot is in place.
 
 ## Target User
 

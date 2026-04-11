@@ -34,7 +34,7 @@
 - `POST /api/query` and `GET /api/metrics` are implemented.
 - Query handling now serves `what changed`, `breakdown`, and `compare` through the generalized internal query engine.
 - The server now uses a built-in dataset definition, a structured query-plan model, a generic orchestrator, and a registered intent executor.
-- Gemini-assisted planning and narrative generation remain constrained, and deterministic parsing fallback is still present in the current interactive path.
+- Gemini-assisted planning and narrative generation remain constrained, and Gemini planning is now required for the main interactive path.
 
 ### Quality and Stability
 
@@ -44,31 +44,29 @@
 
 ## Current Product Gap
 
-The current product is demoable, but it still falls short of the challenge brief in one important way: it can answer the current supported questions without truly requiring LLM interpretation.
+The current product is demoable and now honestly LLM-first for interactive questions, but it still falls short of the full challenge brief.
 
 - Shipped today:
   - one built-in sample dataset
   - two metrics
   - three intent families: `what changed`, `breakdown`, and `compare`
-  - Gemini-assisted parsing and narration with deterministic data execution
+  - Gemini-required interactive planning and Gemini-assisted narration with deterministic data execution
   - Stage 1 engine foundations for future intents
 - Still required for a requirements-complete submission:
-  - an LLM-first interactive planning path
   - reusable dataset onboarding
   - `weekly briefing`
   - richer trust/debug UX on top of the generalized engine
 
 ## Immediate Next Stage
 
-### Stage 4 Pivot: LLM-First QueryLens
+### Stage 5: Weekly Briefing
 
 Status: next implementation stage.
 
 - Keep the built-in portfolio as the demo dataset for now; user-supplied data is still deferred.
-- Remove deterministic parsing as the normal interactive path.
-- Require Gemini planning for `POST /api/query` and return an honest guided failure when Gemini cannot safely interpret a request.
-- Keep execution deterministic after planning so evidence, charts, confidence, and source reads remain grounded.
-- Reframe the product story from “seeded demo logic” to “LLM-first analytics over a sample dataset.”
+- Build one concise weekly briefing flow on top of the existing planner and orchestrator.
+- Keep the current `what changed`, `breakdown`, and `compare` flows stable.
+- Reuse the same evidence-first trust surface instead of introducing a separate report page.
 
 ## Requirements Completion Roadmap
 
@@ -80,18 +78,12 @@ Status: complete for the built-in SME portfolio dataset.
 - Keep Gemini constrained to structured parsing and wording only.
 - Keep data retrieval deterministic and manifest-driven.
 
-### Step 2. Make Interactive Queries LLM-First
-
-- Make Gemini planning mandatory for supported interactive queries.
-- Remove silent deterministic parsing fallback from the main path.
-- Keep bootstrap reliable and deterministic so the app still opens cleanly.
-
-### Step 3. Add Reusable Dataset Onboarding
+### Step 2. Add Reusable Dataset Onboarding
 
 - Introduce dataset manifests, schema profiling, and a reusable onboarding path for tabular datasets.
 - Keep the current SME portfolio as the built-in default judged dataset.
 
-### Step 4. Add the Missing Product Use Cases
+### Step 3. Add the Missing Product Use Cases
 
 - `weekly briefing`
 
@@ -99,13 +91,13 @@ Recommended implementation order:
 
 1. `weekly briefing`
 
-### Step 5. Upgrade the Workspace for Multi-Intent Answers
+### Step 4. Upgrade the Workspace for Multi-Intent Answers
 
 - Add dataset selection.
 - Render intent-specific result surfaces while keeping evidence first.
 - Expose a lightweight interpretation trace so users can see how QueryLens understood the request.
 
-### Step 6. Tighten Trust, Clarity, and Speed
+### Step 5. Tighten Trust, Clarity, and Speed
 
 - Expand source attribution, assumptions, and confidence rules.
 - Add privacy-aware dataset handling for onboarded data.
@@ -118,7 +110,6 @@ Recommended implementation order:
    - Keep the submission story centered on what is actually implemented.
 
 2. Work through the requirements roadmap one stage at a time.
-   - LLM-first interactive planning
    - dataset onboarding
    - `weekly briefing`
    - trust/debug polish
@@ -127,26 +118,23 @@ Recommended implementation order:
 
 ### Goal
 
-Use the completed Stage 3 compare slice to pivot the engine into an honest LLM-first product:
+Use the completed compare slice and LLM-first pivot to ship the next user-visible capability:
 
-- Gemini becomes required for interactive planning
-- deterministic parsing fallback is removed from the main interactive path
-- the built-in portfolio is described and handled as a sample dataset, not as the reason the app works
+- `weekly briefing`, starting with one clear sample-dataset portfolio briefing flow
 
 ### Done When
 
 - the chosen stage is isolated, testable, and commit-sized
 - Bun `lint`, `test`, and `build` remain green
 - the new stage is reflected honestly in the docs and demo story
-- unsupported or model-unavailable cases fail honestly instead of silently falling back
+- the briefing flow remains evidence-backed and easy to demo
 
 ### Order of Work
 
-1. Update docs and product framing from “seeded demo” to “sample dataset”.
-2. Make Gemini-required planning the interactive query path while keeping deterministic execution.
-3. Keep the current `what changed`, `breakdown`, and `compare` flows stable under the new planner contract.
-4. Add focused tests for model-unavailable and invalid-plan behavior.
-5. Re-run the full validation stack and update docs if the shipped surface changes.
+1. Add a `weekly briefing` intent and executor on top of the current planner/orchestrator.
+2. Keep the current `what changed`, `breakdown`, and `compare` flows stable.
+3. Add focused tests and one clear briefing smoke flow.
+4. Re-run the full validation stack and update docs if the shipped surface changes.
 
 ## Defaults and Boundaries
 

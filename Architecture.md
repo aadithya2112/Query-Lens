@@ -2,7 +2,7 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus the first three product slices: a built-in dataset definition, a structured query-plan model, a generic analysis orchestrator, and registered `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over the built-in sample dataset, `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini remains constrained to query planning and final wording.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus the first three product slices: a built-in dataset definition, a structured query-plan model, a generic analysis orchestrator, and registered `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over the built-in sample dataset, `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini is now required for interactive query planning and remains constrained to planning and final wording.
 
 ## Target Architecture Direction
 
@@ -83,12 +83,12 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 ## Current Request Lifecycle
 
 1. The user submits a question through chat.
-2. The server produces a structured query plan for the built-in dataset, with Gemini as the intended interactive planner and local validation enforcing the manifest boundaries.
+2. The server produces a structured query plan for the built-in dataset, with Gemini required for interactive planning and local validation enforcing the manifest boundaries.
 3. The plan is validated against the dataset definition, supported metric, and allowed timeframe rules.
 4. The analysis orchestrator dispatches the plan to the registered `what changed`, `breakdown`, or `compare` executor.
 5. The executor reads weekly movement or account-level stress from `Postgres` and corroborating context from `MongoDB`, or reads the built-in sample dataset when local databases are unavailable.
 6. Drivers, evidence, confidence, assumptions, and chart data are assembled deterministically into a grounded response payload.
-7. For interactive requests only, the planner is moving to a Gemini-required path and the narrative provider can ask Gemini for a structured headline and summary, while deterministic execution remains the source of truth for facts and evidence.
+7. For interactive requests only, the planner requires Gemini and the narrative provider can ask Gemini for a structured headline and summary, while deterministic execution remains the source of truth for facts and evidence.
 8. The UI renders the answer with visible trust evidence rather than raw SQL as the main user experience.
 
 ## Data Responsibilities
@@ -125,7 +125,6 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 The Stage 1 foundation is now complete for the built-in dataset. The next gaps to meet the challenge are:
 
-- making interactive query interpretation honestly LLM-first
 - dataset onboarding and manifest persistence
 - the remaining intent family: `weekly briefing`
 - richer trust/debug UX around the Gemini-assisted path
