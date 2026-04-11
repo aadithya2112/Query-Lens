@@ -53,6 +53,22 @@ describe("query engine provider", () => {
     expect(result.parsed?.scope.region).toBe("north_west")
   }, TEST_TIMEOUT)
 
+  it("returns a model-unavailable failure when interactive Gemini planning is required but not configured", async () => {
+    process.env.QUERYLENS_AI_MODE = "auto"
+
+    const { getQueryEngineProvider } = await import(
+      "@/lib/querylens/server/query-engine-provider"
+    )
+
+    const provider = getQueryEngineProvider({ executionContext: "interactive" })
+    const result = await provider.planQuery("Why did SME cashflow health drop last week?")
+
+    expect(geminiGenerateMock).not.toHaveBeenCalled()
+    expect(result.parsed).toBeUndefined()
+    expect(result.failureKind).toBe("model_unavailable")
+    expect(result.fallbackReason).toContain("needs Gemini enabled")
+  }, TEST_TIMEOUT)
+
   it("normalizes Gemini compare plans through the generic provider seam", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
@@ -90,6 +106,36 @@ describe("query engine provider", () => {
       leftLabel: "North West",
       rightLabel: "London & South East",
     })
+  }, TEST_TIMEOUT)
+
+  it("returns a guided failure instead of deterministic parsing when Gemini output is invalid", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+
+    geminiGenerateMock.mockResolvedValue({
+      functionCalls: [
+        {
+          name: "submit_analytics_query_plan",
+          args: {
+            intent: "what_changed",
+            metric: "cashflow_health_score",
+            timeframe: "last_week",
+            region: "Unknown Region",
+          },
+        },
+      ],
+    })
+
+    const { getQueryEngineProvider } = await import(
+      "@/lib/querylens/server/query-engine-provider"
+    )
+
+    const provider = getQueryEngineProvider({ executionContext: "interactive" })
+    const result = await provider.planQuery("Why did North West cashflow health drop last week?")
+
+    expect(result.parsed).toBeUndefined()
+    expect(result.failureKind).toBe("guided_failure")
+    expect(result.fallbackReason).toContain("could not validate Gemini")
   }, TEST_TIMEOUT)
 
   it("falls back to deterministic narrative when Gemini output is invalid", async () => {

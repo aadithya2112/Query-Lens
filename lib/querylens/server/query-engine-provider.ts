@@ -6,8 +6,9 @@ import {
   getDefaultDatasetId,
 } from "@/lib/querylens/datasets"
 import {
+  canUseGemini,
   type QueryLensExecutionContext,
-  shouldUseGemini,
+  requiresGeminiPlanning,
 } from "@/lib/querylens/server/ai-config"
 import { generateGeminiResponse } from "@/lib/querylens/server/gemini-client"
 import {
@@ -202,6 +203,24 @@ const narrativeJsonSchema = {
     },
   },
 } as const
+
+function buildGeminiRequiredFallback(
+  reason = "QueryLens needs Gemini enabled to interpret interactive questions right now."
+): QueryPlanResult {
+  return {
+    fallbackReason: reason,
+    failureKind: "model_unavailable",
+  }
+}
+
+function buildGuidedPlanningFailure(
+  reason = "QueryLens could not safely interpret that question right now."
+): QueryPlanResult {
+  return {
+    fallbackReason: reason,
+    failureKind: "guided_failure",
+  }
+}
 
 async function buildGeminiNarrative(input: NarrativeInput) {
   const result = await generateGeminiResponse({
@@ -446,6 +465,7 @@ async function planQueryWithGemini(
 
     return {
       fallbackReason: reason,
+      failureKind: "unsupported" as const,
     }
   }
 
@@ -560,16 +580,18 @@ export const deterministicQueryEngineProvider: QueryEngineProvider = {
 export function getQueryEngineProvider(args: {
   executionContext: QueryLensExecutionContext
 }): QueryEngineProvider {
-  if (!shouldUseGemini(args.executionContext)) {
+  const geminiPlanningRequired = requiresGeminiPlanning(args.executionContext)
+  const geminiAvailable = canUseGemini(args.executionContext)
+
+  if (!geminiPlanningRequired) {
     return deterministicQueryEngineProvider
   }
 
   return {
     planQuery: async (question, scopeOverride) => {
-      const deterministicResult = await deterministicQueryEngineProvider.planQuery(
-        question,
-        scopeOverride
-      )
+      if (!geminiAvailable) {
+        return buildGeminiRequiredFallback()
+      }
 
       try {
         const geminiResult = await Promise.race([
@@ -583,18 +605,24 @@ export function getQueryEngineProvider(args: {
           return geminiResult
         }
 
-        if (!deterministicResult.parsed && geminiResult?.fallbackReason) {
-          return {
-            fallbackReason: geminiResult.fallbackReason,
-          }
+        if (geminiResult?.fallbackReason) {
+          return geminiResult
         }
-      } catch {
-        return deterministicResult
-      }
 
-      return deterministicResult
+        return buildGuidedPlanningFailure(
+          "QueryLens could not validate Gemini's interpretation for that request."
+        )
+      } catch {
+        return buildGeminiRequiredFallback(
+          "QueryLens could not reach Gemini to interpret that question right now."
+        )
+      }
     },
     composeNarrative: async (input) => {
+      if (!geminiAvailable) {
+        return buildDeterministicNarrative(input)
+      }
+
       try {
         return await Promise.race([
           buildGeminiNarrative(input),

@@ -178,10 +178,16 @@ export interface QueryPlanFallback {
   fallbackReason: string
 }
 
+export type QueryPlanFailureKind =
+  | "unsupported"
+  | "guided_failure"
+  | "model_unavailable"
+
 export interface QueryPlanResult {
   plan?: StructuredQueryPlan
   parsed?: StructuredQueryPlan
   fallbackReason?: string
+  failureKind?: QueryPlanFailureKind
 }
 
 export type ParsedPhase1Query = StructuredQueryPlan

@@ -1,6 +1,28 @@
 import { POST } from "@/app/api/query/route"
 
 describe("/api/query", () => {
+  it("returns an honest fallback when interactive Gemini planning is unavailable", async () => {
+    process.env.QUERYLENS_AI_MODE = "auto"
+    delete process.env.GEMINI_API_KEY
+
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "Why did SME cashflow health drop last week?",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.fallback).toBe(true)
+    expect(payload.summary).toContain("needs Gemini enabled")
+  })
+
   it("returns a grounded analysis for the flagship question", async () => {
     const request = new Request("http://localhost/api/query", {
       method: "POST",
@@ -132,5 +154,10 @@ describe("/api/query", () => {
     expect(payload.comparisonSummary?.mode).toBe("peer")
     expect(payload.comparisonSummary?.leftLabel).toBe("Hospitality")
     expect(payload.comparisonSummary?.rightLabel).toBe("Retail")
+  })
+
+  afterEach(() => {
+    process.env.QUERYLENS_AI_MODE = "deterministic"
+    delete process.env.GEMINI_API_KEY
   })
 })

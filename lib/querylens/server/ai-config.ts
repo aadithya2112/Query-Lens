@@ -21,7 +21,11 @@ export function getQueryLensAiConfig() {
   }
 }
 
-export function shouldUseGemini(executionContext: QueryLensExecutionContext) {
+export function isDeterministicAiMode() {
+  return getQueryLensAiConfig().mode === "deterministic"
+}
+
+export function canUseGemini(executionContext: QueryLensExecutionContext) {
   const config = getQueryLensAiConfig()
 
   if (executionContext === "bootstrap") {
@@ -33,4 +37,12 @@ export function shouldUseGemini(executionContext: QueryLensExecutionContext) {
   }
 
   return Boolean(config.apiKey)
+}
+
+export function requiresGeminiPlanning(executionContext: QueryLensExecutionContext) {
+  if (executionContext === "bootstrap") {
+    return false
+  }
+
+  return !isDeterministicAiMode()
 }

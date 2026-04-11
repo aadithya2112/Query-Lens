@@ -311,11 +311,11 @@ export function buildWhatChangedFallbackResponse(args: {
   rows: WeeklyMetricRow[]
 }): Phase1AnalysisResponse {
   return {
-    headline: "QueryLens currently supports grounded cashflow change and compare questions",
+    headline: "QueryLens could not complete that request safely",
     summary: args.fallbackReason,
     metric: "cashflow_health_score",
     timeframe: "Ask about this week or last week",
-    comparisonBasis: "Phase 1 compares one seeded weekly window against the prior week",
+    comparisonBasis: "The current sample dataset supports grounded weekly analysis over adjacent windows",
     confidence: calculateConfidenceScore({
       evidenceCount: 0,
       driverCount: 0,
@@ -327,13 +327,13 @@ export function buildWhatChangedFallbackResponse(args: {
     chartSpec: buildWhatChangedChartSpec(filterRowsForScope(args.rows, {}), "Portfolio"),
     evidence: [],
     assumptions: [
-      "Phase 1 is intentionally narrow and does not attempt unsupported metrics or time windows.",
+      "QueryLens stays within the current sample dataset, supported metrics, and validated weekly windows.",
     ],
     supportedFollowUps: [
       DEFAULT_FLAGSHIP_QUESTION,
+      "What makes up at-risk accounts by region and sector last week?",
       "Compare cashflow health this week vs last week",
-      "Why did hospitality cashflow health drop last week?",
-      "Why did North West cashflow health drop this week?",
+      "Compare North West vs London & South East cashflow health last week",
     ],
     fallback: true,
     sourceMode: args.sourceMode,
