@@ -1,10 +1,12 @@
 export type DatasetId = "sme_portfolio"
 export type MetricId = "cashflow_health_score" | "at_risk_account_count"
 export type SupportedTimeframe = "this_week" | "last_week"
-export type QueryIntent = "what_changed" | "breakdown"
+export type QueryIntent = "what_changed" | "breakdown" | "compare"
 export type ScopeDimension = "portfolio" | "region" | "sector"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
 export type BreakdownDimension = "region" | "sector" | "region_sector"
+export type CompareMode = "timeframe" | "peer"
+export type CompareDimension = "region" | "sector"
 export type ContextCollection =
   | "complaints"
   | "service_incidents"
@@ -147,6 +149,18 @@ export interface ComparisonWindow {
   comparisonBasis: "prior_period"
 }
 
+export interface CompareSpec {
+  mode: CompareMode
+  dimension?: CompareDimension
+  leftTimeframe?: SupportedTimeframe
+  rightTimeframe?: SupportedTimeframe
+  selectedTimeframe?: SupportedTimeframe
+  leftScope: ScopeFilter
+  rightScope: ScopeFilter
+  leftLabel: string
+  rightLabel: string
+}
+
 export interface StructuredQueryPlan {
   datasetId: DatasetId
   rawQuestion: string
@@ -157,6 +171,7 @@ export interface StructuredQueryPlan {
   scopeDimensions: ScopeDimension[]
   comparisonWindow: ComparisonWindow
   breakdownDimension?: BreakdownDimension
+  compareSpec?: CompareSpec
 }
 
 export interface QueryPlanFallback {
@@ -206,6 +221,17 @@ export interface ChartSpec {
   explanation: string
 }
 
+export interface ComparisonSummary {
+  mode: CompareMode
+  leftLabel: string
+  leftValue: number
+  rightLabel: string
+  rightValue: number
+  delta: number
+  winnerLabel?: string
+  tie?: boolean
+}
+
 export interface Phase1AnalysisResponse {
   headline: string
   summary: string
@@ -219,6 +245,7 @@ export interface Phase1AnalysisResponse {
   evidence: EvidenceItem[]
   assumptions: string[]
   supportedFollowUps: string[]
+  comparisonSummary?: ComparisonSummary
   fallback?: boolean
   sourceMode: "database" | "fixture"
 }

@@ -5,7 +5,7 @@
       "label": "Cashflow health score",
       "description": "Weekly stability score for the SME portfolio combining payment coverage, balance direction, low-balance exposure, and overdue exposure.",
       "scale": "0-100",
-      "supportedIntents": ["what_changed"],
+      "supportedIntents": ["what_changed", "compare"],
       "weights": {
         "inflowOutflowRatio": 0.4,
         "balanceTrend": 0.25,
@@ -24,7 +24,9 @@
       "exampleQuestions": [
         "Why did SME cashflow health drop last week?",
         "Why did cash flow health drop last week in the North West?",
-        "Why did hospitality cashflow health drop this week?"
+        "Why did hospitality cashflow health drop this week?",
+        "Compare cashflow health this week vs last week.",
+        "Compare North West vs London & South East cashflow health last week."
       ]
     },
     {

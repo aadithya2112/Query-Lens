@@ -1,10 +1,14 @@
+import { getSeedDataset } from "@/lib/querylens/seed-data"
 import { getDatasetDefinition, getDefaultDatasetId } from "@/lib/querylens/datasets"
 import {
   normalizePhase1Text,
   resolvePhase1Scope,
+  resolvePhase1ScopeValue,
 } from "@/lib/querylens/server/parser"
 import type {
   BreakdownDimension,
+  CompareDimension,
+  CompareSpec,
   QueryPlanResult,
   ScopeFilter,
   StructuredQueryPlan,
@@ -64,6 +68,10 @@ function isBreakdownIntent(normalizedQuestion: string) {
   )
 }
 
+function isCompareIntent(normalizedQuestion: string) {
+  return /\b(compare|vs|versus)\b/.test(normalizedQuestion)
+}
+
 function resolveBreakdownDimension(
   normalizedQuestion: string,
   scope: ScopeFilter
@@ -92,6 +100,152 @@ function resolveBreakdownDimension(
   }
 
   return "region_sector"
+}
+
+function resolveTimeframeLabel(timeframe: SupportedTimeframe) {
+  return timeframe === "this_week" ? "This week" : "Last week"
+}
+
+function parseCompareSubjects(question: string) {
+  const normalizedQuestion = normalizePhase1Text(question)
+  const match = normalizedQuestion.match(/\bvs\b|\bversus\b/g)
+
+  if ((match?.length ?? 0) > 1) {
+    return {
+      fallbackReason:
+        "Compare currently supports exactly two regions or exactly two sectors at a time.",
+    }
+  }
+
+  const subjectMatch = normalizedQuestion.match(/compare\s+(.+?)\s+(?:vs|versus)\s+(.+)/)
+
+  if (!subjectMatch) {
+    return {}
+  }
+
+  const [, rawLeft, rawRight] = subjectMatch
+  const dataset = getSeedDataset()
+  const leftRegion = resolvePhase1ScopeValue(rawLeft, dataset.regions)
+  const rightRegion = resolvePhase1ScopeValue(rawRight, dataset.regions)
+  const leftSector = resolvePhase1ScopeValue(rawLeft, dataset.sectors)
+  const rightSector = resolvePhase1ScopeValue(rawRight, dataset.sectors)
+
+  if ((leftRegion && leftSector) || (rightRegion && rightSector)) {
+    return {
+      fallbackReason:
+        "Compare does not support region-and-sector combo peer comparisons yet.",
+    }
+  }
+
+  if ((leftRegion && rightSector) || (leftSector && rightRegion)) {
+    return {
+      fallbackReason:
+        "Compare only supports region vs region or sector vs sector, not mixed dimensions.",
+    }
+  }
+
+  if (leftRegion && rightRegion) {
+    const leftLabel =
+      dataset.regions.find((region) => region.id === leftRegion)?.name ?? rawLeft
+    const rightLabel =
+      dataset.regions.find((region) => region.id === rightRegion)?.name ?? rawRight
+
+    return {
+      dimension: "region" as const,
+      leftScope: { region: leftRegion },
+      rightScope: { region: rightRegion },
+      leftLabel,
+      rightLabel,
+    }
+  }
+
+  if (leftSector && rightSector) {
+    const leftLabel =
+      dataset.sectors.find((sector) => sector.id === leftSector)?.name ?? rawLeft
+    const rightLabel =
+      dataset.sectors.find((sector) => sector.id === rightSector)?.name ?? rawRight
+
+    return {
+      dimension: "sector" as const,
+      leftScope: { sector: leftSector },
+      rightScope: { sector: rightSector },
+      leftLabel,
+      rightLabel,
+    }
+  }
+
+  return {}
+}
+
+function buildTimeframeCompareSpec(scope: ScopeFilter): CompareSpec | QueryPlanResult {
+  if (scope.region && scope.sector) {
+    return {
+      fallbackReason:
+        "Compare currently supports the portfolio or a single region or sector scope, not both at once.",
+    }
+  }
+
+  const dataset = getSeedDataset()
+  const leftLabel = "This week"
+  const rightLabel = "Last week"
+
+  const scopeLabel = scope.region
+    ? dataset.regions.find((region) => region.id === scope.region)?.name
+    : scope.sector
+      ? dataset.sectors.find((sector) => sector.id === scope.sector)?.name
+      : undefined
+
+  return {
+    mode: "timeframe",
+    leftTimeframe: "this_week",
+    rightTimeframe: "last_week",
+    leftScope: scope,
+    rightScope: scope,
+    leftLabel: scopeLabel ? `${scopeLabel} · ${leftLabel}` : leftLabel,
+    rightLabel: scopeLabel ? `${scopeLabel} · ${rightLabel}` : rightLabel,
+  }
+}
+
+function buildPeerCompareSpec(
+  question: string,
+  timeframe: SupportedTimeframe,
+  scopeOverride?: ScopeFilter
+): CompareSpec | QueryPlanResult {
+  if (scopeOverride?.region || scopeOverride?.sector) {
+    return {
+      fallbackReason:
+        "Peer compare does not support an extra scope override on top of the two compared peers.",
+    }
+  }
+
+  const parsed = parseCompareSubjects(question)
+
+  if ("fallbackReason" in parsed) {
+    return parsed
+  }
+
+  if (
+    !parsed.dimension ||
+    !parsed.leftScope ||
+    !parsed.rightScope ||
+    !parsed.leftLabel ||
+    !parsed.rightLabel
+  ) {
+    return {
+      fallbackReason:
+        "Compare currently supports exactly two regions or exactly two sectors in one selected week.",
+    }
+  }
+
+  return {
+    mode: "peer",
+    dimension: parsed.dimension as CompareDimension,
+    selectedTimeframe: timeframe,
+    leftScope: parsed.leftScope,
+    rightScope: parsed.rightScope,
+    leftLabel: parsed.leftLabel,
+    rightLabel: parsed.rightLabel,
+  }
 }
 
 export function validateQueryPlan(plan: StructuredQueryPlan): QueryPlanResult {
@@ -130,6 +284,13 @@ export function validateQueryPlan(plan: StructuredQueryPlan): QueryPlanResult {
     }
   }
 
+  if (plan.intent === "compare" && !plan.compareSpec) {
+    return {
+      fallbackReason:
+        "Compare questions need either a this-week-vs-last-week view or two peers from the same dimension.",
+    }
+  }
+
   return {
     plan,
     parsed: plan,
@@ -147,7 +308,7 @@ export function planDeterministicQuery(
   if (!metric) {
     return {
       fallbackReason:
-        "QueryLens currently supports cashflow health change questions and at-risk account breakdowns for this dataset.",
+        "QueryLens currently supports cashflow health change and compare questions, plus at-risk account breakdowns for this dataset.",
     }
   }
 
@@ -171,10 +332,43 @@ export function planDeterministicQuery(
   }
 
   if (metric.id === "cashflow_health_score") {
+    if (isCompareIntent(normalizedQuestion)) {
+      const timeframeCompare =
+        normalizedQuestion.includes("this week vs last week") ||
+        normalizedQuestion.includes("this week versus last week") ||
+        normalizedQuestion.includes("last week vs this week") ||
+        normalizedQuestion.includes("last week versus this week")
+
+      const compareSpec = timeframeCompare
+        ? buildTimeframeCompareSpec(scope)
+        : buildPeerCompareSpec(question, timeframe, scopeOverride)
+
+      if ("fallbackReason" in compareSpec) {
+        return compareSpec
+      }
+
+      return validateQueryPlan({
+        datasetId,
+        rawQuestion: question,
+        intent: "compare",
+        metricId: "cashflow_health_score",
+        timeframe: timeframeCompare ? "this_week" : timeframe,
+        scope: timeframeCompare ? scope : {},
+        scopeDimensions: timeframeCompare
+          ? [...resolveScopeDimensions(scope)]
+          : [compareSpec.dimension ?? "portfolio"],
+        comparisonWindow: {
+          timeframe: timeframeCompare ? "this_week" : timeframe,
+          comparisonBasis: "prior_period",
+        },
+        compareSpec,
+      })
+    }
+
     if (!isWhatChangedIntent(normalizedQuestion)) {
       return {
         fallbackReason:
-          "Cashflow health currently supports 'what changed' questions such as why the score dropped this week or last week.",
+          "Cashflow health currently supports 'what changed' and compare questions for this week or last week.",
       }
     }
 

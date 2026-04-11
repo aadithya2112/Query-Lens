@@ -63,6 +63,72 @@ describe("query planner", () => {
     })
   })
 
+  it("creates a timeframe compare plan for cashflow health", () => {
+    const result = planDeterministicQuery(
+      "Compare cashflow health this week vs last week."
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "compare",
+      metricId: "cashflow_health_score",
+      timeframe: "this_week",
+      compareSpec: {
+        mode: "timeframe",
+        leftTimeframe: "this_week",
+        rightTimeframe: "last_week",
+        leftLabel: "This week",
+        rightLabel: "Last week",
+      },
+    })
+  })
+
+  it("creates a region peer compare plan", () => {
+    const result = planDeterministicQuery(
+      "Compare North West vs London & South East cashflow health last week."
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "compare",
+      metricId: "cashflow_health_score",
+      timeframe: "last_week",
+      compareSpec: {
+        mode: "peer",
+        dimension: "region",
+        selectedTimeframe: "last_week",
+        leftLabel: "North West",
+        rightLabel: "London & South East",
+      },
+    })
+  })
+
+  it("creates a sector peer compare plan", () => {
+    const result = planDeterministicQuery(
+      "Compare hospitality vs retail cashflow health this week."
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "compare",
+      metricId: "cashflow_health_score",
+      timeframe: "this_week",
+      compareSpec: {
+        mode: "peer",
+        dimension: "sector",
+        selectedTimeframe: "this_week",
+        leftLabel: "Hospitality",
+        rightLabel: "Retail",
+      },
+    })
+  })
+
+  it("rejects mixed-dimension peer compare", () => {
+    const result = planDeterministicQuery(
+      "Compare North West vs retail cashflow health last week."
+    )
+
+    expect(result.plan).toBeUndefined()
+    expect(result.fallbackReason).toContain("region vs region or sector vs sector")
+  })
+
   it("returns guided fallback for unsupported timeframes", () => {
     const result = planDeterministicQuery("Why did cashflow health drop last month?")
 
@@ -106,5 +172,24 @@ describe("query planner", () => {
 
     expect(invalid.plan).toBeUndefined()
     expect(invalid.fallbackReason).toContain("does not support")
+  })
+
+  it("rejects compare plans without compare metadata", () => {
+    const invalid = validateQueryPlan({
+      datasetId: "sme_portfolio",
+      rawQuestion: "Compare cashflow health this week vs last week",
+      intent: "compare",
+      metricId: "cashflow_health_score",
+      timeframe: "this_week",
+      scope: {},
+      scopeDimensions: ["portfolio"],
+      comparisonWindow: {
+        timeframe: "this_week",
+        comparisonBasis: "prior_period",
+      },
+    })
+
+    expect(invalid.plan).toBeUndefined()
+    expect(invalid.fallbackReason).toContain("Compare questions need")
   })
 })
