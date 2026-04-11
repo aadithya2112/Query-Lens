@@ -2,15 +2,18 @@ import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
 import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
+import { executeDiscoveryPlan } from "@/lib/querylens/server/executors/discovery"
 import {
   buildWhatChangedFallbackResponse,
   executeWhatChangedPlan,
 } from "@/lib/querylens/server/executors/what-changed"
 import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
+import { getQueryLensRetrievalStore } from "@/lib/querylens/server/retrieval"
 import type {
   Phase1AnalysisResponse,
   QueryRequestBody,
   QueryIntent,
+  RetrievalContext,
   StructuredQueryPlan,
 } from "@/lib/querylens/types"
 
@@ -20,6 +23,7 @@ interface IntentExecutor {
     weeklyRows: Awaited<ReturnType<Awaited<ReturnType<typeof getQueryLensDataAccess>>["listWeeklyMetrics"]>>
     dataAccess: Awaited<ReturnType<typeof getQueryLensDataAccess>>
     composeNarrative: ReturnType<typeof getQueryEngineProvider>["composeNarrative"]
+    retrievalContext: RetrievalContext
   }): Promise<Phase1AnalysisResponse>
 }
 
@@ -30,6 +34,9 @@ const executors: Partial<Record<QueryIntent, IntentExecutor>> = {
   breakdown: {
     execute: executeBreakdownPlan,
   },
+  discovery: {
+    execute: executeDiscoveryPlan,
+  },
   what_changed: {
     execute: executeWhatChangedPlan,
   },
@@ -39,12 +46,32 @@ export async function analyzeQuery(
   input: QueryRequestBody,
   options: { executionContext?: QueryLensExecutionContext } = {}
 ): Promise<Phase1AnalysisResponse> {
+  const executionContext = options.executionContext ?? "interactive"
   const dataAccess = await getQueryLensDataAccess()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
+  const retrievalStore = await getQueryLensRetrievalStore()
+  const chatId =
+    input.chatId?.trim() ||
+    (executionContext === "bootstrap" ? "bootstrap" : "querylens-session")
+  const retrievalContext =
+    executionContext === "bootstrap"
+      ? {
+          datasetMatches: [],
+          memoryMatches: [],
+          recentMessages: [],
+        }
+      : await retrievalStore.retrieveContext({
+          chatId,
+          question: input.question,
+        })
   const provider = getQueryEngineProvider({
-    executionContext: options.executionContext ?? "interactive",
+    executionContext,
   })
-  const parseResult = await provider.planQuery(input.question, input.scope)
+  const parseResult = await provider.planQuery(
+    input.question,
+    input.scope,
+    retrievalContext
+  )
 
   if (!parseResult.parsed) {
     return buildWhatChangedFallbackResponse({
@@ -72,10 +99,33 @@ export async function analyzeQuery(
     weeklyRows,
     dataAccess,
     composeNarrative: provider.composeNarrative,
+    retrievalContext,
   })
 
-  return {
+  const enrichedResponse = {
     ...response,
     metric: response.metric ?? parseResult.parsed.metricId,
+    conversationContextUsed:
+      retrievalContext.memoryMatches.length > 0 ||
+      retrievalContext.recentMessages.length > 0,
+    retrievalTrace: {
+      datasetMatches: retrievalContext.datasetMatches.map((match) => match.title),
+      memoryMatches: retrievalContext.memoryMatches.map((match) => match.title),
+      recentMessagesCount: retrievalContext.recentMessages.length,
+    },
   }
+
+  if (executionContext !== "bootstrap" && input.chatId) {
+    try {
+      await retrievalStore.persistConversation({
+        chatId,
+        question: input.question,
+        response: enrichedResponse,
+      })
+    } catch (error) {
+      console.warn("QueryLens could not persist conversational memory.", error)
+    }
+  }
+
+  return enrichedResponse
 }

@@ -4,6 +4,7 @@ import { analyzeQuery } from "@/lib/querylens/server/analysis-orchestrator"
 
 const queryRequestSchema = z.object({
   question: z.string().min(1, "Question is required."),
+  chatId: z.string().min(1).optional(),
   scope: z
     .object({
       region: z.string().optional(),

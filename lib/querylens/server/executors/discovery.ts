@@ -1,0 +1,206 @@
+import { calculateConfidenceScore } from "@/lib/querylens/scoring"
+import { getDatasetDefinition } from "@/lib/querylens/datasets"
+import {
+  buildDiscoveryCatalogSections,
+} from "@/lib/querylens/server/retrieval"
+import type {
+  CatalogSection,
+  DriverItem,
+  Phase1AnalysisResponse,
+  RetrievalContext,
+  SourceHealth,
+  StructuredQueryPlan,
+  WeeklyMetricRow,
+} from "@/lib/querylens/types"
+
+interface DiscoveryExecutorArgs {
+  plan: StructuredQueryPlan
+  weeklyRows: WeeklyMetricRow[]
+  dataAccess: {
+    sourceMode: "database" | "fixture"
+    getSourceHealth: () => Promise<SourceHealth[]>
+  }
+  retrievalContext: RetrievalContext
+}
+
+function buildCoverageLabel(weeklyRows: WeeklyMetricRow[]) {
+  const portfolioRows = weeklyRows
+    .filter((row) => row.recordType === "portfolio")
+    .sort((left, right) => left.weekStart.localeCompare(right.weekStart))
+
+  const first = portfolioRows[0]
+  const last = portfolioRows.at(-1)
+
+  if (!first || !last) {
+    return "Coverage information is not currently available."
+  }
+
+  return `${first.weekStart} to ${last.weekEnd}`
+}
+
+function buildChartSpec(sourceHealth: SourceHealth[], sectionCount: number) {
+  return {
+    type: "bar" as const,
+    title: "Dataset overview",
+    xKey: "label" as const,
+    yKey: "value" as const,
+    data: [
+      ...sourceHealth.map((source) => ({
+        label: source.name,
+        value: source.recordCount ?? 0,
+      })),
+      {
+        label: "Catalog sections",
+        value: sectionCount,
+      },
+    ],
+    explanation:
+      "The discovery view summarizes the active dataset, connected sources, and the metadata QueryLens can retrieve before planning analytical questions.",
+  }
+}
+
+function buildDiscoveryDrivers(args: {
+  sourceHealth: SourceHealth[]
+  metricCount: number
+  coverageLabel: string
+}): DriverItem[] {
+  return [
+    {
+      id: "dataset-metrics",
+      title: `${args.metricCount} metrics are available right now`,
+      impactLabel: `${args.metricCount} metrics`,
+      direction: "positive",
+      description:
+        "The current sample dataset supports cashflow health analysis, at-risk account breakdowns, and metadata discovery.",
+    },
+    {
+      id: "dataset-sources",
+      title: `${args.sourceHealth.length} source layers are active`,
+      impactLabel: `${args.sourceHealth.length} sources`,
+      direction: "positive",
+      description:
+        "QueryLens can ground answers with structured facts, contextual signals, and the semantic metric manifest.",
+    },
+    {
+      id: "dataset-coverage",
+      title: "Weekly coverage is bounded and explicit",
+      impactLabel: args.coverageLabel,
+      direction: "positive",
+      description:
+        "Time coverage is explicitly known, which keeps discovery answers and follow-up analytics within safe dataset boundaries.",
+    },
+  ]
+}
+
+function prioritizeSections(
+  sections: CatalogSection[],
+  plan: StructuredQueryPlan,
+  retrievalContext: RetrievalContext
+) {
+  const matchedIds = new Set(retrievalContext.datasetMatches.map((match) => match.id))
+
+  const focusOrder = [
+    plan.discoveryFocus === "overview" ? "dataset-overview" : null,
+    plan.discoveryFocus === "metrics" ? "dataset-metrics" : null,
+    plan.discoveryFocus === "sources" ? "dataset-sources" : null,
+    plan.discoveryFocus === "dimensions" ? "dataset-dimensions" : null,
+    plan.discoveryFocus === "time_coverage" ? "dataset-time-coverage" : null,
+    plan.discoveryFocus === "questions" ? "dataset-supported-questions" : null,
+  ].filter(Boolean)
+
+  return [...sections].sort((left, right) => {
+    const leftFocusIndex = focusOrder.indexOf(left.id)
+    const rightFocusIndex = focusOrder.indexOf(right.id)
+
+    if (leftFocusIndex !== -1 || rightFocusIndex !== -1) {
+      if (leftFocusIndex === -1) return 1
+      if (rightFocusIndex === -1) return -1
+      return leftFocusIndex - rightFocusIndex
+    }
+
+    const leftMatched = matchedIds.has(left.id) ? 0 : 1
+    const rightMatched = matchedIds.has(right.id) ? 0 : 1
+
+    if (leftMatched !== rightMatched) {
+      return leftMatched - rightMatched
+    }
+
+    return left.title.localeCompare(right.title)
+  })
+}
+
+export async function executeDiscoveryPlan(
+  args: DiscoveryExecutorArgs
+): Promise<Phase1AnalysisResponse> {
+  const dataset = getDatasetDefinition(args.plan.datasetId)
+  const sourceHealth = await args.dataAccess.getSourceHealth()
+  const coverageLabel = buildCoverageLabel(args.weeklyRows)
+  const catalogSections = prioritizeSections(
+    buildDiscoveryCatalogSections(),
+    args.plan,
+    args.retrievalContext
+  ).slice(0, 4)
+
+  const summary = `QueryLens currently has ${dataset.metrics.length} analytical metrics across ${dataset.supportedIntentIds.length} intent families for the ${dataset.label} dataset. The active source stack includes ${sourceHealth.map((source) => source.name).join(", ")}, with weekly coverage from ${coverageLabel}.`
+  const evidence = [
+    ...sourceHealth.map((source) => ({
+      sourceType:
+        source.type === "manifest" ? "postgres" : (source.type as "postgres" | "mongodb"),
+      sourceName: source.name,
+      timeRange: coverageLabel,
+      scope: dataset.label,
+      supportingFact: `${source.detail}`,
+      queryTemplateId: `discovery_${source.id}_v1`,
+    })),
+    ...args.retrievalContext.datasetMatches.slice(0, 3).map((match) => ({
+      sourceType: "postgres" as const,
+      sourceName: "Dataset catalog",
+      timeRange: "Metadata retrieval",
+      scope: match.title,
+      supportingFact: match.content,
+      queryTemplateId: `catalog_${match.id}_v1`,
+    })),
+  ]
+
+  return {
+    intent: "discovery",
+    headline: `QueryLens is currently grounded on the ${dataset.label} dataset`,
+    summary,
+    metric: "dataset_catalog",
+    timeframe: `Coverage: ${coverageLabel}`,
+    comparisonBasis: "Catalog, source, and metadata overview",
+    confidence: calculateConfidenceScore({
+      evidenceCount: evidence.length,
+      driverCount: catalogSections.length,
+      hasCrossSourceEvidence: sourceHealth.some((source) => source.type === "mongodb"),
+      fallback: false,
+    }),
+    activeScope: dataset.label,
+    drivers: buildDiscoveryDrivers({
+      sourceHealth,
+      metricCount: dataset.metrics.length,
+      coverageLabel,
+    }),
+    chartSpec: buildChartSpec(sourceHealth, catalogSections.length),
+    evidence,
+    assumptions: [
+      "Discovery answers are built from retrieved metadata, source health, and the current sample dataset boundaries.",
+      "Analytical answers still require a supported metric, timeframe, and intent after planning.",
+    ],
+    supportedFollowUps: [
+      "What metrics are available?",
+      "Which sources are connected?",
+      "Why did SME cashflow health drop last week?",
+      "Compare cashflow health this week vs last week",
+    ],
+    discoverySummary: {
+      datasetLabel: dataset.label,
+      sourceLabels: sourceHealth.map((source) => source.name),
+      metricCount: dataset.metrics.length,
+      timeCoverage: coverageLabel,
+      dimensionLabels: dataset.dimensions,
+    },
+    catalogSections,
+    sourceMode: args.dataAccess.sourceMode,
+  }
+}

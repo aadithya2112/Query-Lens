@@ -23,9 +23,11 @@ import { roundTo } from "@/lib/querylens/scoring"
 import type {
   CompareSpec,
   ContextEvent,
+  DiscoveryFocus,
   DriverItem,
   Phase1AnalysisResponse,
   QueryPlanResult,
+  RetrievalContext,
   ScopeFilter,
   StructuredQueryPlan,
 } from "@/lib/querylens/types"
@@ -74,10 +76,19 @@ const submitCompareSchema = z.object({
   rightEntity: z.string().min(1).optional(),
 })
 
+const submitDiscoverySchema = z.object({
+  intent: z.literal("discovery"),
+  metric: z.literal("dataset_catalog"),
+  discoveryFocus: z
+    .enum(["overview", "metrics", "sources", "dimensions", "time_coverage", "questions"])
+    .optional(),
+})
+
 const submitQueryPlanSchema = z.discriminatedUnion("intent", [
   submitWhatChangedSchema,
   submitBreakdownSchema,
   submitCompareSchema,
+  submitDiscoverySchema,
 ])
 
 interface NarrativeInput {
@@ -92,7 +103,8 @@ interface NarrativeInput {
 export interface QueryEngineProvider {
   planQuery: (
     question: string,
-    scopeOverride?: ScopeFilter
+    scopeOverride?: ScopeFilter,
+    retrievalContext?: RetrievalContext
   ) => Promise<QueryPlanResult>
   composeNarrative: (
     input: NarrativeInput
@@ -239,15 +251,15 @@ const plannerTools: FunctionDeclaration[] = [
     parametersJsonSchema: {
       type: "object",
       additionalProperties: false,
-      required: ["intent", "metric", "timeframe"],
+      required: ["intent", "metric"],
       properties: {
         intent: {
           type: "string",
-          enum: ["what_changed", "breakdown", "compare"],
+          enum: ["what_changed", "breakdown", "compare", "discovery"],
         },
         metric: {
           type: "string",
-          enum: ["cashflow_health_score", "at_risk_account_count"],
+          enum: ["cashflow_health_score", "at_risk_account_count", "dataset_catalog"],
         },
         timeframe: {
           type: "string",
@@ -277,6 +289,10 @@ const plannerTools: FunctionDeclaration[] = [
         rightEntity: {
           type: "string",
         },
+        discoveryFocus: {
+          type: "string",
+          enum: ["overview", "metrics", "sources", "dimensions", "time_coverage", "questions"],
+        },
       },
     },
   },
@@ -297,7 +313,31 @@ const plannerTools: FunctionDeclaration[] = [
   },
 ]
 
-function buildPlannerPrompt(question: string) {
+function formatRetrievedContext(retrievalContext?: RetrievalContext) {
+  if (!retrievalContext) {
+    return "No retrieved context was available."
+  }
+
+  const datasetContext = retrievalContext.datasetMatches.length
+    ? retrievalContext.datasetMatches
+        .map((match, index) => `${index + 1}. ${match.title}: ${match.content}`)
+        .join("\n")
+    : "No dataset metadata matches were retrieved."
+  const memoryContext = retrievalContext.memoryMatches.length
+    ? retrievalContext.memoryMatches
+        .map((match, index) => `${index + 1}. ${match.title}: ${match.content}`)
+        .join("\n")
+    : "No conversation memory matches were retrieved."
+  const recentMessages = retrievalContext.recentMessages.length
+    ? retrievalContext.recentMessages
+        .map((message) => `${message.role}: ${message.text}`)
+        .join("\n")
+    : "No recent conversation turns were available."
+
+  return `Dataset context:\n${datasetContext}\n\nConversation memory:\n${memoryContext}\n\nRecent conversation:\n${recentMessages}`
+}
+
+function buildPlannerPrompt(question: string, retrievalContext?: RetrievalContext) {
   return `
 You are planning a QueryLens analytics query.
 
@@ -316,11 +356,19 @@ Supported product boundaries:
   - timeframe: this_week or last_week
   - compareMode: timeframe or peer
   - compareDimension: region or sector for peer compare
+- intent: discovery
+  - metric: dataset_catalog
+  - discoveryFocus: overview, metrics, sources, dimensions, time_coverage, or questions
 - optional scope filters: region and sector
 - supported regions: North West, London & South East, Midlands
 - supported sectors: Hospitality, Retail, Professional Services
 
-Reject requests about unsupported metrics, unsupported time windows, briefings, uploads, or anything outside the current what-changed, breakdown, and compare flows.
+Use retrieved context to resolve references like "that", "there", "those metrics", or "that region".
+
+Reject requests about unsupported metrics, unsupported time windows, uploads, or anything outside the current discovery, what-changed, breakdown, and compare flows.
+
+Retrieved context:
+${formatRetrievedContext(retrievalContext)}
 
 Question:
 ${question}
@@ -435,10 +483,11 @@ function resolveCompareSpec(args: {
 
 async function planQueryWithGemini(
   question: string,
-  scopeOverride?: ScopeFilter
+  scopeOverride?: ScopeFilter,
+  retrievalContext?: RetrievalContext
 ) {
   const result = await generateGeminiResponse({
-    prompt: buildPlannerPrompt(question),
+    prompt: buildPlannerPrompt(question, retrievalContext),
     tools: [{ functionDeclarations: plannerTools }],
     toolConfig: {
       functionCallingConfig: {
@@ -500,6 +549,24 @@ async function planQueryWithGemini(
   }
 
   const parsed = (() => {
+    if (parsedArgs.data.intent === "discovery") {
+      return {
+        datasetId: getDefaultDatasetId(),
+        rawQuestion: question,
+        intent: "discovery" as const,
+        metricId: "dataset_catalog" as const,
+        timeframe: "this_week" as const,
+        scope: {},
+        scopeDimensions: ["portfolio"] as StructuredQueryPlan["scopeDimensions"],
+        comparisonWindow: {
+          timeframe: "this_week" as const,
+          comparisonBasis: "prior_period" as const,
+        },
+        discoveryFocus:
+          parsedArgs.data.discoveryFocus as DiscoveryFocus | undefined,
+      }
+    }
+
     if (parsedArgs.data.intent === "compare") {
       const compareSpec = resolveCompareSpec({
         question,
@@ -588,14 +655,14 @@ export function getQueryEngineProvider(args: {
   }
 
   return {
-    planQuery: async (question, scopeOverride) => {
+    planQuery: async (question, scopeOverride, retrievalContext) => {
       if (!geminiAvailable) {
         return buildGeminiRequiredFallback()
       }
 
       try {
         const geminiResult = await Promise.race([
-          planQueryWithGemini(question, scopeOverride),
+          planQueryWithGemini(question, scopeOverride, retrievalContext),
           new Promise<undefined>((resolve) => {
             setTimeout(() => resolve(undefined), 6_000)
           }),

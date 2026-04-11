@@ -120,6 +120,17 @@ describe("query planner", () => {
     })
   })
 
+  it("creates a discovery plan for vague metadata questions", () => {
+    const result = planDeterministicQuery("What data is currently stored?")
+
+    expect(result.plan).toMatchObject({
+      intent: "discovery",
+      metricId: "dataset_catalog",
+      discoveryFocus: "overview",
+      scopeDimensions: ["portfolio"],
+    })
+  })
+
   it("rejects mixed-dimension peer compare", () => {
     const result = planDeterministicQuery(
       "Compare North West vs retail cashflow health last week."

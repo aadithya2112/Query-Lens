@@ -112,6 +112,62 @@ describe("/api/query", () => {
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "mongodb")).toBe(true)
   })
 
+  it("returns a grounded discovery response for broad metadata questions", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "What data is currently stored?",
+        chatId: "route-discovery",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.intent).toBe("discovery")
+    expect(payload.metric).toBe("dataset_catalog")
+    expect(payload.discoverySummary?.datasetLabel).toBe("SME portfolio")
+    expect(payload.catalogSections?.length).toBeGreaterThan(0)
+  })
+
+  it("uses chatId to retain conversational memory across discovery turns", async () => {
+    const firstRequest = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "What data is currently stored?",
+        chatId: "route-memory",
+      }),
+    })
+
+    await POST(firstRequest)
+
+    const secondRequest = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "What metrics are available?",
+        chatId: "route-memory",
+      }),
+    })
+
+    const response = await POST(secondRequest)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.intent).toBe("discovery")
+    expect(payload.conversationContextUsed).toBe(true)
+    expect(payload.retrievalTrace?.recentMessagesCount).toBeGreaterThan(0)
+  })
+
   it("returns a grounded region peer compare for cashflow health", async () => {
     const request = new Request("http://localhost/api/query", {
       method: "POST",

@@ -44,4 +44,34 @@ describe("analysis orchestrator", () => {
     expect(payload.comparisonSummary?.mode).toBe("timeframe")
     expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
   })
+
+  it("dispatches vague metadata questions through the discovery executor", async () => {
+    const payload = await analyzeQuery({
+      question: "What data is currently stored?",
+      chatId: "discovery-test",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.intent).toBe("discovery")
+    expect(payload.metric).toBe("dataset_catalog")
+    expect(payload.discoverySummary?.datasetLabel).toBe("SME portfolio")
+    expect(payload.catalogSections?.length).toBeGreaterThan(0)
+    expect(payload.evidence.length).toBeGreaterThan(0)
+  })
+
+  it("persists conversational context when chatId is present", async () => {
+    await analyzeQuery({
+      question: "What data is currently stored?",
+      chatId: "memory-test",
+    })
+
+    const followUp = await analyzeQuery({
+      question: "What metrics are available?",
+      chatId: "memory-test",
+    })
+
+    expect(followUp.intent).toBe("discovery")
+    expect(followUp.conversationContextUsed).toBe(true)
+    expect(followUp.retrievalTrace?.recentMessagesCount).toBeGreaterThan(0)
+  })
 })

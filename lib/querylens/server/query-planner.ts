@@ -9,6 +9,7 @@ import type {
   BreakdownDimension,
   CompareDimension,
   CompareSpec,
+  DiscoveryFocus,
   QueryPlanResult,
   ScopeFilter,
   StructuredQueryPlan,
@@ -70,6 +71,36 @@ function isBreakdownIntent(normalizedQuestion: string) {
 
 function isCompareIntent(normalizedQuestion: string) {
   return /\b(compare|vs|versus)\b/.test(normalizedQuestion)
+}
+
+function isDiscoveryIntent(normalizedQuestion: string) {
+  return /(what data|what is stored|currently stored|what can i ask|what metrics|which metrics|which sources|what sources|what regions|what sectors|time range|time coverage|what data do we have|what is available|available data)/.test(
+    normalizedQuestion
+  )
+}
+
+function resolveDiscoveryFocus(normalizedQuestion: string): DiscoveryFocus {
+  if (/(what metrics|which metrics)/.test(normalizedQuestion)) {
+    return "metrics"
+  }
+
+  if (/(which sources|what sources|connected sources)/.test(normalizedQuestion)) {
+    return "sources"
+  }
+
+  if (/(what regions|what sectors|dimensions|segments|categories)/.test(normalizedQuestion)) {
+    return "dimensions"
+  }
+
+  if (/(time range|time coverage|how far back|what period)/.test(normalizedQuestion)) {
+    return "time_coverage"
+  }
+
+  if (/(what can i ask|supported questions|examples)/.test(normalizedQuestion)) {
+    return "questions"
+  }
+
+  return "overview"
 }
 
 function resolveBreakdownDimension(
@@ -257,6 +288,13 @@ export function validateQueryPlan(plan: StructuredQueryPlan): QueryPlanResult {
     }
   }
 
+  if (plan.intent === "discovery") {
+    return {
+      plan,
+      parsed: plan,
+    }
+  }
+
   if (!dataset.metrics.some((metric) => metric.id === plan.metricId)) {
     return {
       fallbackReason: `The ${dataset.label} dataset does not support that metric yet.`,
@@ -304,6 +342,23 @@ export function planDeterministicQuery(
   const datasetId = getDefaultDatasetId()
   const normalizedQuestion = normalizePhase1Text(question)
   const metric = resolveMetric(question)
+
+  if (isDiscoveryIntent(normalizedQuestion)) {
+    return validateQueryPlan({
+      datasetId,
+      rawQuestion: question,
+      intent: "discovery",
+      metricId: "dataset_catalog",
+      timeframe: "this_week",
+      scope: {},
+      scopeDimensions: ["portfolio"],
+      comparisonWindow: {
+        timeframe: "this_week",
+        comparisonBasis: "prior_period",
+      },
+      discoveryFocus: resolveDiscoveryFocus(normalizedQuestion),
+    })
+  }
 
   if (!metric) {
     return {
