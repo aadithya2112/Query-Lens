@@ -75,25 +75,30 @@ export async function embedTexts(args: {
     return args.texts.map(embedDeterministically)
   }
 
-  const client = getGeminiEmbeddingClient()
-  const response = await client.models.embedContent({
-    model: getEmbeddingModel(),
-    contents: args.texts,
-    config: {
-      outputDimensionality: EMBEDDING_DIMENSIONS,
-      taskType:
-        args.task === "query" ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
-    },
-  })
+  try {
+    const client = getGeminiEmbeddingClient()
+    const response = await client.models.embedContent({
+      model: getEmbeddingModel(),
+      contents: args.texts,
+      config: {
+        outputDimensionality: EMBEDDING_DIMENSIONS,
+        taskType:
+          args.task === "query" ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
+      },
+    })
 
-  const embeddings =
-    response.embeddings?.map((entry) => entry.values ?? []) ?? []
+    const embeddings =
+      response.embeddings?.map((entry) => entry.values ?? []) ?? []
 
-  if (embeddings.length !== args.texts.length) {
-    throw new Error("Gemini embeddings response did not match the number of texts.")
+    if (embeddings.length !== args.texts.length) {
+      throw new Error("Gemini embeddings response did not match the number of texts.")
+    }
+
+    return embeddings.map((values) => normalizeVector(values))
+  } catch {
+    geminiEmbeddingClient = undefined
+    return args.texts.map(embedDeterministically)
   }
-
-  return embeddings.map((values) => normalizeVector(values))
 }
 
 export function formatVectorLiteral(values: number[]) {

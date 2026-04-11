@@ -89,9 +89,92 @@ function TrustBar({ analysis }: EvidencePanelProps) {
   )
 }
 
+function DiscoverySummaryCards({ analysis }: EvidencePanelProps) {
+  if (!analysis.discoverySummary) {
+    return null
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-4">
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Dataset
+        </p>
+        <p className="mt-3 text-lg font-semibold text-foreground">
+          {analysis.discoverySummary.datasetLabel}
+        </p>
+      </div>
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Metrics
+        </p>
+        <p className="mt-3 text-3xl font-semibold text-foreground">
+          {analysis.discoverySummary.metricCount}
+        </p>
+      </div>
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Sources
+        </p>
+        <p className="mt-3 text-lg font-semibold text-foreground">
+          {analysis.discoverySummary.sourceLabels.join(", ")}
+        </p>
+      </div>
+      <div className="rounded-[24px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Coverage
+        </p>
+        <p className="mt-3 text-lg font-semibold text-foreground">
+          {analysis.discoverySummary.timeCoverage}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function CatalogSections({ analysis }: EvidencePanelProps) {
+  if (!analysis.catalogSections?.length) {
+    return null
+  }
+
+  return (
+    <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+      <div className="flex items-center gap-2">
+        <Sparkles size={16} className="text-muted-foreground" />
+        <h2 className="text-base font-semibold text-foreground">
+          Catalog and suggested paths
+        </h2>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {analysis.catalogSections.map((section) => (
+          <div
+            key={section.id}
+            className="rounded-[22px] border border-border bg-muted/10 px-4 py-4"
+          >
+            <p className="text-sm font-semibold text-foreground">{section.title}</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {section.summary}
+            </p>
+            {section.items.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {section.items.map((item) => (
+                  <li key={item} className="text-sm text-muted-foreground">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function EvidencePanel({ analysis }: EvidencePanelProps) {
   const isBreakdown = analysis.metric === "at_risk_account_count"
   const isCompare = Boolean(analysis.comparisonSummary)
+  const isDiscovery = analysis.intent === "discovery"
 
   return (
     <section className="px-4 py-4 lg:px-6 lg:py-7 mx-auto max-w-full w-full">
@@ -109,15 +192,21 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
         </div>
 
         <TrustBar analysis={analysis} />
-        <ComparisonCards analysis={analysis} />
+        <DiscoverySummaryCards analysis={analysis} />
+        {!isDiscovery && <ComparisonCards analysis={analysis} />}
         <TrendChart analysis={analysis} />
 
         <div className="flex flex-col gap-5">
+          {isDiscovery ? (
+            <CatalogSections analysis={analysis} />
+          ) : null}
           <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">
-                {isBreakdown
+                {isDiscovery
+                  ? "Discovery highlights"
+                  : isBreakdown
                   ? "Top concentrations"
                   : isCompare
                     ? "Top differences"
@@ -223,12 +312,36 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
             </summary>
             <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
-                {isBreakdown
+                {isDiscovery
+                  ? "The discovery slice uses pgvector-backed metadata retrieval, source health checks, and conversation memory to answer broad questions safely."
+                  : isBreakdown
                   ? "The breakdown slice uses validated planning, account-level weekly stress rollups, and contextual Mongo evidence."
                   : isCompare
                     ? "The compare slice uses validated planning, side-by-side weekly metric rows, and contextual Mongo evidence."
                     : "The what-changed slice uses validated planning, sample-dataset weekly metrics, and contextual Mongo evidence."}
               </p>
+              {analysis.retrievalTrace && (
+                <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Retrieval trace
+                  </p>
+                  <p className="mt-2">
+                    Dataset matches:{" "}
+                    {analysis.retrievalTrace.datasetMatches.length
+                      ? analysis.retrievalTrace.datasetMatches.join(", ")
+                      : "none"}
+                  </p>
+                  <p className="mt-1">
+                    Memory matches:{" "}
+                    {analysis.retrievalTrace.memoryMatches.length
+                      ? analysis.retrievalTrace.memoryMatches.join(", ")
+                      : "none"}
+                  </p>
+                  <p className="mt-1">
+                    Recent turns used: {analysis.retrievalTrace.recentMessagesCount}
+                  </p>
+                </div>
+              )}
               <ul className="space-y-2">
                 {analysis.evidence.map((item) => (
                   <li

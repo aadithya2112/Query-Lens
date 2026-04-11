@@ -1,6 +1,6 @@
 "use client"
 
-import { startTransition, useState } from "react"
+import { startTransition, useEffect, useState } from "react"
 
 import { Activity, Settings2 } from "lucide-react"
 
@@ -25,9 +25,56 @@ import {
 } from "@/components/ui/sheet"
 import type {
   BootstrapPayload,
-  MetricDefinition,
   Phase1AnalysisResponse,
 } from "@/lib/querylens/types"
+
+const CHAT_ID_STORAGE_KEY = "querylens.chatId"
+const CHAT_MESSAGES_STORAGE_KEY = "querylens.messages"
+const ACTIVE_ANALYSIS_STORAGE_KEY = "querylens.activeAnalysis"
+
+function buildInitialMessages(
+  initialQuestion: string,
+  initialAnalysis: Phase1AnalysisResponse
+): ConversationMessage[] {
+  return [
+    {
+      id: "user-initial",
+      role: "user",
+      text: initialQuestion,
+    },
+    {
+      id: "assistant-initial",
+      role: "assistant",
+      text: initialAnalysis.summary,
+      analysis: initialAnalysis,
+    },
+  ]
+}
+
+function generateChatId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+
+  return `querylens-${Date.now()}`
+}
+
+function readStoredState<T>(key: string): T | undefined {
+  if (typeof window === "undefined") {
+    return undefined
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(key)
+    if (!rawValue) {
+      return undefined
+    }
+
+    return JSON.parse(rawValue) as T
+  } catch {
+    return undefined
+  }
+}
 
 function buildAssistantMessage(
   analysis: Phase1AnalysisResponse,
@@ -46,23 +93,54 @@ export default function Workspace({
   sourceHealth,
   initialAnalysis,
 }: BootstrapPayload) {
-  const [messages, setMessages] = useState<ConversationMessage[]>([
-    {
-      id: "user-initial",
-      role: "user",
-      text: initialQuestion,
-    },
-    {
-      id: "assistant-initial",
-      role: "assistant",
-      text: initialAnalysis.summary,
-      analysis: initialAnalysis,
-    },
-  ])
+  const [messages, setMessages] = useState<ConversationMessage[]>(
+    buildInitialMessages(initialQuestion, initialAnalysis)
+  )
   const [activeAnalysis, setActiveAnalysis] = useState(initialAnalysis)
+  const [chatId, setChatId] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const activeMetric =
-    metrics.find((metric) => metric.id === activeAnalysis.metric) ?? metrics[0]
+  const [isRestored, setIsRestored] = useState(false)
+  const activeMetric = metrics.find((metric) => metric.id === activeAnalysis.metric)
+
+  useEffect(() => {
+    const storedChatId = window.localStorage.getItem(CHAT_ID_STORAGE_KEY)
+    const nextChatId = storedChatId || generateChatId()
+
+    if (!storedChatId) {
+      window.localStorage.setItem(CHAT_ID_STORAGE_KEY, nextChatId)
+    }
+
+    setChatId(nextChatId)
+
+    const storedMessages = readStoredState<ConversationMessage[]>(
+      CHAT_MESSAGES_STORAGE_KEY
+    )
+    const storedAnalysis = readStoredState<Phase1AnalysisResponse>(
+      ACTIVE_ANALYSIS_STORAGE_KEY
+    )
+
+    if (storedMessages?.length) {
+      setMessages(storedMessages)
+    }
+
+    if (storedAnalysis) {
+      setActiveAnalysis(storedAnalysis)
+    }
+
+    setIsRestored(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isRestored || typeof window === "undefined") {
+      return
+    }
+
+    window.localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages))
+    window.localStorage.setItem(
+      ACTIVE_ANALYSIS_STORAGE_KEY,
+      JSON.stringify(activeAnalysis)
+    )
+  }, [activeAnalysis, isRestored, messages])
 
   const handleSend = async (question: string) => {
     const trimmed = question.trim()
@@ -87,7 +165,10 @@ export default function Workspace({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({
+          question: trimmed,
+          chatId: chatId || undefined,
+        }),
       })
 
       if (!response.ok) {
@@ -111,7 +192,7 @@ export default function Workspace({
           {
             id: `assistant-error-${Date.now()}`,
             role: "assistant",
-            text: "QueryLens could not analyze that request right now. The current evidence view is still available while the local slice is rechecked.",
+            text: "QueryLens could not analyze that request right now. The current evidence view is still available while the active slice is rechecked.",
           },
         ])
       })
@@ -137,7 +218,9 @@ export default function Workspace({
           <p className="hidden text-sm text-muted-foreground md:inline-block">
               Metric Focus:{" "}
               <span className="font-medium text-foreground">
-              {activeMetric?.label || "Cashflow"}
+                {activeAnalysis.intent === "discovery"
+                  ? "Dataset discovery"
+                  : activeMetric?.label || "Cashflow"}
               </span>
             </p>
           <div className="h-4 w-px bg-border hidden md:block" />
@@ -158,7 +241,7 @@ export default function Workspace({
               <div className="mt-6">
                 <Sidebar
                   analysis={activeAnalysis}
-                  metric={activeMetric as MetricDefinition}
+                  metric={activeMetric}
                   sourceHealth={sourceHealth}
                 />
               </div>

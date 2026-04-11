@@ -19,6 +19,7 @@ interface ChatPanelProps {
 }
 
 const QUICK_PROMPTS = [
+  "What data is currently stored?",
   "Why did SME cashflow health drop last week?",
   "What makes up at-risk accounts by region and sector last week?",
   "Compare cashflow health this week vs last week",
@@ -74,6 +75,11 @@ function AssistantMessage({
               confidence {analysis.confidence}%
             </span>
           </div>
+          {analysis.conversationContextUsed && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Conversation context was used to interpret this reply.
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             {analysis.supportedFollowUps.map((followUp) => (
               <button

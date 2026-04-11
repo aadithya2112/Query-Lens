@@ -9,7 +9,7 @@ import type {
 } from "@/lib/querylens/types"
 
 interface SidebarProps {
-  metric: MetricDefinition
+  metric?: MetricDefinition
   sourceHealth: SourceHealth[]
   analysis: Phase1AnalysisResponse
 }
@@ -42,6 +42,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const isBreakdown = analysis.metric === "at_risk_account_count"
   const isCompare = Boolean(analysis.comparisonSummary)
+  const isDiscovery = analysis.intent === "discovery"
 
   return (
     <aside className="rounded-[28px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl h-fit">
@@ -55,7 +56,9 @@ export default function Sidebar({
               QueryLens
             </p>
             <h1 className="mt-1 text-xl font-semibold text-foreground">
-              {isCompare
+              {isDiscovery
+                ? "Dataset discovery"
+                : isCompare
                 ? "SME cashflow compare"
                 : isBreakdown
                 ? "SME risk concentration breakdown"
@@ -64,7 +67,9 @@ export default function Sidebar({
           </div>
         </div>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          {isCompare
+          {isDiscovery
+            ? "A conversational metadata view that explains what QueryLens currently knows about the sample dataset, the connected sources, and the supported analytical paths."
+            : isCompare
             ? "A trust-first side-by-side comparison of weekly cashflow health, using the sample dataset's Postgres facts and Mongo context to explain the gap."
             : isBreakdown
             ? "A trust-first breakdown of where weekly account stress is concentrated, using the sample dataset's Postgres facts and Mongo context side by side."
@@ -85,6 +90,16 @@ export default function Sidebar({
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {analysis.timeframe}
         </p>
+        {analysis.conversationContextUsed && (
+          <>
+            <p className="mt-3 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Conversation memory
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              Active for this response
+            </p>
+          </>
+        )}
         <p className="mt-3 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Source mode
         </p>
@@ -99,46 +114,67 @@ export default function Sidebar({
         <div className="flex items-center gap-2">
           <Layers3 size={16} className="text-foreground" />
           <h2 className="text-sm font-semibold text-foreground">
-            Metric definition
+            {isDiscovery ? "Discovery scope" : "Metric definition"}
           </h2>
         </div>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {metric.description}
+          {isDiscovery
+            ? "Discovery answers come from retrieved dataset metadata, source health, and sample-dataset coverage summaries before analytical execution begins."
+            : metric?.description}
         </p>
-        <div className="mt-4 space-y-3">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Payment coverage
-            </p>
-            <p className="text-sm text-foreground">
-              {Math.round(metric.weights.inflowOutflowRatio * 100)}%
-            </p>
+        {isDiscovery ? (
+          <div className="mt-4 space-y-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Available intents
+              </p>
+              <p className="text-sm text-foreground">
+                discovery, what changed, breakdown, compare
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Time windows
+              </p>
+              <p className="text-sm text-foreground">this week, last week</p>
+            </div>
           </div>
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Balance trend
-            </p>
-            <p className="text-sm text-foreground">
-              {Math.round(metric.weights.balanceTrend * 100)}%
-            </p>
+        ) : metric ? (
+          <div className="mt-4 space-y-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Payment coverage
+              </p>
+              <p className="text-sm text-foreground">
+                {Math.round(metric.weights.inflowOutflowRatio * 100)}%
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Balance trend
+              </p>
+              <p className="text-sm text-foreground">
+                {Math.round(metric.weights.balanceTrend * 100)}%
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Low-balance exposure
+              </p>
+              <p className="text-sm text-foreground">
+                {Math.round(metric.weights.lowBalanceExposure * 100)}%
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Overdue exposure
+              </p>
+              <p className="text-sm text-foreground">
+                {Math.round(metric.weights.overdueExposure * 100)}%
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Low-balance exposure
-            </p>
-            <p className="text-sm text-foreground">
-              {Math.round(metric.weights.lowBalanceExposure * 100)}%
-            </p>
-          </div>
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Overdue exposure
-            </p>
-            <p className="text-sm text-foreground">
-              {Math.round(metric.weights.overdueExposure * 100)}%
-            </p>
-          </div>
-        </div>
+        ) : null}
       </section>
 
       <section className="py-6">
@@ -156,8 +192,9 @@ export default function Sidebar({
         <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
           <FileCheck2 size={14} className="text-muted-foreground" />
           <p className="text-sm leading-6 text-muted-foreground">
-            QueryLens intentionally supports a narrow set of metrics and intents
-            so the answer remains grounded.
+            {isDiscovery
+              ? "Discovery keeps the app conversational while staying grounded in retrieved metadata and source health."
+              : "QueryLens intentionally supports a narrow set of metrics and intents so the answer remains grounded."}
           </p>
         </div>
       </section>
