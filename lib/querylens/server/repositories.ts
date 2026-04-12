@@ -9,6 +9,7 @@ import type {
 import type {
   ContextCollection,
   ContextEvent,
+  DailyAccountMetric,
   ScopeFilter,
   SourceHealth,
   WeeklyAccountStressRow,
@@ -18,6 +19,11 @@ import type {
 export interface QueryLensDataAccess {
   sourceMode: "database" | "fixture"
   listWeeklyMetrics(): Promise<WeeklyMetricRow[]>
+  listDailyMetrics(args: {
+    startDate: string
+    endDate: string
+    scope: ScopeFilter
+  }): Promise<DailyAccountMetric[]>
   listWeeklyAccountStress(args: {
     targetStart: string
     scope: ScopeFilter
@@ -27,6 +33,10 @@ export interface QueryLensDataAccess {
     targetEnd: string
     scope: ScopeFilter
   }): Promise<ContextEvent[]>
+  getDateCoverage(): Promise<{
+    startDate: string
+    endDate: string
+  }>
   getSourceHealth(): Promise<SourceHealth[]>
   getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot>
   executeReadOnlySql(args: {
@@ -218,6 +228,11 @@ interface CountRow {
   count: number | string
 }
 
+interface CoverageRow {
+  min_date: string | Date
+  max_date: string | Date
+}
+
 interface WeeklyAccountStressDbRow {
   week_start: string | Date
   account_id: string
@@ -227,6 +242,20 @@ interface WeeklyAccountStressDbRow {
   sector_name: string
   low_balance_days: number | string
   has_overdue: boolean
+}
+
+interface DailyMetricDbRow {
+  account_id: string
+  date: string | Date
+  week_start: string | Date
+  region_id: string
+  sector_id: string
+  inbound_payments: number | string
+  outbound_payments: number | string
+  end_balance: number | string
+  loan_utilization: number | string
+  low_balance_flag: boolean
+  overdue_flag: boolean
 }
 
 function sortContextEvents(left: ContextEvent, right: ContextEvent) {
@@ -331,6 +360,21 @@ class FixtureDataAccess implements QueryLensDataAccess {
     return getSampleDataset().weeklyMetrics
   }
 
+  async listDailyMetrics(args: {
+    startDate: string
+    endDate: string
+    scope: ScopeFilter
+  }): Promise<DailyAccountMetric[]> {
+    const dataset = getSampleDataset()
+
+    return dataset.dailyMetrics.filter((metric) => {
+      if (metric.date < args.startDate || metric.date > args.endDate) return false
+      if (args.scope.region && metric.regionId !== args.scope.region) return false
+      if (args.scope.sector && metric.sectorId !== args.scope.sector) return false
+      return true
+    })
+  }
+
   async listWeeklyAccountStress(args: {
     targetStart: string
     scope: ScopeFilter
@@ -403,6 +447,15 @@ class FixtureDataAccess implements QueryLensDataAccess {
         return true
       })
       .sort(sortContextEvents)
+  }
+
+  async getDateCoverage() {
+    const dates = getSampleDataset().dailyMetrics.map((metric) => metric.date).sort()
+
+    return {
+      startDate: dates[0],
+      endDate: dates.at(-1) ?? dates[0],
+    }
   }
 
   async getSourceHealth(): Promise<SourceHealth[]> {
@@ -538,6 +591,50 @@ class DatabaseDataAccess implements QueryLensDataAccess {
     })) as WeeklyMetricRow[]
   }
 
+  async listDailyMetrics(args: {
+    startDate: string
+    endDate: string
+    scope: ScopeFilter
+  }): Promise<DailyAccountMetric[]> {
+    const pool = getPgPool()
+    const result = await pool.query<DailyMetricDbRow>(
+      `
+        SELECT
+          account_id,
+          date,
+          week_start,
+          region_id,
+          sector_id,
+          inbound_payments,
+          outbound_payments,
+          end_balance,
+          loan_utilization,
+          low_balance_flag,
+          overdue_flag
+        FROM daily_account_metrics
+        WHERE date BETWEEN $1 AND $2
+          AND ($3::text IS NULL OR region_id = $3)
+          AND ($4::text IS NULL OR sector_id = $4)
+        ORDER BY date, account_id
+      `,
+      [args.startDate, args.endDate, args.scope.region ?? null, args.scope.sector ?? null]
+    )
+
+    return result.rows.map((row) => ({
+      accountId: row.account_id,
+      date: normalizeDateValue(row.date),
+      weekStart: normalizeDateValue(row.week_start),
+      regionId: row.region_id,
+      sectorId: row.sector_id,
+      inboundPayments: Number(row.inbound_payments),
+      outboundPayments: Number(row.outbound_payments),
+      endBalance: Number(row.end_balance),
+      loanUtilization: Number(row.loan_utilization),
+      lowBalanceFlag: row.low_balance_flag,
+      overdueFlag: row.overdue_flag,
+    }))
+  }
+
   async listWeeklyAccountStress(args: {
     targetStart: string
     scope: ScopeFilter
@@ -615,6 +712,22 @@ class DatabaseDataAccess implements QueryLensDataAccess {
     )
 
     return results.flat().sort(sortContextEvents)
+  }
+
+  async getDateCoverage() {
+    const pool = getPgPool()
+    const result = await pool.query<CoverageRow>(`
+      SELECT
+        MIN(date) AS min_date,
+        MAX(date) AS max_date
+      FROM daily_account_metrics
+    `)
+    const row = result.rows[0]
+
+    return {
+      startDate: normalizeDateValue(row.min_date),
+      endDate: normalizeDateValue(row.max_date),
+    }
   }
 
   async getSourceHealth(): Promise<SourceHealth[]> {

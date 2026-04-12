@@ -1,6 +1,11 @@
-import { formatWeekLabel, getSampleDataset } from "@/lib/querylens/seed-data"
-import { getWeekWindow } from "@/lib/querylens/reference-date"
+import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
+import { buildBreakdownFollowUps } from "@/lib/querylens/follow-ups"
+import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import {
+  aggregateAccountStressRows,
+  getScaledLowBalanceDayThreshold,
+} from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   BreakdownDimension,
@@ -11,8 +16,6 @@ import type {
   StructuredQueryPlan,
   WeeklyAccountStressRow,
 } from "@/lib/querylens/types"
-
-const LOW_BALANCE_DAYS_THRESHOLD = 2
 
 interface BreakdownExecutorArgs {
   dataAccess: QueryLensDataAccess
@@ -96,21 +99,21 @@ function getBucketScope(row: WeeklyAccountStressRow, dimension: BreakdownDimensi
 
 function buildBreakdownBuckets(
   rows: WeeklyAccountStressRow[],
-  dimension: BreakdownDimension
+  dimension: BreakdownDimension,
+  lowBalanceDaysThreshold: number
 ) {
   const grouped = new Map<string, BreakdownBucket>()
 
   rows.forEach((row) => {
     const bucketId = getBucketId(row, dimension)
     const existing = grouped.get(bucketId)
-    const isAtRisk =
-      row.lowBalanceDays >= LOW_BALANCE_DAYS_THRESHOLD || row.hasOverdue
+    const isAtRisk = row.lowBalanceDays >= lowBalanceDaysThreshold || row.hasOverdue
 
     if (existing) {
       existing.accountCount += 1
       existing.atRiskAccountCount += isAtRisk ? 1 : 0
       existing.lowBalanceAccountCount +=
-        row.lowBalanceDays >= LOW_BALANCE_DAYS_THRESHOLD ? 1 : 0
+        row.lowBalanceDays >= lowBalanceDaysThreshold ? 1 : 0
       existing.overdueAccountCount += row.hasOverdue ? 1 : 0
       return
     }
@@ -121,7 +124,7 @@ function buildBreakdownBuckets(
       accountCount: 1,
       atRiskAccountCount: isAtRisk ? 1 : 0,
       lowBalanceAccountCount:
-        row.lowBalanceDays >= LOW_BALANCE_DAYS_THRESHOLD ? 1 : 0,
+        row.lowBalanceDays >= lowBalanceDaysThreshold ? 1 : 0,
       overdueAccountCount: row.hasOverdue ? 1 : 0,
       share: 0,
       scope: getBucketScope(row, dimension),
@@ -162,7 +165,7 @@ function buildDrivers(buckets: BreakdownBucket[]): DriverItem[] {
         : `${bucket.label} remains a meaningful stress pocket`,
     impactLabel: `${bucket.atRiskAccountCount} accts · ${bucket.share.toFixed(1)}%`,
     direction: "negative" as const,
-    description: `${bucket.lowBalanceAccountCount} accounts hit the low-balance threshold and ${bucket.overdueAccountCount} showed overdue exposure in the selected week.`,
+    description: `${bucket.lowBalanceAccountCount} accounts hit the low-balance threshold and ${bucket.overdueAccountCount} showed overdue exposure in the selected range.`,
   }))
 }
 
@@ -182,14 +185,19 @@ function buildChartSpec(
       share: bucket.share,
     })),
     explanation:
-      "The breakdown ranks where weekly account stress is concentrated so the user can see the biggest pressure pockets first.",
+      "The breakdown ranks where account stress is concentrated so the user can see the biggest pressure pockets first.",
   }
 }
 
-function buildAssumptions(scope: ScopeFilter, dimension: BreakdownDimension) {
+function buildAssumptions(
+  scope: ScopeFilter,
+  dimension: BreakdownDimension,
+  lowBalanceDaysThreshold: number,
+  dayCount: number
+) {
   const assumptions = [
-    "An account is counted at risk when it has at least 2 low-balance days or any overdue flag during the selected week.",
-    `The breakdown groups results by ${dimension.replace("_", " ")} within the selected weekly window.`,
+    `An account is counted at risk when it has at least ${lowBalanceDaysThreshold} low-balance day${lowBalanceDaysThreshold === 1 ? "" : "s"} or any overdue flag within the selected ${dayCount}-day window.`,
+    `The breakdown groups results by ${dimension.replace("_", " ")} within the selected date window.`,
   ]
 
   if (!scope.region && !scope.sector) {
@@ -202,15 +210,22 @@ function buildAssumptions(scope: ScopeFilter, dimension: BreakdownDimension) {
 export async function executeBreakdownPlan(
   args: BreakdownExecutorArgs
 ): Promise<Phase1AnalysisResponse> {
-  const timeframe = getWeekWindow(args.plan.timeframe)
+  const targetWindow = args.plan.comparisonWindow.targetWindow
   const activeScopeLabel = getScopeLabel(args.plan.scope)
   const dimension = args.plan.breakdownDimension ?? "region_sector"
-  const stressRows = await args.dataAccess.listWeeklyAccountStress({
-    targetStart: timeframe.targetStart,
+  const dailyMetrics = await args.dataAccess.listDailyMetrics({
+    startDate: targetWindow.startDate,
+    endDate: targetWindow.endDate,
     scope: args.plan.scope,
   })
+  const stressRows = aggregateAccountStressRows(dailyMetrics, targetWindow.startDate)
+  const lowBalanceDaysThreshold = getScaledLowBalanceDayThreshold(targetWindow.dayCount)
 
-  const { buckets, totalAtRisk } = buildBreakdownBuckets(stressRows, dimension)
+  const { buckets, totalAtRisk } = buildBreakdownBuckets(
+    stressRows,
+    dimension,
+    lowBalanceDaysThreshold
+  )
   const totalAccounts = buckets.reduce(
     (total, bucket) => total + bucket.accountCount,
     0
@@ -221,21 +236,22 @@ export async function executeBreakdownPlan(
     await Promise.all(
       buckets.slice(0, 2).map((bucket) =>
         args.dataAccess.listContextEvents({
-          targetStart: timeframe.targetStart,
-          targetEnd: timeframe.targetEnd,
+          targetStart: targetWindow.startDate,
+          targetEnd: targetWindow.endDate,
           scope: bucket.scope,
         })
       )
     )
   ).flat()
+  const timeframeLabel = formatContextualDateWindowLabel(targetWindow)
 
   const evidence: EvidenceItem[] = [
     {
       sourceType: "postgres",
       sourceName: "daily_account_metrics",
-      timeRange: `Selected week (${formatWeekLabel(timeframe.targetStart)})`,
+      timeRange: timeframeLabel,
       scope: activeScopeLabel,
-      supportingFact: `${totalAtRisk} of ${totalAccounts} accounts met the weekly at-risk threshold in the selected window.`,
+      supportingFact: `${totalAtRisk} of ${totalAccounts} accounts met the at-risk threshold in the selected ${targetWindow.dayCount}-day window.`,
       queryTemplateId: "weekly_at_risk_rollup_v1",
     },
   ]
@@ -244,9 +260,9 @@ export async function executeBreakdownPlan(
     evidence.push({
       sourceType: "postgres",
       sourceName: "daily_account_metrics",
-      timeRange: `Selected week (${formatWeekLabel(timeframe.targetStart)})`,
+      timeRange: timeframeLabel,
       scope: topBucket.label,
-      supportingFact: `${topBucket.label} contributed ${topBucket.atRiskAccountCount} at-risk accounts, or ${topBucket.share.toFixed(1)}% of the total weekly stress.`,
+      supportingFact: `${topBucket.label} contributed ${topBucket.atRiskAccountCount} at-risk accounts, or ${topBucket.share.toFixed(1)}% of the total stress in the selected range.`,
       queryTemplateId: "at_risk_breakdown_bucket_v1",
     })
   }
@@ -255,7 +271,7 @@ export async function executeBreakdownPlan(
     evidence.push({
       sourceType: "mongodb",
       sourceName: event.collection,
-      timeRange: `Selected week (${formatWeekLabel(timeframe.targetStart)})`,
+      timeRange: timeframeLabel,
       scope:
         event.regionName && event.sectorName
           ? `${event.regionName} / ${event.sectorName}`
@@ -268,23 +284,19 @@ export async function executeBreakdownPlan(
   const drivers = buildDrivers(buckets)
   const headline = topBucket
     ? `${topBucket.label} leads the at-risk account mix`
-    : "No concentrated at-risk pocket was found in the selected week"
+    : "No concentrated at-risk pocket was found in the selected range"
   const summary = topBucket
-    ? `${totalAtRisk} of ${totalAccounts} accounts were flagged at risk in ${activeScopeLabel.toLowerCase()} for ${formatWeekLabel(
-        timeframe.targetStart
-      )}. ${topBucket.label} accounted for ${topBucket.atRiskAccountCount} of them, with the highest concentration of low-balance and overdue stress.`
-    : `No accounts met the weekly at-risk threshold in ${activeScopeLabel.toLowerCase()} for ${formatWeekLabel(
-        timeframe.targetStart
-      )}.`
+    ? `${totalAtRisk} of ${totalAccounts} accounts were flagged at risk in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}. ${topBucket.label} accounted for ${topBucket.atRiskAccountCount} of them, with the highest concentration of low-balance and overdue stress.`
+    : `No accounts met the at-risk threshold in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}.`
 
   return {
     intent: "breakdown",
     headline,
     summary,
     metric: "at_risk_account_count",
-    timeframe: `Selected week (${formatWeekLabel(timeframe.targetStart)})`,
+    timeframe: timeframeLabel,
     comparisonBasis:
-      "Share of weekly at-risk accounts within the selected breakdown view",
+      "Share of at-risk accounts within the selected date window and breakdown view",
     confidence: calculateConfidenceScore({
       evidenceCount: evidence.length,
       driverCount: drivers.length,
@@ -295,14 +307,17 @@ export async function executeBreakdownPlan(
     }),
     activeScope: activeScopeLabel,
     drivers,
-    chartSpec: buildChartSpec(buckets, formatWeekLabel(timeframe.targetStart), dimension),
+    chartSpec: buildChartSpec(buckets, targetWindow.label, dimension),
     evidence,
-    assumptions: buildAssumptions(args.plan.scope, dimension),
-    supportedFollowUps: [
-      "Break down at-risk accounts by region this week",
-      "Break down at-risk accounts by sector last week",
-      "Why did SME cashflow health drop last week?",
-    ],
+    assumptions: buildAssumptions(
+      args.plan.scope,
+      dimension,
+      lowBalanceDaysThreshold,
+      targetWindow.dayCount
+    ),
+    supportedFollowUps: buildBreakdownFollowUps({
+      targetWindow,
+    }),
     sourceMode: args.dataAccess.sourceMode,
   }
 }

@@ -13,6 +13,71 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
 }))
 
+function buildWhatChangedPlan(args: {
+  rawQuestion: string
+  timeframe: "this_week" | "last_week"
+  scope?: {
+    region?: string
+    sector?: string
+  }
+}) {
+  const targetWindow =
+    args.timeframe === "this_week"
+      ? {
+          startDate: "2026-04-06",
+          endDate: "2026-04-12",
+          dayCount: 7,
+          label: "Apr 6 - 12, 2026",
+          relativeTimeframe: "this_week" as const,
+        }
+      : {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+          dayCount: 7,
+          label: "Mar 30, 2026 - Apr 5, 2026",
+          relativeTimeframe: "last_week" as const,
+        }
+  const comparisonDateWindow =
+    args.timeframe === "this_week"
+      ? {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+          dayCount: 7,
+          label: "Mar 30, 2026 - Apr 5, 2026",
+          relativeTimeframe: "last_week" as const,
+        }
+      : {
+          startDate: "2026-03-23",
+          endDate: "2026-03-29",
+          dayCount: 7,
+          label: "Mar 23 - 29, 2026",
+        }
+
+  return {
+    datasetId: "sme_portfolio" as const,
+    rawQuestion: args.rawQuestion,
+    intent: "what_changed" as const,
+    metricId: "cashflow_health_score" as const,
+    timeframe: args.timeframe,
+    dateWindow: targetWindow,
+    scope: args.scope ?? {},
+    scopeDimensions:
+      args.scope?.region && args.scope?.sector
+        ? (["region", "sector"] as const)
+        : args.scope?.region
+          ? (["region"] as const)
+          : args.scope?.sector
+            ? (["sector"] as const)
+            : (["portfolio"] as const),
+    comparisonWindow: {
+      timeframe: args.timeframe,
+      comparisonBasis: "prior_period" as const,
+      targetWindow,
+      comparisonDateWindow,
+    },
+  }
+}
+
 describe("phase-1 provider selection", () => {
   beforeEach(() => {
     geminiGenerateMock.mockReset()
@@ -47,19 +112,10 @@ describe("phase-1 provider selection", () => {
 
     const provider = getPhase1Provider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
-      parsed: {
-        datasetId: "sme_portfolio",
+      parsed: buildWhatChangedPlan({
         rawQuestion: "Why did SME cashflow health drop last week?",
-        intent: "what_changed",
-        metricId: "cashflow_health_score",
         timeframe: "last_week",
-        scope: {},
-        scopeDimensions: ["portfolio"],
-        comparisonWindow: {
-          timeframe: "last_week",
-          comparisonBasis: "prior_period",
-        },
-      },
+      }),
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
       previousScore: 100,
@@ -87,6 +143,11 @@ describe("phase-1 provider selection", () => {
           detail: "Weekend settlement confirmation slowed down.",
         },
       ],
+      allowedFollowUps: [
+        "Focus on the North West contribution to last week's drop",
+        "Focus on hospitality SMEs last week",
+        "What changed this week instead?",
+      ],
     })
 
     expect(geminiGenerateMock).toHaveBeenCalledOnce()
@@ -102,24 +163,20 @@ describe("phase-1 provider selection", () => {
 
     const provider = getPhase1Provider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
-      parsed: {
-        datasetId: "sme_portfolio",
+      parsed: buildWhatChangedPlan({
         rawQuestion: "Why did SME cashflow health drop last week?",
-        intent: "what_changed",
-        metricId: "cashflow_health_score",
         timeframe: "last_week",
-        scope: {},
-        scopeDimensions: ["portfolio"],
-        comparisonWindow: {
-          timeframe: "last_week",
-          comparisonBasis: "prior_period",
-        },
-      },
+      }),
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
       previousScore: 100,
       drivers: [],
       contextEvents: [],
+      allowedFollowUps: [
+        "Focus on the North West contribution to last week's drop",
+        "Focus on hospitality SMEs last week",
+        "What changed this week instead?",
+      ],
     })
 
     expect(geminiGenerateMock).not.toHaveBeenCalled()
@@ -144,24 +201,20 @@ describe("phase-1 provider selection", () => {
 
     const provider = getPhase1Provider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
-      parsed: {
-        datasetId: "sme_portfolio",
+      parsed: buildWhatChangedPlan({
         rawQuestion: "Why did SME cashflow health drop last week?",
-        intent: "what_changed",
-        metricId: "cashflow_health_score",
         timeframe: "last_week",
-        scope: {},
-        scopeDimensions: ["portfolio"],
-        comparisonWindow: {
-          timeframe: "last_week",
-          comparisonBasis: "prior_period",
-        },
-      },
+      }),
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
       previousScore: 100,
       drivers: [],
       contextEvents: [],
+      allowedFollowUps: [
+        "Focus on the North West contribution to last week's drop",
+        "Focus on hospitality SMEs last week",
+        "What changed this week instead?",
+      ],
     })
 
     expect(geminiGenerateMock).toHaveBeenCalledOnce()
@@ -221,25 +274,19 @@ describe("phase-1 provider selection", () => {
     )
 
     expect(result.parsed).toEqual({
-      datasetId: "sme_portfolio",
-      rawQuestion:
-        "Help me understand why North West hospitality cashflow got worse last week",
-      intent: "what_changed",
-      metricId: "cashflow_health_score",
-      timeframe: "last_week",
-      scope: {
-        region: "north_west",
-        sector: "hospitality",
-      },
-      scopeDimensions: ["region", "sector"],
-      comparisonWindow: {
+      ...buildWhatChangedPlan({
+        rawQuestion:
+          "Help me understand why North West hospitality cashflow got worse last week",
         timeframe: "last_week",
-        comparisonBasis: "prior_period",
-      },
+        scope: {
+          region: "north_west",
+          sector: "hospitality",
+        },
+      }),
     })
   }, TEST_TIMEOUT)
 
-  it("returns a guided failure when Gemini returns invalid scope values", async () => {
+  it("ignores unsupported Gemini scope extraction because deterministic parsing owns input resolution", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
 
@@ -266,9 +313,11 @@ describe("phase-1 provider selection", () => {
       "Why did cashflow health drop last week?"
     )
 
-    expect(result.parsed).toBeUndefined()
-    expect(result.failureKind).toBe("guided_failure")
-    expect(result.fallbackReason).toContain("could not validate Gemini")
+    expect(result.parsed).toMatchObject({
+      intent: "what_changed",
+      timeframe: "last_week",
+      scope: {},
+    })
   }, TEST_TIMEOUT)
 
   it("preserves explicit scope overrides over Gemini-extracted scope", async () => {

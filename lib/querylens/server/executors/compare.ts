@@ -1,11 +1,14 @@
-import { formatWeekLabel } from "@/lib/querylens/seed-data"
-import { getWeekWindow } from "@/lib/querylens/reference-date"
+import {
+  formatContextualDateWindowLabel,
+  getRelativeDateWindow,
+} from "@/lib/querylens/date-windows"
+import { buildCompareFollowUps } from "@/lib/querylens/follow-ups"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import {
   buildWhatChangedFallbackResponse,
   filterRowsForScope,
-  getScopeLabel,
 } from "@/lib/querylens/server/executors/what-changed"
 import type {
   CompareSpec,
@@ -161,26 +164,32 @@ async function getCompareContextEvents(args: {
   weakerScope: ScopeFilter
 }) {
   if (args.compareSpec.mode === "timeframe") {
-    const leftWindow = getWeekWindow(args.compareSpec.leftTimeframe ?? "this_week")
-    const rightWindow = getWeekWindow(args.compareSpec.rightTimeframe ?? "last_week")
+    const leftWindow =
+      args.compareSpec.leftWindow ??
+      getRelativeDateWindow(args.compareSpec.leftTimeframe ?? "this_week")
+    const rightWindow =
+      args.compareSpec.rightWindow ??
+      getRelativeDateWindow(args.compareSpec.rightTimeframe ?? "last_week")
     const leftEvents = await args.dataAccess.listContextEvents({
-      targetStart: leftWindow.targetStart,
-      targetEnd: leftWindow.targetEnd,
+      targetStart: leftWindow.startDate,
+      targetEnd: leftWindow.endDate,
       scope: args.compareSpec.leftScope,
     })
     const rightEvents = await args.dataAccess.listContextEvents({
-      targetStart: rightWindow.targetStart,
-      targetEnd: rightWindow.targetEnd,
+      targetStart: rightWindow.startDate,
+      targetEnd: rightWindow.endDate,
       scope: args.compareSpec.rightScope,
     })
 
     return [...leftEvents, ...rightEvents]
   }
 
-  const selectedWindow = getWeekWindow(args.compareSpec.selectedTimeframe ?? "last_week")
+  const selectedWindow =
+    args.compareSpec.selectedWindow ??
+    getRelativeDateWindow(args.compareSpec.selectedTimeframe ?? "last_week")
   const weakerEvents = await args.dataAccess.listContextEvents({
-    targetStart: selectedWindow.targetStart,
-    targetEnd: selectedWindow.targetEnd,
+    targetStart: selectedWindow.startDate,
+    targetEnd: selectedWindow.endDate,
     scope: args.weakerScope,
   })
   const strongerScope =
@@ -189,8 +198,8 @@ async function getCompareContextEvents(args: {
       ? args.compareSpec.rightScope
       : args.compareSpec.leftScope
   const strongerEvents = await args.dataAccess.listContextEvents({
-    targetStart: selectedWindow.targetStart,
-    targetEnd: selectedWindow.targetEnd,
+    targetStart: selectedWindow.startDate,
+    targetEnd: selectedWindow.endDate,
     scope: strongerScope,
   })
 
@@ -252,31 +261,80 @@ function buildEvidence(args: {
   return evidence
 }
 
-function getRowsForCompare(
-  weeklyRows: WeeklyMetricRow[],
+async function getRowsForCompare(
+  dataAccess: QueryLensDataAccess,
   compareSpec: CompareSpec
-): { leftRow?: WeeklyMetricRow; rightRow?: WeeklyMetricRow; timeframeLabel: string } {
+): Promise<{ leftRow?: WeeklyMetricRow; rightRow?: WeeklyMetricRow; timeframeLabel: string }> {
   if (compareSpec.mode === "timeframe") {
-    const leftWindow = getWeekWindow(compareSpec.leftTimeframe ?? "this_week")
-    const rightWindow = getWeekWindow(compareSpec.rightTimeframe ?? "last_week")
-    const leftRows = filterRowsForScope(weeklyRows, compareSpec.leftScope)
-    const rightRows = filterRowsForScope(weeklyRows, compareSpec.rightScope)
+    const leftWindow =
+      compareSpec.leftWindow ??
+      getRelativeDateWindow(compareSpec.leftTimeframe ?? "this_week")
+    const rightWindow =
+      compareSpec.rightWindow ??
+      getRelativeDateWindow(compareSpec.rightTimeframe ?? "last_week")
+    const [leftDailyMetrics, rightDailyMetrics] = await Promise.all([
+      dataAccess.listDailyMetrics({
+        startDate: leftWindow.startDate,
+        endDate: leftWindow.endDate,
+        scope: compareSpec.leftScope,
+      }),
+      dataAccess.listDailyMetrics({
+        startDate: rightWindow.startDate,
+        endDate: rightWindow.endDate,
+        scope: compareSpec.rightScope,
+      }),
+    ])
+    const leftRows = aggregateMetricWindowRows({
+      dailyMetrics: leftDailyMetrics,
+      startDate: leftWindow.startDate,
+      endDate: leftWindow.endDate,
+    })
+    const rightRows = aggregateMetricWindowRows({
+      dailyMetrics: rightDailyMetrics,
+      startDate: rightWindow.startDate,
+      endDate: rightWindow.endDate,
+    })
 
     return {
-      leftRow: leftRows.find((row) => row.weekStart === leftWindow.targetStart),
-      rightRow: rightRows.find((row) => row.weekStart === rightWindow.targetStart),
-      timeframeLabel: `${formatWeekLabel(leftWindow.targetStart)} vs ${formatWeekLabel(rightWindow.targetStart)}`,
+      leftRow: filterRowsForScope(leftRows, compareSpec.leftScope)[0],
+      rightRow: filterRowsForScope(rightRows, compareSpec.rightScope)[0],
+      timeframeLabel: `${leftWindow.label} vs ${rightWindow.label}`,
     }
   }
 
-  const selectedWindow = getWeekWindow(compareSpec.selectedTimeframe ?? "last_week")
-  const leftRows = filterRowsForScope(weeklyRows, compareSpec.leftScope)
-  const rightRows = filterRowsForScope(weeklyRows, compareSpec.rightScope)
+  const selectedWindow =
+    compareSpec.selectedWindow ??
+    getRelativeDateWindow(compareSpec.selectedTimeframe ?? "last_week")
+  const [leftDailyMetrics, rightDailyMetrics] = await Promise.all([
+    dataAccess.listDailyMetrics({
+      startDate: selectedWindow.startDate,
+      endDate: selectedWindow.endDate,
+      scope: compareSpec.leftScope,
+    }),
+    dataAccess.listDailyMetrics({
+      startDate: selectedWindow.startDate,
+      endDate: selectedWindow.endDate,
+      scope: compareSpec.rightScope,
+    }),
+  ])
+  const leftRows = aggregateMetricWindowRows({
+    dailyMetrics: leftDailyMetrics,
+    startDate: selectedWindow.startDate,
+    endDate: selectedWindow.endDate,
+  })
+  const rightRows = aggregateMetricWindowRows({
+    dailyMetrics: rightDailyMetrics,
+    startDate: selectedWindow.startDate,
+    endDate: selectedWindow.endDate,
+  })
 
   return {
-    leftRow: leftRows.find((row) => row.weekStart === selectedWindow.targetStart),
-    rightRow: rightRows.find((row) => row.weekStart === selectedWindow.targetStart),
-    timeframeLabel: `Selected week (${formatWeekLabel(selectedWindow.targetStart)})`,
+    leftRow: filterRowsForScope(leftRows, compareSpec.leftScope)[0],
+    rightRow: filterRowsForScope(rightRows, compareSpec.rightScope)[0],
+    timeframeLabel:
+      compareSpec.mode === "peer"
+        ? formatContextualDateWindowLabel(selectedWindow)
+        : selectedWindow.label,
   }
 }
 
@@ -294,8 +352,8 @@ export async function executeComparePlan(
     })
   }
 
-  const { leftRow, rightRow, timeframeLabel } = getRowsForCompare(
-    args.weeklyRows,
+  const { leftRow, rightRow, timeframeLabel } = await getRowsForCompare(
+    args.dataAccess,
     compareSpec
   )
 
@@ -333,6 +391,17 @@ export async function executeComparePlan(
   const summary = comparisonSummary.tie
     ? `${compareSpec.leftLabel} and ${compareSpec.rightLabel} both scored ${comparisonSummary.leftValue.toFixed(1)} in the selected compare view, so the main differences come from component mix rather than the headline score.`
     : `${comparisonSummary.winnerLabel} leads by ${comparisonSummary.delta.toFixed(1)} points in the selected compare view. QueryLens highlights where payment coverage, balance resilience, and stress indicators create the clearest separation.`
+  const targetWindow =
+    compareSpec.mode === "timeframe"
+      ? compareSpec.leftWindow ??
+        getRelativeDateWindow(compareSpec.leftTimeframe ?? "this_week")
+      : compareSpec.selectedWindow ??
+        getRelativeDateWindow(compareSpec.selectedTimeframe ?? "last_week")
+  const comparisonWindow =
+    compareSpec.mode === "timeframe"
+      ? compareSpec.rightWindow ??
+        getRelativeDateWindow(compareSpec.rightTimeframe ?? "last_week")
+      : undefined
 
   return {
     intent: "compare",
@@ -355,11 +424,10 @@ export async function executeComparePlan(
     chartSpec: buildChartSpec(compareSpec, leftRow, rightRow),
     evidence,
     assumptions: buildAssumptions(args.plan),
-    supportedFollowUps: [
-      "Compare cashflow health this week vs last week",
-      "Compare North West vs London & South East cashflow health last week",
-      "Compare hospitality vs retail cashflow health this week",
-    ],
+    supportedFollowUps: buildCompareFollowUps({
+      targetWindow,
+      comparisonWindow,
+    }),
     comparisonSummary,
     sourceMode: args.dataAccess.sourceMode,
   }

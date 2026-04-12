@@ -89,6 +89,27 @@ describe("/api/query", () => {
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "postgres")).toBe(true)
   })
 
+  it("returns a grounded custom-range what-changed response when the dates differ from the predefined prompt", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "Why did SME cashflow health drop from 2026-04-02 to 2026-04-08?",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.timeframe).toContain("Selected range")
+    expect(payload.supportedFollowUps.some((item: string) => item.includes("2026-04-02"))).toBe(true)
+  })
+
   it("returns a grounded timeframe compare for cashflow health", async () => {
     const request = new Request("http://localhost/api/query", {
       method: "POST",
@@ -110,6 +131,26 @@ describe("/api/query", () => {
     expect(payload.comparisonSummary?.leftLabel).toContain("This week")
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "postgres")).toBe(true)
     expect(payload.evidence.some((item: { sourceType: string }) => item.sourceType === "mongodb")).toBe(true)
+  })
+
+  it("returns a guided fallback with exact coverage dates for out-of-range requests", async () => {
+    const request = new Request("http://localhost/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: "Why did cashflow health drop from 2025-01-01 to 2025-01-07?",
+      }),
+    })
+
+    const response = await POST(request)
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.fallback).toBe(true)
+    expect(payload.summary).toContain("2026")
+    expect(payload.summary).toContain("Apr 12, 2026")
   })
 
   it("returns a grounded discovery response for broad metadata questions", async () => {

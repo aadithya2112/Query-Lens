@@ -87,6 +87,19 @@ function buildAssistantMessage(
   }
 }
 
+function buildSuggestedPrompts(
+  initialQuestion: string,
+  activeAnalysis: Phase1AnalysisResponse
+) {
+  return Array.from(
+    new Set([
+      "What data is currently stored?",
+      initialQuestion,
+      ...activeAnalysis.supportedFollowUps,
+    ])
+  ).slice(0, 6)
+}
+
 export default function Workspace({
   initialQuestion,
   metrics,
@@ -107,6 +120,7 @@ export default function Workspace({
       : activeAnalysis.intent === "agentic_query"
         ? "Custom live query"
         : activeMetric?.label || "Cashflow"
+const suggestedPrompts = buildSuggestedPrompts(initialQuestion, activeAnalysis)
 
   useEffect(() => {
     const storedChatId = window.localStorage.getItem(CHAT_ID_STORAGE_KEY)
@@ -265,6 +279,7 @@ export default function Workspace({
               isLoading={isLoading}
               messages={messages}
               onSend={handleSend}
+              suggestedPrompts={suggestedPrompts}
             />
           </ResizablePanel>
           <ResizableHandle withHandle />

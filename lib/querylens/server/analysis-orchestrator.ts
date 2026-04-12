@@ -1,6 +1,7 @@
 import { canUseGemini } from "@/lib/querylens/server/ai-config"
 import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
+import { formatDateCoverage, isDateWindowWithinCoverage } from "@/lib/querylens/date-windows"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
 import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
@@ -44,6 +45,28 @@ const executors: Partial<Record<QueryIntent, IntentExecutor>> = {
   },
 }
 
+function getPlanDateWindows(plan: StructuredQueryPlan) {
+  const windows = [plan.dateWindow, plan.comparisonWindow.targetWindow]
+
+  if (plan.comparisonWindow.comparisonDateWindow) {
+    windows.push(plan.comparisonWindow.comparisonDateWindow)
+  }
+
+  if (plan.compareSpec?.leftWindow) {
+    windows.push(plan.compareSpec.leftWindow)
+  }
+
+  if (plan.compareSpec?.rightWindow) {
+    windows.push(plan.compareSpec.rightWindow)
+  }
+
+  if (plan.compareSpec?.selectedWindow) {
+    windows.push(plan.compareSpec.selectedWindow)
+  }
+
+  return windows
+}
+
 export async function analyzeQuery(
   input: QueryRequestBody,
   options: { executionContext?: QueryLensExecutionContext } = {}
@@ -51,6 +74,7 @@ export async function analyzeQuery(
   const executionContext = options.executionContext ?? "interactive"
   const dataAccess = await getQueryLensDataAccess()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
+  const dateCoverage = await dataAccess.getDateCoverage()
   const retrievalStore = await getQueryLensRetrievalStore()
   const chatId =
     input.chatId?.trim() ||
@@ -127,6 +151,18 @@ export async function analyzeQuery(
       fallbackReason:
         parseResult.fallbackReason ??
         "The question could not be matched to the phase-1 vertical slice safely.",
+      sourceMode: dataAccess.sourceMode,
+      rows: weeklyRows,
+    })
+  }
+
+  const outOfCoverageWindow = getPlanDateWindows(parseResult.parsed).find(
+    (window) => !isDateWindowWithinCoverage(window, dateCoverage)
+  )
+
+  if (outOfCoverageWindow) {
+    return buildWhatChangedFallbackResponse({
+      fallbackReason: `That request falls outside the dataset coverage window of ${formatDateCoverage(dateCoverage)}.`,
       sourceMode: dataAccess.sourceMode,
       rows: weeklyRows,
     })

@@ -84,6 +84,52 @@ export function formatDateWindowLabel(startDate: string, endDate: string) {
   return `${format(start, "MMM d, yyyy")} - ${format(end, "MMM d, yyyy")}`
 }
 
+export function formatContextualDateWindowLabel(window: DateWindow) {
+  if (window.relativeTimeframe === "this_week") {
+    return `This week (${window.label})`
+  }
+
+  if (window.relativeTimeframe === "last_week") {
+    return `Last week (${window.label})`
+  }
+
+  if (window.dayCount === 1) {
+    return `Selected day (${window.label})`
+  }
+
+  return `Selected range (${window.label})`
+}
+
+export function formatPriorPeriodComparisonLabel(
+  targetWindow: DateWindow,
+  comparisonWindow: DateWindow
+) {
+  if (
+    targetWindow.relativeTimeframe === "this_week" &&
+    comparisonWindow.relativeTimeframe === "last_week"
+  ) {
+    return `Compared with last week (${comparisonWindow.label})`
+  }
+
+  if (targetWindow.relativeTimeframe === "last_week") {
+    return `Compared with the prior week (${comparisonWindow.label})`
+  }
+
+  return `Compared with the previous ${comparisonWindow.dayCount}-day window (${comparisonWindow.label})`
+}
+
+export function formatCompactWindowLabel(window: DateWindow) {
+  if (window.relativeTimeframe === "this_week") {
+    return "This week"
+  }
+
+  if (window.relativeTimeframe === "last_week") {
+    return "Last week"
+  }
+
+  return window.label
+}
+
 export function buildDateWindow(args: {
   startDate: string
   endDate: string

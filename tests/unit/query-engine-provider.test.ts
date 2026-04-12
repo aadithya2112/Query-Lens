@@ -13,6 +13,42 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
 }))
 
+function buildWhatChangedPlan() {
+  return {
+    datasetId: "sme_portfolio" as const,
+    rawQuestion: "Why did SME cashflow health drop last week?",
+    intent: "what_changed" as const,
+    metricId: "cashflow_health_score" as const,
+    timeframe: "last_week" as const,
+    dateWindow: {
+      startDate: "2026-03-30",
+      endDate: "2026-04-05",
+      dayCount: 7,
+      label: "Mar 30, 2026 - Apr 5, 2026",
+      relativeTimeframe: "last_week" as const,
+    },
+    scope: {},
+    scopeDimensions: ["portfolio"] as const,
+    comparisonWindow: {
+      timeframe: "last_week" as const,
+      comparisonBasis: "prior_period" as const,
+      targetWindow: {
+        startDate: "2026-03-30",
+        endDate: "2026-04-05",
+        dayCount: 7,
+        label: "Mar 30, 2026 - Apr 5, 2026",
+        relativeTimeframe: "last_week" as const,
+      },
+      comparisonDateWindow: {
+        startDate: "2026-03-23",
+        endDate: "2026-03-29",
+        dayCount: 7,
+        label: "Mar 23 - 29, 2026",
+      },
+    },
+  }
+}
+
 describe("query engine provider", () => {
   beforeEach(() => {
     geminiGenerateMock.mockReset()
@@ -112,7 +148,7 @@ describe("query engine provider", () => {
     })
   }, TEST_TIMEOUT)
 
-  it("returns a guided failure instead of deterministic parsing when Gemini output is invalid", async () => {
+  it("returns a guided failure when Gemini intent metadata does not match deterministic parsing", async () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
 
@@ -121,10 +157,9 @@ describe("query engine provider", () => {
         {
           name: "submit_analytics_query_plan",
           args: {
-            intent: "what_changed",
+            intent: "compare",
             metric: "cashflow_health_score",
-            timeframe: "last_week",
-            region: "Unknown Region",
+            compareMode: "peer",
           },
         },
       ],
@@ -160,24 +195,17 @@ describe("query engine provider", () => {
 
     const provider = getQueryEngineProvider({ executionContext: "interactive" })
     const result = await provider.composeNarrative({
-      parsed: {
-        datasetId: "sme_portfolio",
-        rawQuestion: "Why did SME cashflow health drop last week?",
-        intent: "what_changed",
-        metricId: "cashflow_health_score",
-        timeframe: "last_week",
-        scope: {},
-        scopeDimensions: ["portfolio"],
-        comparisonWindow: {
-          timeframe: "last_week",
-          comparisonBasis: "prior_period",
-        },
-      },
+      parsed: buildWhatChangedPlan(),
       activeScopeLabel: "Portfolio",
       currentScore: 98.3,
       previousScore: 100,
       drivers: [],
       contextEvents: [],
+      allowedFollowUps: [
+        "Focus on the North West contribution to last week's drop",
+        "Focus on hospitality SMEs last week",
+        "What changed this week instead?",
+      ],
     })
 
     expect(result.summary).toContain("Portfolio moved down")

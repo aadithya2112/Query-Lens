@@ -34,6 +34,18 @@ describe("analysis orchestrator", () => {
     expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
   })
 
+  it("dispatches custom-range what-changed questions through the same deterministic intent", async () => {
+    const payload = await analyzeQuery({
+      question: "Why did SME cashflow health drop from 2026-04-02 to 2026-04-08?",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.timeframe).toContain("Selected range")
+    expect(payload.comparisonBasis).toContain("previous 7-day window")
+    expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
+  })
+
   it("dispatches timeframe compare questions through the compare executor", async () => {
     const payload = await analyzeQuery({
       question: "Compare cashflow health this week vs last week",
@@ -43,6 +55,18 @@ describe("analysis orchestrator", () => {
     expect(payload.metric).toBe("cashflow_health_score")
     expect(payload.comparisonSummary?.mode).toBe("timeframe")
     expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
+  })
+
+  it("dispatches explicit custom-range compare questions through the compare executor", async () => {
+    const payload = await analyzeQuery({
+      question:
+        "Compare cashflow health from 2026-04-02 to 2026-04-08 vs from 2026-03-26 to 2026-04-01",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.comparisonSummary?.mode).toBe("timeframe")
+    expect(payload.timeframe).toContain("2026")
   })
 
   it("dispatches vague metadata questions through the discovery executor", async () => {
@@ -57,6 +81,17 @@ describe("analysis orchestrator", () => {
     expect(payload.discoverySummary?.datasetLabel).toBe("SME portfolio")
     expect(payload.catalogSections?.length).toBeGreaterThan(0)
     expect(payload.evidence.length).toBeGreaterThan(0)
+  })
+
+  it("dispatches custom-range breakdown questions through the breakdown executor", async () => {
+    const payload = await analyzeQuery({
+      question: "Break down at-risk accounts by region from 2026-04-02 to 2026-04-08",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.intent).toBe("breakdown")
+    expect(payload.metric).toBe("at_risk_account_count")
+    expect(payload.timeframe).toContain("Selected range")
   })
 
   it("persists conversational context when chatId is present", async () => {

@@ -1,11 +1,17 @@
+import {
+  buildPriorEqualDateWindow,
+  formatContextualDateWindowLabel,
+  formatPriorPeriodComparisonLabel,
+} from "@/lib/querylens/date-windows"
+import { buildWhatChangedFollowUps } from "@/lib/querylens/follow-ups"
 import { formatWeekLabel, getSampleDataset } from "@/lib/querylens/seed-data"
-import { getWeekWindow } from "@/lib/querylens/reference-date"
 import {
   calculateConfidenceScore,
   calculateWeightedDriverImpact,
   roundTo,
 } from "@/lib/querylens/scoring"
 import { DEFAULT_FLAGSHIP_QUESTION } from "@/lib/querylens/server/analysis-provider"
+import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   ContextEvent,
@@ -28,6 +34,7 @@ interface WhatChangedExecutorArgs {
     previousScore: number
     drivers: DriverItem[]
     contextEvents: ContextEvent[]
+    allowedFollowUps: string[]
   }) => Promise<
     Pick<Phase1AnalysisResponse, "headline" | "summary" | "supportedFollowUps">
   >
@@ -345,10 +352,39 @@ export async function executeWhatChangedPlan(
   args: WhatChangedExecutorArgs
 ): Promise<Phase1AnalysisResponse> {
   const activeScopeLabel = getScopeLabel(args.plan.scope)
-  const timeframe = getWeekWindow(args.plan.timeframe)
-  const scopedRows = filterRowsForScope(args.weeklyRows, args.plan.scope)
-  const current = scopedRows.find((row) => row.weekStart === timeframe.targetStart)
-  const previous = scopedRows.find((row) => row.weekStart === timeframe.comparisonStart)
+  const historicalScopedRows = filterRowsForScope(args.weeklyRows, args.plan.scope)
+  const targetWindow = args.plan.comparisonWindow.targetWindow
+  const comparisonDateWindow =
+    args.plan.comparisonWindow.comparisonDateWindow ??
+    buildPriorEqualDateWindow(targetWindow)
+  const [targetDailyMetrics, comparisonDailyMetrics] = await Promise.all([
+    args.dataAccess.listDailyMetrics({
+      startDate: targetWindow.startDate,
+      endDate: targetWindow.endDate,
+      scope: args.plan.scope,
+    }),
+    comparisonDateWindow
+      ? args.dataAccess.listDailyMetrics({
+          startDate: comparisonDateWindow.startDate,
+          endDate: comparisonDateWindow.endDate,
+          scope: args.plan.scope,
+        })
+      : Promise.resolve([]),
+  ])
+  const targetRows = aggregateMetricWindowRows({
+    dailyMetrics: targetDailyMetrics,
+    startDate: targetWindow.startDate,
+    endDate: targetWindow.endDate,
+  })
+  const comparisonRows = comparisonDateWindow
+    ? aggregateMetricWindowRows({
+        dailyMetrics: comparisonDailyMetrics,
+        startDate: comparisonDateWindow.startDate,
+        endDate: comparisonDateWindow.endDate,
+      })
+    : []
+  const current = filterRowsForScope(targetRows, args.plan.scope)[0]
+  const previous = filterRowsForScope(comparisonRows, args.plan.scope)[0]
 
   if (!current || !previous) {
     return buildWhatChangedFallbackResponse({
@@ -359,23 +395,25 @@ export async function executeWhatChangedPlan(
     })
   }
 
-  const regionSectorRows = args.weeklyRows.filter(
-    (row) =>
-      row.recordType === "region_sector" &&
-      (row.weekStart === timeframe.targetStart || row.weekStart === timeframe.comparisonStart)
+  const regionSectorRows = [...targetRows, ...comparisonRows].filter(
+    (row) => row.recordType === "region_sector"
   )
   const contextEvents = await args.dataAccess.listContextEvents({
-    targetStart: timeframe.targetStart,
-    targetEnd: timeframe.targetEnd,
+    targetStart: targetWindow.startDate,
+    targetEnd: targetWindow.endDate,
     scope: args.plan.scope,
   })
+  const timeframeLabel = formatContextualDateWindowLabel(targetWindow)
+  const comparisonLabel = comparisonDateWindow
+    ? formatPriorPeriodComparisonLabel(targetWindow, comparisonDateWindow)
+    : "Compared with the immediately preceding validated period"
   const drivers = buildDrivers(current, previous, regionSectorRows)
   const evidence = buildEvidence({
     current,
     previous,
     regionSectorRows,
     contextEvents,
-    timeframeLabel: timeframe.timeframeLabel,
+    timeframeLabel,
     activeScopeLabel,
   })
   const confidence = calculateConfidenceScore({
@@ -383,7 +421,11 @@ export async function executeWhatChangedPlan(
     driverCount: drivers.length,
     hasCrossSourceEvidence: evidence.some((item) => item.sourceType === "mongodb"),
   })
-  const chartSpec = buildWhatChangedChartSpec(scopedRows, activeScopeLabel)
+  const chartSpec = buildWhatChangedChartSpec(historicalScopedRows, activeScopeLabel)
+  const allowedFollowUps = buildWhatChangedFollowUps({
+    targetWindow,
+    comparisonWindow: comparisonDateWindow,
+  })
   const narrative = await args.composeNarrative({
     parsed: args.plan,
     activeScopeLabel,
@@ -391,6 +433,7 @@ export async function executeWhatChangedPlan(
     previousScore: previous.cashflowHealthScore,
     drivers,
     contextEvents,
+    allowedFollowUps,
   })
 
   return {
@@ -398,8 +441,8 @@ export async function executeWhatChangedPlan(
     headline: narrative.headline,
     summary: narrative.summary,
     metric: args.plan.metricId,
-    timeframe: timeframe.timeframeLabel,
-    comparisonBasis: timeframe.comparisonLabel,
+    timeframe: timeframeLabel,
+    comparisonBasis: comparisonLabel,
     confidence,
     activeScope: activeScopeLabel,
     drivers,

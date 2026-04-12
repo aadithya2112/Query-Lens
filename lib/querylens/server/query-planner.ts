@@ -42,11 +42,25 @@ function resolveMetric(question: string) {
   const normalizedQuestion = normalizePhase1Text(question)
   const dataset = getDatasetDefinition()
 
-  return dataset.metrics.find((metric) =>
+  const directMatch = dataset.metrics.find((metric) =>
     metric.synonyms.some((synonym) =>
       normalizedQuestion.includes(normalizePhase1Text(synonym))
     )
   )
+
+  if (directMatch) {
+    return directMatch
+  }
+
+  if (/\bcash\s*flow\b|\bcashflow\b/.test(question.toLowerCase())) {
+    return dataset.metrics.find((metric) => metric.id === "cashflow_health_score")
+  }
+
+  if (/\bat risk\b|\bat-risk\b|\brisky\b|\bstressed accounts\b/.test(question.toLowerCase())) {
+    return dataset.metrics.find((metric) => metric.id === "at_risk_account_count")
+  }
+
+  return undefined
 }
 
 function isWhatChangedIntent(normalizedQuestion: string) {

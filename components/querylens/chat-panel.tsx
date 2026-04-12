@@ -25,16 +25,8 @@ interface ChatPanelProps {
   messages: ConversationMessage[]
   isLoading: boolean
   onSend: (question: string) => Promise<void> | void
+  suggestedPrompts: string[]
 }
-
-const QUICK_PROMPTS = [
-  "What data is currently stored?",
-  "Why did SME cashflow health drop last week?",
-  "What makes up at-risk accounts by region and sector last week?",
-  "Compare cashflow health this week vs last week",
-  "Why did North West cashflow health drop last week?",
-  "How has cashflow health trended over time?",
-]
 
 function formatTableValue(value: string | number | boolean | null) {
   if (value === null) {
@@ -237,6 +229,7 @@ export default function ChatPanel({
   messages,
   isLoading,
   onSend,
+  suggestedPrompts,
 }: ChatPanelProps) {
   const [inputValue, setInputValue] = useState("")
   const scrollAnchorRef = useRef<HTMLDivElement>(null)
@@ -288,7 +281,7 @@ export default function ChatPanel({
       <div className="flex flex-col gap-4 border-t border-border pt-4">
         {messages.length <= 2 && (
           <div className="flex flex-wrap gap-2">
-            {QUICK_PROMPTS.map((prompt) => (
+            {suggestedPrompts.map((prompt) => (
               <button
                 key={prompt}
                 className="rounded-full border border-border px-3 py-1.5 text-left text-xs text-muted-foreground transition hover:border-muted-foreground hover:text-foreground bg-muted/20"
