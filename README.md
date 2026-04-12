@@ -115,7 +115,7 @@ npm install
 ### 2. Create local environment config
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
 The default values in `.env.example` are already set for the local Docker stack:
