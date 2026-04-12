@@ -191,4 +191,353 @@
   .ql-enter {
     animation: ql-slide-up 240ms ease-out both;
   }
+
+  /* ══════════════════════════════════════════════════════
+     Thinking Loader – Premium Loading Experience
+     ══════════════════════════════════════════════════════ */
+
+  .ql-thinking-root {
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(
+      135deg,
+      rgba(24, 24, 27, 0.92) 0%,
+      rgba(30, 27, 38, 0.88) 50%,
+      rgba(24, 24, 27, 0.92) 100%
+    );
+    backdrop-filter: blur(24px);
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ql-thinking-root::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(168, 130, 255, 0.04) 30%,
+      rgba(130, 180, 255, 0.06) 50%,
+      rgba(168, 130, 255, 0.04) 70%,
+      transparent 100%
+    );
+    animation: ql-shimmer 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes ql-shimmer {
+    0%, 100% { opacity: 0.4; transform: translateX(-100%); }
+    50%      { opacity: 1;   transform: translateX(100%);  }
+  }
+
+  /* ── header ─────────────────────────────────────────── */
+
+  .ql-thinking-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .ql-thinking-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .ql-thinking-label-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .ql-thinking-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ql-text);
+  }
+
+  .ql-thinking-sparkle {
+    color: rgba(168, 130, 255, 0.8);
+    animation: ql-sparkle-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes ql-sparkle-pulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.18); }
+  }
+
+  .ql-thinking-subtitle {
+    font-size: 12px;
+    color: var(--ql-muted);
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* animated dots … */
+  .ql-thinking-dots::after {
+    content: "";
+    animation: ql-dots 1.4s steps(4, end) infinite;
+  }
+
+  @keyframes ql-dots {
+    0%  { content: ""; }
+    25% { content: "."; }
+    50% { content: ".."; }
+    75% { content: "..."; }
+  }
+
+  /* ── toggle button ──────────────────────────────────── */
+
+  .ql-thinking-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ql-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 180ms ease;
+    font-family: var(--font-mono);
+  }
+
+  .ql-thinking-toggle:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--ql-text);
+  }
+
+  .ql-thinking-toggle-label {
+    letter-spacing: 0.05em;
+  }
+
+  .ql-thinking-chevron {
+    transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ql-chevron-open {
+    transform: rotate(180deg);
+  }
+
+  /* ── mini progress bar ──────────────────────────────── */
+
+  .ql-thinking-progress-track {
+    margin-top: 12px;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+
+  .ql-thinking-progress-bar {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #a882ff 0%, #82b4ff 60%, #a882ff 100%);
+    background-size: 200% 100%;
+    animation: ql-progress-glow 2s ease-in-out infinite;
+    transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes ql-progress-glow {
+    0%, 100% { background-position: 0%   50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  /* ── expandable steps ───────────────────────────────── */
+
+  .ql-thinking-steps-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ql-steps-open {
+    grid-template-rows: 1fr;
+  }
+
+  .ql-thinking-steps {
+    overflow: hidden;
+  }
+
+  .ql-steps-open .ql-thinking-steps {
+    padding-top: 14px;
+  }
+
+  /* ── individual step ────────────────────────────────── */
+
+  .ql-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    position: relative;
+  }
+
+  .ql-step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 28px;
+    bottom: -4px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .ql-step-done:not(:last-child)::after {
+    background: rgba(168, 130, 255, 0.25);
+  }
+
+  /* step icon */
+  .ql-step-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 300ms ease;
+  }
+
+  .ql-step-done .ql-step-icon {
+    background: rgba(168, 130, 255, 0.18);
+    border: 1px solid rgba(168, 130, 255, 0.3);
+  }
+
+  .ql-step-active .ql-step-icon {
+    background: rgba(130, 180, 255, 0.12);
+    border: 1px solid rgba(130, 180, 255, 0.3);
+    box-shadow: 0 0 12px rgba(130, 180, 255, 0.15);
+  }
+
+  .ql-step-pending .ql-step-icon {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .ql-step-check {
+    color: #a882ff;
+  }
+
+  .ql-step-spin {
+    color: #82b4ff;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .ql-step-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* step text */
+  .ql-step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding-top: 1px;
+  }
+
+  .ql-step-label {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .ql-step-done .ql-step-label {
+    color: var(--ql-muted);
+  }
+
+  .ql-step-active .ql-step-label {
+    color: var(--ql-text);
+  }
+
+  .ql-step-pending .ql-step-label {
+    color: rgba(255, 255, 255, 0.28);
+  }
+
+  .ql-step-detail {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.35);
+    line-height: 1.4;
+  }
+
+  /* ══════════════════════════════════════════════════════
+     Orbital Spinner
+     ══════════════════════════════════════════════════════ */
+
+  .ql-orbital-wrap {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+
+  .ql-orbital-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #a882ff, #82b4ff);
+    box-shadow:
+      0 0 12px rgba(168, 130, 255, 0.5),
+      0 0 24px rgba(130, 180, 255, 0.25);
+    animation: ql-core-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes ql-core-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1);   opacity: 1;   }
+    50%      { transform: translate(-50%, -50%) scale(1.35); opacity: 0.8; }
+  }
+
+  .ql-orbital-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid transparent;
+  }
+
+  .ql-ring-1 {
+    inset: 2px;
+    border-top-color: rgba(168, 130, 255, 0.6);
+    border-right-color: rgba(168, 130, 255, 0.15);
+    animation: ql-orbit 1.6s linear infinite;
+  }
+
+  .ql-ring-2 {
+    inset: -1px;
+    border-bottom-color: rgba(130, 180, 255, 0.5);
+    border-left-color: rgba(130, 180, 255, 0.12);
+    animation: ql-orbit 2.4s linear infinite reverse;
+  }
+
+  .ql-ring-3 {
+    inset: 5px;
+    border-top-color: rgba(255, 255, 255, 0.15);
+    animation: ql-orbit 3.2s linear infinite;
+  }
+
+  @keyframes ql-orbit {
+    to { transform: rotate(360deg); }
+  }
 }

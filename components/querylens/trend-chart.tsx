@@ -80,7 +80,11 @@ export default function TrendChart({ analysis }: TrendChartProps) {
                   border: "1px solid rgba(201, 167, 106, 0.18)",
                   background: "rgba(12, 18, 27, 0.96)",
                   color: "#f7fafc",
+                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
                 }}
+                itemStyle={{ color: "rgba(201, 167, 106, 0.9)" }}
+                labelStyle={{ color: "#f7fafc", fontWeight: 600 }}
+                cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}
                 formatter={(value: number, _name, item) => {
                   const share = Number(item.payload.share ?? 0)
                   if (isCompare) {
@@ -138,7 +142,11 @@ export default function TrendChart({ analysis }: TrendChartProps) {
                   border: "1px solid rgba(201, 167, 106, 0.18)",
                   background: "rgba(12, 18, 27, 0.96)",
                   color: "#f7fafc",
+                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
                 }}
+                itemStyle={{ color: "rgba(201, 167, 106, 0.9)" }}
+                labelStyle={{ color: "#f7fafc", fontWeight: 600 }}
+                cursor={{ stroke: "rgba(201, 167, 106, 0.2)", strokeWidth: 1 }}
                 formatter={(value: number) => [`${value.toFixed(1)}`, "Score"]}
                 labelFormatter={(label) => `Week of ${label}`}
               />

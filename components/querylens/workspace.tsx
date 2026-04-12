@@ -2,7 +2,8 @@
 
 import { startTransition, useEffect, useState } from "react"
 
-import { Activity, Settings2 } from "lucide-react"
+import Link from "next/link"
+import { Activity, Github, Home, Settings2 } from "lucide-react"
 
 import ChatPanel, {
   type ConversationMessage,
@@ -215,6 +216,23 @@ export default function Workspace({
         </div>
 
         <div className="flex items-center gap-3">
+          <a
+            href="/"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted/20 hover:text-foreground"
+            title="Home"
+          >
+            <Home className="h-4 w-4" />
+          </a>
+          <a
+            href="https://github.com/aadithya2112/Query-Lens"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted/20 hover:text-foreground"
+            title="GitHub"
+          >
+            <Github className="h-4 w-4" />
+          </a>
+          <div className="h-4 w-px bg-border hidden md:block" />
           <p className="hidden text-sm text-muted-foreground md:inline-block">
               Metric Focus:{" "}
               <span className="font-medium text-foreground">
@@ -253,8 +271,8 @@ export default function Workspace({
       <div className="flex-1 overflow-hidden min-h-0">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           <ResizablePanel
-            defaultSize={65}
-            minSize={40}
+            defaultSize={35}
+            minSize={25}
             className="flex h-full min-h-0 flex-col overflow-hidden"
           >
             <ChatPanel
@@ -265,8 +283,8 @@ export default function Workspace({
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel
-            defaultSize={35}
-            minSize={25}
+            defaultSize={65}
+            minSize={40}
             className="h-full min-h-0 overflow-y-auto bg-muted/10"
           >
             <div className="h-full overflow-y-auto">

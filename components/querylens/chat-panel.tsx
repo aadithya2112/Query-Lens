@@ -3,6 +3,8 @@
 import { Send, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
+import ThinkingLoader from "@/components/querylens/thinking-loader"
+
 import type { Phase1AnalysisResponse } from "@/lib/querylens/types"
 
 export interface ConversationMessage {
@@ -140,12 +142,7 @@ export default function ChatPanel({
           ),
         )}
 
-        {isLoading && (
-          <div className="ql-enter rounded-[22px] border border-border px-4 py-4 text-sm text-muted-foreground">
-            QueryLens is assembling the weekly drivers and corroborating
-            context.
-          </div>
-        )}
+        <ThinkingLoader isActive={isLoading} />
 
         <div ref={scrollAnchorRef} />
       </div>
