@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const { geminiGenerateMock } = vi.hoisted(() => ({
+const { geminiChatSendMock, geminiGenerateMock } = vi.hoisted(() => ({
+  geminiChatSendMock: vi.fn(),
   geminiGenerateMock: vi.fn(),
 }))
 const TEST_TIMEOUT = 15_000
 
 vi.mock("@/lib/querylens/server/gemini-client", () => ({
+  createGeminiChatSession: () => ({
+    sendMessage: geminiChatSendMock,
+  }),
   generateGeminiResponse: geminiGenerateMock,
 }))
 

@@ -3,6 +3,15 @@
 import { Send, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
+import TrendChart from "@/components/querylens/trend-chart"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import type { Phase1AnalysisResponse } from "@/lib/querylens/types"
 
 export interface ConversationMessage {
@@ -24,8 +33,123 @@ const QUICK_PROMPTS = [
   "What makes up at-risk accounts by region and sector last week?",
   "Compare cashflow health this week vs last week",
   "Why did North West cashflow health drop last week?",
-  "Why did hospitality cashflow health drop this week?",
+  "How has cashflow health trended over time?",
 ]
+
+function formatTableValue(value: string | number | boolean | null) {
+  if (value === null) {
+    return "null"
+  }
+
+  if (typeof value === "number") {
+    return Number.isInteger(value)
+      ? value.toLocaleString()
+      : value.toLocaleString(undefined, {
+          maximumFractionDigits: 2,
+        })
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "true" : "false"
+  }
+
+  return value
+}
+
+function InlineResultTable({ analysis }: { analysis: Phase1AnalysisResponse }) {
+  if (!analysis.resultTable || analysis.resultTable.columns.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[22px] border border-border bg-background/40">
+      <div className="border-b border-border px-4 py-3">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Result preview
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {analysis.resultTable.truncated
+            ? `Showing ${analysis.resultTable.rows.length} of at least ${analysis.resultTable.totalRows} rows`
+            : `${analysis.resultTable.totalRows} row${analysis.resultTable.totalRows === 1 ? "" : "s"}`}
+        </p>
+      </div>
+      <div className="max-h-72 overflow-auto">
+        <Table className="text-xs">
+          <TableHeader className="sticky top-0 z-10 bg-background/95">
+            <TableRow className="border-border hover:bg-transparent">
+              {analysis.resultTable.columns.map((column) => (
+                <TableHead
+                  key={column}
+                  className="h-10 px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  {column}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analysis.resultTable.rows.slice(0, 6).map((row, rowIndex) => (
+              <TableRow key={`chat-result-${rowIndex}`} className="border-border">
+                {analysis.resultTable?.columns.map((column) => (
+                  <TableCell
+                    key={`${rowIndex}-${column}`}
+                    className="max-w-[180px] px-3 py-2 align-top text-foreground"
+                  >
+                    <span className="block truncate">
+                      {formatTableValue(row[column] ?? null)}
+                    </span>
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}
+
+function QueryRunsDisclosure({ analysis }: { analysis: Phase1AnalysisResponse }) {
+  if (!analysis.queryRuns?.length) {
+    return null
+  }
+
+  return (
+    <details className="mt-4 rounded-[22px] border border-border bg-background/30 px-4 py-4">
+      <summary className="cursor-pointer list-none font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors">
+        Queries used
+      </summary>
+      <div className="mt-4 space-y-4">
+        {analysis.queryRuns.map((queryRun) => (
+          <div
+            key={queryRun.id}
+            className="rounded-[18px] border border-border bg-background/40 px-4 py-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {queryRun.title}
+                </p>
+                <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  {queryRun.sourceType} · {queryRun.language}
+                </p>
+              </div>
+              <span className="rounded-full border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                {queryRun.rowCount} row{queryRun.rowCount === 1 ? "" : "s"}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {queryRun.summary}
+            </p>
+            <pre className="mt-3 overflow-x-auto rounded-2xl border border-border bg-black/30 p-3 text-xs leading-6 text-foreground">
+              <code>{queryRun.statement}</code>
+            </pre>
+          </div>
+        ))}
+      </div>
+    </details>
+  )
+}
 
 function AssistantMessage({
   message,
@@ -65,6 +189,15 @@ function AssistantMessage({
         </p>
       </div>
 
+      {analysis?.chartSpec && (
+        <div className="mt-4">
+          <TrendChart analysis={analysis} compact />
+        </div>
+      )}
+
+      {analysis && <InlineResultTable analysis={analysis} />}
+      {analysis && <QueryRunsDisclosure analysis={analysis} />}
+
       {analysis && (
         <div className="mt-4 border-t border-border pt-4">
           <div className="flex items-center justify-between gap-3">
@@ -80,18 +213,20 @@ function AssistantMessage({
               Conversation context was used to interpret this reply.
             </p>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {analysis.supportedFollowUps.map((followUp) => (
-              <button
-                key={followUp}
-                className="rounded-full border border-border px-3 py-1.5 text-left text-xs bg-muted/20 text-muted-foreground transition hover:border-muted-foreground hover:text-foreground"
-                onClick={() => onSend(followUp)}
-                type="button"
-              >
-                {followUp}
-              </button>
-            ))}
-          </div>
+          {analysis.supportedFollowUps.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {analysis.supportedFollowUps.map((followUp) => (
+                <button
+                  key={followUp}
+                  className="rounded-full border border-border px-3 py-1.5 text-left text-xs bg-muted/20 text-muted-foreground transition hover:border-muted-foreground hover:text-foreground"
+                  onClick={() => onSend(followUp)}
+                  type="button"
+                >
+                  {followUp}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -142,8 +277,8 @@ export default function ChatPanel({
 
         {isLoading && (
           <div className="ql-enter rounded-[22px] border border-border px-4 py-4 text-sm text-muted-foreground">
-            QueryLens is assembling the weekly drivers and corroborating
-            context.
+            QueryLens is assembling grounded evidence and checking the approved
+            live sources when needed.
           </div>
         )}
 

@@ -3,6 +3,10 @@ import { Pool } from "pg"
 
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import type {
+  AgenticQueryExecutionResult,
+  AgenticSchemaSnapshot,
+} from "@/lib/querylens/server/agentic-types"
+import type {
   ContextCollection,
   ContextEvent,
   ScopeFilter,
@@ -24,6 +28,16 @@ export interface QueryLensDataAccess {
     scope: ScopeFilter
   }): Promise<ContextEvent[]>
   getSourceHealth(): Promise<SourceHealth[]>
+  getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot>
+  executeReadOnlySql(args: {
+    statement: string
+    maxRows: number
+  }): Promise<AgenticQueryExecutionResult>
+  executeReadOnlyMongoPipeline(args: {
+    collection: ContextCollection
+    pipeline: Record<string, unknown>[]
+    maxRows: number
+  }): Promise<AgenticQueryExecutionResult>
 }
 
 declare global {
@@ -37,6 +51,145 @@ const CONTEXT_COLLECTIONS: ContextCollection[] = [
   "risk_alerts",
   "rm_notes",
 ]
+
+const AGENTIC_POSTGRES_TABLES = [
+  {
+    name: "regions",
+    description: "Reference table of supported SME regions.",
+    columns: ["id", "name"],
+  },
+  {
+    name: "sectors",
+    description: "Reference table of supported SME sectors.",
+    columns: ["id", "name"],
+  },
+  {
+    name: "accounts",
+    description: "Account master data with region, sector, segment, and baseline thresholds.",
+    columns: [
+      "id",
+      "business_name",
+      "region_id",
+      "sector_id",
+      "segment",
+      "low_balance_threshold",
+      "base_daily_inbound",
+      "base_daily_outbound",
+      "base_balance",
+      "base_utilization",
+    ],
+  },
+  {
+    name: "daily_account_metrics",
+    description: "Daily account facts including balances, payments, utilization, and stress flags.",
+    columns: [
+      "account_id",
+      "date",
+      "week_start",
+      "region_id",
+      "sector_id",
+      "inbound_payments",
+      "outbound_payments",
+      "end_balance",
+      "loan_utilization",
+      "low_balance_flag",
+      "overdue_flag",
+    ],
+  },
+  {
+    name: "weekly_portfolio_metrics",
+    description: "Weekly portfolio, region, sector, and region-sector aggregates with cashflow health components.",
+    columns: [
+      "week_start",
+      "week_end",
+      "record_type",
+      "region_id",
+      "sector_id",
+      "region_name",
+      "sector_name",
+      "account_count",
+      "inbound_payments",
+      "outbound_payments",
+      "opening_balance",
+      "closing_balance",
+      "low_balance_share",
+      "overdue_share",
+      "avg_utilization",
+      "inflow_outflow_score",
+      "balance_trend_score",
+      "low_balance_score",
+      "overdue_score",
+      "cashflow_health_score",
+    ],
+  },
+] as const
+
+const AGENTIC_MONGO_COLLECTIONS = [
+  {
+    name: "complaints",
+    description: "Customer complaint events tied to regions, sectors, and severity.",
+    columns: [
+      "id",
+      "occurredAt",
+      "weekStart",
+      "regionId",
+      "sectorId",
+      "regionName",
+      "sectorName",
+      "severity",
+      "summary",
+      "detail",
+    ],
+  },
+  {
+    name: "service_incidents",
+    description: "Operational incidents that can corroborate payment disruption or service stress.",
+    columns: [
+      "id",
+      "occurredAt",
+      "weekStart",
+      "regionId",
+      "sectorId",
+      "regionName",
+      "sectorName",
+      "severity",
+      "summary",
+      "detail",
+    ],
+  },
+  {
+    name: "risk_alerts",
+    description: "Risk alerts that provide contextual signals around exposure changes.",
+    columns: [
+      "id",
+      "occurredAt",
+      "weekStart",
+      "regionId",
+      "sectorId",
+      "regionName",
+      "sectorName",
+      "severity",
+      "summary",
+      "detail",
+    ],
+  },
+  {
+    name: "rm_notes",
+    description: "Relationship-manager notes used as qualitative corroborating context.",
+    columns: [
+      "id",
+      "occurredAt",
+      "weekStart",
+      "regionId",
+      "sectorId",
+      "regionName",
+      "sectorName",
+      "severity",
+      "summary",
+      "detail",
+    ],
+  },
+] as const
 
 interface WeeklyMetricDbRow {
   week_start: string | Date
@@ -93,6 +246,82 @@ function normalizeDateValue(value: string | Date) {
   const day = String(value.getDate()).padStart(2, "0")
 
   return `${year}-${month}-${day}`
+}
+
+function serializeQueryValue(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value
+  }
+
+  if (typeof value === "bigint") {
+    return value.toString()
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+
+  if (Array.isArray(value)) {
+    return JSON.stringify(value)
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value)
+  }
+
+  return String(value)
+}
+
+function normalizeQueryRows(
+  rows: Array<Record<string, unknown>>,
+  maxRows: number
+): AgenticQueryExecutionResult["rowset"] {
+  const visibleRows = rows.slice(0, maxRows)
+  const columns = Array.from(
+    visibleRows.reduce((set, row) => {
+      Object.keys(row).forEach((key) => set.add(key))
+      return set
+    }, new Set<string>())
+  )
+
+  return {
+    columns,
+    rows: visibleRows.map((row) =>
+      Object.fromEntries(
+        columns.map((column) => [column, serializeQueryValue(row[column])])
+      )
+    ),
+    totalRows: rows.length,
+    truncated: rows.length > maxRows,
+  }
+}
+
+function buildFixtureAgenticSchemaSnapshot(): AgenticSchemaSnapshot {
+  const dataset = getSampleDataset()
+
+  return {
+    postgres: AGENTIC_POSTGRES_TABLES.map((table) => ({
+      ...table,
+      rowCount:
+        table.name === "regions"
+          ? dataset.regions.length
+          : table.name === "sectors"
+            ? dataset.sectors.length
+            : table.name === "accounts"
+              ? dataset.accounts.length
+              : table.name === "daily_account_metrics"
+                ? dataset.dailyMetrics.length
+                : dataset.weeklyMetrics.length,
+    })),
+    mongodb: AGENTIC_MONGO_COLLECTIONS.map((collection) => ({
+      ...collection,
+      rowCount: dataset.contextEvents[collection.name as ContextCollection].length,
+    })),
+  }
 }
 
 class FixtureDataAccess implements QueryLensDataAccess {
@@ -211,6 +440,18 @@ class FixtureDataAccess implements QueryLensDataAccess {
         recordCount: 1,
       },
     ]
+  }
+
+  async getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot> {
+    return buildFixtureAgenticSchemaSnapshot()
+  }
+
+  async executeReadOnlySql(): Promise<AgenticQueryExecutionResult> {
+    throw new Error("Agentic SQL execution is only available in database mode.")
+  }
+
+  async executeReadOnlyMongoPipeline(): Promise<AgenticQueryExecutionResult> {
+    throw new Error("Agentic Mongo execution is only available in database mode.")
   }
 }
 
@@ -431,6 +672,104 @@ class DatabaseDataAccess implements QueryLensDataAccess {
         recordCount: 1,
       },
     ]
+  }
+
+  async getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot> {
+    const pool = getPgPool()
+    const client = await getMongoClientPromise()
+    const db = client.db()
+
+    const postgresCounts = await Promise.all(
+      AGENTIC_POSTGRES_TABLES.map(async (table) => {
+        const result = await pool.query<CountRow>(
+          `SELECT COUNT(*)::int AS count FROM ${table.name}`
+        )
+
+        return {
+          ...table,
+          rowCount: Number(result.rows[0]?.count ?? 0),
+        }
+      })
+    )
+
+    const mongodbCounts = await Promise.all(
+      AGENTIC_MONGO_COLLECTIONS.map(async (collection) => ({
+        ...collection,
+        rowCount: await db.collection(collection.name).countDocuments(),
+      }))
+    )
+
+    return {
+      postgres: postgresCounts,
+      mongodb: mongodbCounts,
+    }
+  }
+
+  async executeReadOnlySql(args: {
+    statement: string
+    maxRows: number
+  }): Promise<AgenticQueryExecutionResult> {
+    const pool = getPgPool()
+    const client = await pool.connect()
+    const trimmed = args.statement.trim().replace(/;+\s*$/g, "")
+
+    try {
+      await client.query("BEGIN READ ONLY")
+      await client.query("SET LOCAL statement_timeout = 5000")
+      const result = await client.query<Record<string, unknown>>(
+        `SELECT * FROM (${trimmed}) AS querylens_agentic_result LIMIT ${Math.max(args.maxRows + 1, 2)}`
+      )
+      await client.query("ROLLBACK")
+
+      const rowset = normalizeQueryRows(result.rows, args.maxRows)
+
+      return {
+        rowset,
+        summary: rowset.truncated
+          ? `Returned ${rowset.totalRows}+ rows before truncation.`
+          : `Returned ${rowset.totalRows} row${rowset.totalRows === 1 ? "" : "s"}.`,
+      }
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK")
+      } catch {
+        // Ignore rollback errors after the original query failure.
+      }
+
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
+  async executeReadOnlyMongoPipeline(args: {
+    collection: ContextCollection
+    pipeline: Record<string, unknown>[]
+    maxRows: number
+  }): Promise<AgenticQueryExecutionResult> {
+    const client = await getMongoClientPromise()
+    const db = client.db()
+    const result = await db
+      .collection<Record<string, unknown>>(args.collection)
+      .aggregate([...args.pipeline, { $limit: args.maxRows + 1 }], {
+        maxTimeMS: 5000,
+      })
+      .toArray()
+
+    const rowset = normalizeQueryRows(
+      result.map((row) => {
+        const { _id, ...document } = row
+        return document
+      }),
+      args.maxRows
+    )
+
+    return {
+      rowset,
+      summary: rowset.truncated
+        ? `Returned ${rowset.totalRows}+ documents before truncation.`
+        : `Returned ${rowset.totalRows} document${rowset.totalRows === 1 ? "" : "s"}.`,
+    }
   }
 }
 

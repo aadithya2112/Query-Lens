@@ -101,6 +101,12 @@ export default function Workspace({
   const [isLoading, setIsLoading] = useState(false)
   const [isRestored, setIsRestored] = useState(false)
   const activeMetric = metrics.find((metric) => metric.id === activeAnalysis.metric)
+  const activeMetricLabel =
+    activeAnalysis.intent === "discovery"
+      ? "Dataset discovery"
+      : activeAnalysis.intent === "agentic_query"
+        ? "Custom live query"
+        : activeMetric?.label || "Cashflow"
 
   useEffect(() => {
     const storedChatId = window.localStorage.getItem(CHAT_ID_STORAGE_KEY)
@@ -218,9 +224,7 @@ export default function Workspace({
           <p className="hidden text-sm text-muted-foreground md:inline-block">
               Metric Focus:{" "}
               <span className="font-medium text-foreground">
-                {activeAnalysis.intent === "discovery"
-                  ? "Dataset discovery"
-                  : activeMetric?.label || "Cashflow"}
+                {activeMetricLabel}
               </span>
             </p>
           <div className="h-4 w-px bg-border hidden md:block" />

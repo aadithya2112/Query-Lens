@@ -1,3 +1,5 @@
+import { canUseGemini } from "@/lib/querylens/server/ai-config"
+import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
@@ -74,6 +76,53 @@ export async function analyzeQuery(
   )
 
   if (!parseResult.parsed) {
+    if (
+      executionContext === "interactive" &&
+      canUseGemini(executionContext) &&
+      parseResult.failureKind !== "model_unavailable"
+    ) {
+      if (dataAccess.sourceMode !== "database") {
+        return buildWhatChangedFallbackResponse({
+          fallbackReason:
+            "This custom live-query fallback needs QueryLens connected to live Postgres and MongoDB sources. In fixture mode, QueryLens can still answer the built-in discovery, what-changed, breakdown, and compare questions.",
+          sourceMode: dataAccess.sourceMode,
+          rows: weeklyRows,
+        })
+      }
+
+      const agenticResponse = await executeAgenticFallback({
+        question: input.question,
+        dataAccess,
+        retrievalContext,
+      })
+
+      const enrichedAgenticResponse = {
+        ...agenticResponse,
+        conversationContextUsed:
+          retrievalContext.memoryMatches.length > 0 ||
+          retrievalContext.recentMessages.length > 0,
+        retrievalTrace: {
+          datasetMatches: retrievalContext.datasetMatches.map((match) => match.title),
+          memoryMatches: retrievalContext.memoryMatches.map((match) => match.title),
+          recentMessagesCount: retrievalContext.recentMessages.length,
+        },
+      }
+
+      if (input.chatId) {
+        try {
+          await retrievalStore.persistConversation({
+            chatId,
+            question: input.question,
+            response: enrichedAgenticResponse,
+          })
+        } catch (error) {
+          console.warn("QueryLens could not persist conversational memory.", error)
+        }
+      }
+
+      return enrichedAgenticResponse
+    }
+
     return buildWhatChangedFallbackResponse({
       fallbackReason:
         parseResult.fallbackReason ??

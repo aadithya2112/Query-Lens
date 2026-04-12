@@ -40,6 +40,7 @@ export default function Sidebar({
   sourceHealth,
   analysis,
 }: SidebarProps) {
+  const isAgentic = analysis.intent === "agentic_query"
   const isBreakdown = analysis.metric === "at_risk_account_count"
   const isCompare = Boolean(analysis.comparisonSummary)
   const isDiscovery = analysis.intent === "discovery"
@@ -58,6 +59,8 @@ export default function Sidebar({
             <h1 className="mt-1 text-xl font-semibold text-foreground">
               {isDiscovery
                 ? "Dataset discovery"
+                : isAgentic
+                ? "Custom live query"
                 : isCompare
                 ? "SME cashflow compare"
                 : isBreakdown
@@ -69,6 +72,8 @@ export default function Sidebar({
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
           {isDiscovery
             ? "A conversational metadata view that explains what QueryLens currently knows about the sample dataset, the connected sources, and the supported analytical paths."
+            : isAgentic
+            ? "A read-only live-query view where Gemini explored the approved Postgres and MongoDB sources to answer a question outside the built-in analysis categories."
             : isCompare
             ? "A trust-first side-by-side comparison of weekly cashflow health, using the sample dataset's Postgres facts and Mongo context to explain the gap."
             : isBreakdown
@@ -120,6 +125,8 @@ export default function Sidebar({
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {isDiscovery
             ? "Discovery answers come from retrieved dataset metadata, source health, and sample-dataset coverage summaries before analytical execution begins."
+            : isAgentic
+            ? "Custom live queries are grounded in the approved database schema and executed with read-only guards before QueryLens renders the answer."
             : metric?.description}
         </p>
         {isDiscovery ? (
@@ -137,6 +144,31 @@ export default function Sidebar({
                 Time windows
               </p>
               <p className="text-sm text-foreground">this week, last week</p>
+            </div>
+          </div>
+        ) : isAgentic ? (
+          <div className="mt-4 space-y-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Execution mode
+              </p>
+              <p className="text-sm text-foreground">Auto-run read-only</p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Allowed sources
+              </p>
+              <p className="text-sm text-foreground">
+                approved Postgres tables, approved MongoDB collections
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Visual output
+              </p>
+              <p className="text-sm text-foreground">
+                chat-native chart when the result shape supports it
+              </p>
             </div>
           </div>
         ) : metric ? (
@@ -194,6 +226,8 @@ export default function Sidebar({
           <p className="text-sm leading-6 text-muted-foreground">
             {isDiscovery
               ? "Discovery keeps the app conversational while staying grounded in retrieved metadata and source health."
+              : isAgentic
+              ? "Custom queries stay read-only and grounded by schema-aware execution before Gemini summarizes the result."
               : "QueryLens intentionally supports a narrow set of metrics and intents so the answer remains grounded."}
           </p>
         </div>

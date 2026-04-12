@@ -3,12 +3,14 @@ export type MetricId =
   | "cashflow_health_score"
   | "at_risk_account_count"
   | "dataset_catalog"
+  | "custom_query_result"
 export type SupportedTimeframe = "this_week" | "last_week"
 export type QueryIntent =
   | "what_changed"
   | "breakdown"
   | "compare"
   | "discovery"
+  | "agentic_query"
 export type ScopeDimension = "portfolio" | "region" | "sector"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
 export type BreakdownDimension = "region" | "sector" | "region_sector"
@@ -226,22 +228,46 @@ export interface EvidenceItem {
   queryTemplateId: string
 }
 
-export interface ChartPoint {
-  label: string
-  weekStart?: string
-  weekEnd?: string
-  score?: number
-  value?: number
-  share?: number
+export interface ChartDatum {
+  [key: string]: string | number | undefined
 }
 
-export interface ChartSpec {
-  type: "line" | "bar"
+interface BaseChartSpec {
   title: string
-  xKey: "label"
-  yKey: "score" | "value"
-  data: ChartPoint[]
   explanation: string
+  data: ChartDatum[]
+}
+
+export interface CartesianChartSpec extends BaseChartSpec {
+  type: "line" | "bar"
+  xKey: string
+  yKey: string
+}
+
+export interface PieChartSpec extends BaseChartSpec {
+  type: "pie"
+  labelKey: string
+  valueKey: string
+}
+
+export type ChartSpec = CartesianChartSpec | PieChartSpec
+
+export interface ResultTable {
+  columns: string[]
+  rows: Array<Record<string, string | number | boolean | null>>
+  totalRows: number
+  truncated: boolean
+}
+
+export interface QueryRun {
+  id: string
+  title: string
+  sourceType: "postgres" | "mongodb"
+  language: "sql" | "mongodb"
+  statement: string
+  status: "completed" | "rejected" | "failed"
+  rowCount: number
+  summary: string
 }
 
 export interface ComparisonSummary {
@@ -286,13 +312,15 @@ export interface Phase1AnalysisResponse {
   confidence: number
   activeScope: string
   drivers: DriverItem[]
-  chartSpec: ChartSpec
+  chartSpec?: ChartSpec
   evidence: EvidenceItem[]
   assumptions: string[]
   supportedFollowUps: string[]
   comparisonSummary?: ComparisonSummary
   discoverySummary?: DiscoverySummary
   catalogSections?: CatalogSection[]
+  resultTable?: ResultTable
+  queryRuns?: QueryRun[]
   conversationContextUsed?: boolean
   retrievalTrace?: RetrievalTrace
   fallback?: boolean
