@@ -12,7 +12,7 @@
 > The live deployment runs in fixture mode — the full SME portfolio dataset and all four use cases are available out of the box.
 
 ---
-![Preview Image](C:\Users\ASUS\Videos\natwest\Query-Lens\app\images\landing-page-preview.png)
+![Preview Image](app/images/landing-page-preview.png)
 
 QueryLens is a **trust-first analytics interface** built for the NatWest Group hackathon challenge on seamless self-service intelligence. It lets non-technical users ask natural language questions about a synthetic SME banking portfolio and instantly receive clear, verified, source-backed answers — no SQL, no dashboards, no guesswork.
 
