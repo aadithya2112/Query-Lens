@@ -12,17 +12,18 @@
 > The live deployment runs in fixture mode — the full SME portfolio dataset and all four use cases are available out of the box.
 
 ---
+
 ![Preview Image](app/images/landing-page-preview.png)
 
 QueryLens is a **trust-first analytics interface** built for the NatWest Group hackathon challenge on seamless self-service intelligence. It lets non-technical users ask natural language questions about a synthetic SME banking portfolio and instantly receive clear, verified, source-backed answers — no SQL, no dashboards, no guesswork.
 
 The product is built around the three pillars of the hackathon brief:
 
-| Pillar | How QueryLens delivers it |
-|--------|--------------------------|
-| **Clarity** | Plain-English narratives with jargon-free explanations for non-expert users |
-| **Trust** | Consistent metric definitions, visible evidence cards, assumptions, confidence scores, and source transparency across Postgres and MongoDB |
-| **Speed** | Near-instant responses through a structured query-plan model and a generic orchestrator — no complex multi-step workflows |
+| Pillar      | How QueryLens delivers it                                                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Clarity** | Plain-English narratives with jargon-free explanations for non-expert users                                                                |
+| **Trust**   | Consistent metric definitions, visible evidence cards, assumptions, confidence scores, and source transparency across Postgres and MongoDB |
+| **Speed**   | Near-instant responses through a structured query-plan model and a generic orchestrator — no complex multi-step workflows                  |
 
 ---
 
@@ -119,9 +120,6 @@ cp .env.example .env.local
 
 The default values in `.env.example` are already set for the local Docker stack:
 
-- `QUERYLENS_REFERENCE_DATE=2026-04-11`
-- `QUERYLENS_DATA_MODE=database`
-- `QUERYLENS_AI_MODE=gemini`
 - local `POSTGRES_URL`
 - local `MONGODB_URL`
 
@@ -159,12 +157,15 @@ Use the sample prompts or ask:
 ```text
 What data is currently stored?
 ```
+
 ```text
 Why did SME cashflow health drop last week?
 ```
+
 ```text
 What makes up at-risk accounts by region and sector last week?
 ```
+
 ```text
 Compare cashflow health this week vs last week
 ```
