@@ -244,7 +244,7 @@ npm run test:e2e
 
 ---
 
-## Architecture Notes
+## Architecture 
 
 QueryLens is a single `Next.js` application with an integrated server layer.
 
@@ -254,7 +254,8 @@ QueryLens is a single `Next.js` application with an integrated server layer.
 - Interactive query parsing requires Gemini planning for supported questions, while data retrieval, evidence assembly, charting, confidence, and retrieval persistence remain deterministic and grounded.
 - Fixture mode remains available as a safe fallback when live databases are not running.
 
-For the fuller diagram and request lifecycle, see [Architecture.md](./Architecture.md) and [Flow.md](./Flow.md).
+For the fuller details and request lifecycle, see [Architecture.md](./Architecture.md) and [Flow.md](./Flow.md).
+![architecture](app/images/architecture_flowchart.svg )
 
 ---
 
