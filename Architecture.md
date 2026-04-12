@@ -37,13 +37,13 @@ flowchart LR
       RETRIEVE["RAG Retrieval Layer"]
       PLAN["Query Planner (Gemini-first)"]
       VALIDATE["Dataset / Metric / Timeframe Validation"]
-      ORCH["Analysis Orchestrator"]
+      ANALYZE["Analysis Orchestrator"]
       EXEC["Intent Executor"]
       NARRATE["Narrative Provider (Deterministic or Gemini)"]
       MEMORY["Conversation Memory Persistence"]
     end
 
-    QUERY --> RETRIEVE --> PLAN --> VALIDATE --> ORCH --> EXEC --> NARRATE --> MEMORY --> QUERY
+    QUERY --> RETRIEVE --> PLAN --> VALIDATE --> ANALYZE --> EXEC --> NARRATE --> MEMORY --> QUERY
 
     subgraph DATA["Data Sources"]
       PG["Postgres\naccounts, daily metrics, weekly metrics"]
