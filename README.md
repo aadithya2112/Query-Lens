@@ -1,8 +1,70 @@
 # QueryLens
 
-QueryLens is a trust-first analytics demo for a synthetic SME banking portfolio. It lets a non-technical user ask grounded natural-language questions such as `What data is currently stored?`, `Why did SME cashflow health drop last week?`, `What makes up at-risk accounts by region and sector last week?`, or `Compare cashflow health this week vs last week` and get evidence-backed answers from a built-in sample dataset surfaced through structured facts, contextual signals, and retrieval-backed metadata.
+> **NatWest Group Hackathon — Talk to Data: Seamless Self-Service Intelligence**
+
+---
+
+## Live Demo
+
+> ### **[https://query-lens-one.vercel.app/](https://query-lens-one.vercel.app/)**
+>
+> **No setup required. Click the link and start asking questions immediately.**
+> The live deployment runs in fixture mode — the full SME portfolio dataset and all four use cases are available out of the box.
+
+---
+![Preview Image](C:\Users\ASUS\Videos\natwest\Query-Lens\app\images\landing-page-preview.png)
+
+QueryLens is a **trust-first analytics interface** built for the NatWest Group hackathon challenge on seamless self-service intelligence. It lets non-technical users ask natural language questions about a synthetic SME banking portfolio and instantly receive clear, verified, source-backed answers — no SQL, no dashboards, no guesswork.
+
+The product is built around the three pillars of the hackathon brief:
+
+| Pillar | How QueryLens delivers it |
+|--------|--------------------------|
+| **Clarity** | Plain-English narratives with jargon-free explanations for non-expert users |
+| **Trust** | Consistent metric definitions, visible evidence cards, assumptions, confidence scores, and source transparency across Postgres and MongoDB |
+| **Speed** | Near-instant responses through a structured query-plan model and a generic orchestrator — no complex multi-step workflows |
+
+---
+
+## Table of Contents
+
+- [🚀 Live Demo](#-live-demo)
+- [Overview](#overview)
+- [Working Features](#working-features)
+- [Not Yet Implemented](#not-yet-implemented)
+- [Tech Stack](#tech-stack)
+- [Recommended Local Demo Path](#recommended-local-demo-path)
+  - [1. Install dependencies](#1-install-dependencies)
+  - [2. Create local environment config](#2-create-local-environment-config)
+  - [3. Start the databases](#3-start-the-databases)
+  - [4. Load the sample dataset](#4-load-the-sample-dataset)
+  - [5. Start the app](#5-start-the-app)
+  - [6. Run the flagship questions](#6-run-the-flagship-questions)
+- [Fixture Mode](#fixture-mode)
+- [API Usage Examples](#api-usage-examples)
+- [Validation Commands](#validation-commands)
+- [Architecture Notes](#architecture-notes)
+- [Repository Structure](#repository-structure)
+- [Limitations](#limitations)
+- [Future Improvements](#future-improvements)
+- [Cleanup](#cleanup)
+
+---
+
+## Overview
+
+QueryLens addresses the core problem in the hackathon brief: **many people struggle to get quick, accurate, and trustworthy answers from data** because of too many steps, unclear terminology, and lack of confidence in the results.
 
 The current shipped milestone is intentionally focused on one strong local demo dataset rather than a broad but partial product. The app is designed for a short local demo where a reviewer can boot the stack, run a few sample-dataset questions, and understand both the product story and the supporting architecture quickly.
+
+The four use cases from the hackathon spec are all represented:
+
+- **Understand what changed** — `Why did SME cashflow health drop last week?`
+- **Compare** — `Compare cashflow health this week vs last week`
+- **Breakdown / decomposition** — `What makes up at-risk accounts by region and sector last week?`
+- **Discover / summarise** — `What data is currently stored?`
+
+---
 
 ## Working Features
 
@@ -24,6 +86,8 @@ The current shipped milestone is intentionally focused on one strong local demo 
 - Dockerized local stack with reproducible sample data
 - Automated coverage with `Vitest` and a Playwright browser smoke test
 
+---
+
 ## Not Yet Implemented
 
 These are intentionally deferred and should not be treated as shipped:
@@ -31,6 +95,8 @@ These are intentionally deferred and should not be treated as shipped:
 - `weekly briefing`
 - arbitrary file upload or open-ended source ingestion
 - raw SQL as a primary user workflow
+
+---
 
 ## Tech Stack
 
@@ -45,6 +111,8 @@ These are intentionally deferred and should not be treated as shipped:
 - `Playwright`
 - `Bun`
 - `Gemini API` via `@google/genai` for required interactive planning, embeddings, and narrative generation
+
+---
 
 ## Recommended Local Demo Path
 
@@ -108,7 +176,7 @@ What makes up at-risk accounts by region and sector last week?
 Compare cashflow health this week vs last week
 ```
 
-Expected result:
+**Expected result:**
 
 - a grounded narrative explaining the drop
 - visible `Postgres` and `MongoDB` evidence
@@ -117,6 +185,8 @@ Expected result:
 - a separate breakdown view showing where weekly at-risk accounts are concentrated
 - a compare view showing the delta between two weekly windows or two peers
 - a discovery view showing dataset coverage, sources, metrics, and suggested next questions
+
+---
 
 ## Fixture Mode
 
@@ -127,6 +197,8 @@ QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 npm run dev
 ```
 
 This uses the same sample dataset story, but reads from in-repo fixtures instead of the live local databases.
+
+---
 
 ## API Usage Examples
 
@@ -163,6 +235,8 @@ Example response shape:
 }
 ```
 
+---
+
 ## Validation Commands
 
 Run the automated checks with:
@@ -174,17 +248,21 @@ npm run build
 npm run test:e2e
 ```
 
+---
+
 ## Architecture Notes
 
 QueryLens is a single `Next.js` application with an integrated server layer.
 
 - `POST /api/query` interprets the question, validates it against the current dataset and manifest, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
-- The server now routes requests through a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and conversation memory, and a generic analysis orchestrator before executing the current `discovery`, `what changed`, `breakdown`, or `compare` intent.
+- The server routes requests through a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and conversation memory, and a generic analysis orchestrator before executing the current `discovery`, `what changed`, `breakdown`, or `compare` intent.
 - `GET /api/metrics` exposes the current metric manifest for all shipped slices.
-- Interactive query parsing now requires Gemini planning for supported questions, while data retrieval, evidence assembly, charting, confidence, and retrieval persistence remain deterministic and grounded.
+- Interactive query parsing requires Gemini planning for supported questions, while data retrieval, evidence assembly, charting, confidence, and retrieval persistence remain deterministic and grounded.
 - Fixture mode remains available as a safe fallback when live databases are not running.
 
 For the fuller diagram and request lifecycle, see [Architecture.md](./Architecture.md) and [Flow.md](./Flow.md).
+
+---
 
 ## Repository Structure
 
@@ -201,6 +279,8 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 └─ README.md
 ```
 
+---
+
 ## Limitations
 
 - The current milestone supports two analytical metrics plus one catalog/discovery path.
@@ -211,13 +291,17 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 - The current trace/debug details are lightweight and development-oriented.
 - Only one built-in dataset is supported today; reusable dataset onboarding is not implemented yet.
 
+---
+
 ## Future Improvements
 
 - Add reusable dataset onboarding for tabular datasets
-- Add `weekly briefing`
+- Add `weekly briefing` to complete the fourth hackathon use case
 - Expand metric coverage beyond `cashflow_health_score`
 - Improve trace detail and retrieval transparency for richer trust UX
 - Add a submission/demo script with screenshots or recorded walkthrough
+
+---
 
 ## Cleanup
 
