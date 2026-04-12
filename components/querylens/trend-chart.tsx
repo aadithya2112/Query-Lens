@@ -148,6 +148,12 @@ export default function TrendChart({ analysis, compact = false }: TrendChartProp
               data={chartSpec.data}
               margin={{ top: 12, right: 12, left: -18, bottom: 0 }}
             >
+              <defs>
+                <linearGradient id={`${gradientId}-bar`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(201,167,106,0.4)" />
+                  <stop offset="100%" stopColor="rgba(201,167,106,0.05)" />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 stroke="rgba(163, 173, 185, 0.09)"
                 vertical={false}
@@ -188,8 +194,10 @@ export default function TrendChart({ analysis, compact = false }: TrendChartProp
               />
               <Bar
                 dataKey={chartSpec.yKey}
-                fill="rgba(201, 167, 106, 0.82)"
-                radius={[8, 8, 0, 0]}
+                fill={`url(#${gradientId}-bar)`}
+                stroke="rgba(201, 167, 106, 0.6)"
+                strokeWidth={1.5}
+                radius={[6, 6, 0, 0]}
               />
             </BarChart>
           ) : (

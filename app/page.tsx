@@ -1,5 +1,7 @@
+import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import previewImg from "./images/landing-page-preview.png"
 
 export default function Home() {
   return (
@@ -14,21 +16,21 @@ export default function Home() {
       </nav>
 
       <main className="flex-1 flex flex-col items-center justify-center relative pt-32 pb-20 px-6 sm:px-12 text-center isolate">
-        
+
         {/* Glow behind text */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-tr from-[#3b82f6]/40 via-[#a855f7]/40 to-[#ef4444]/30 blur-[130px] rounded-[100%] pointer-events-none -z-10" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-tr from-[#D6C5B3]/25 via-[#A38D7A]/20 to-[#6E5D4E]/30 blur-[130px] rounded-[100%] pointer-events-none -z-10" />
 
         <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] backdrop-blur-md mb-8 text-white/70 animate-in fade-in slide-in-from-bottom-4 duration-700 hover:bg-white/10 transition-colors cursor-default">
-          Introducing QueryLens Pro
+          Introducing QueryLens
         </div>
 
         <h1 className="text-6xl sm:text-7xl lg:text-[110px] font-semibold tracking-[-0.04em] leading-[1.05] animate-in fade-in slide-in-from-bottom-6 duration-1000">
-          Data analysis. <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFB4B4] via-[#C9A76A] to-[#B3E5FC]">
+          Talk to Data. <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FDFBF7] via-[#D6C5B3] to-[#A38D7A]">
             Brilliantly simple.
           </span>
         </h1>
-        
+
         <p className="mt-10 text-xl sm:text-2xl text-[#86868b] max-w-2xl mx-auto font-medium tracking-tight animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-150">
           The ultimate intelligent workspace. Ask questions, explore insights, and uncover metrics beautifully.
         </p>
@@ -48,17 +50,21 @@ export default function Home() {
         </div>
 
         {/* Mockup / Image area to ground the layout */}
-        <div className="w-full max-w-5xl aspect-[16/9] mt-24 rounded-[32px] border border-white/10 bg-gradient-to-b from-[#1c1c1e]/80 to-transparent backdrop-blur-3xl shadow-[0_0_80px_rgba(0,0,0,0.8)] relative overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-500">
-             <div className="absolute top-0 left-0 right-0 h-14 border-b border-white/5 bg-[#1c1c1e]/20 flex items-center px-6 gap-2">
-                 <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] border border-black/10"></div>
-                 <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] border border-black/10"></div>
-                 <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f] border border-black/10"></div>
-             </div>
-             <div className="w-full h-full pt-14 flex flex-col items-center justify-center relative">
-                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.05),transparent_50%)]" />
-                 <h3 className="text-3xl font-semibold tracking-tight text-white/80 mb-2">Workspace Preview</h3>
-                 <p className="text-[#86868b] font-medium tracking-tight">Your data, reimagined.</p>
-             </div>
+        <div className="w-full max-w-7xl mt-24 rounded-[32px] border border-white/10 bg-[#09090b] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-500 flex flex-col">
+          <div className="h-14 shrink-0 border-b border-white/5 bg-[#18181b] flex items-center px-6 gap-2 z-10 box-border">
+            <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] border border-black/10"></div>
+            <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] border border-black/10"></div>
+            <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f] border border-black/10"></div>
+          </div>
+          <div className="w-full overflow-hidden">
+            <Image 
+              src={previewImg} 
+              alt="QueryLens Workspace Preview" 
+              quality={100}
+              className="w-full h-auto block"
+              priority
+            />
+          </div>
         </div>
 
       </main>
