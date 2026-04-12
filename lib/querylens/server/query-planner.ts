@@ -489,6 +489,13 @@ export function planDeterministicQuery(
       }
     }
 
+    if (!primaryWindow) {
+      return {
+        fallbackReason:
+          "Try asking about an exact date, a date range, 'week of ...', 'this week', or 'last week' so QueryLens can resolve the analysis window safely.",
+      }
+    }
+
     return validateQueryPlan({
       datasetId,
       rawQuestion: question,
@@ -516,6 +523,13 @@ export function planDeterministicQuery(
     return {
       fallbackReason:
         "For a useful breakdown, apply either a region filter or a sector filter, not both at once.",
+    }
+  }
+
+  if (!primaryWindow) {
+    return {
+      fallbackReason:
+        "Try asking about an exact date, a date range, 'week of ...', 'this week', or 'last week' so QueryLens can resolve the analysis window safely.",
     }
   }
 
