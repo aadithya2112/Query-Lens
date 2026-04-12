@@ -1,7 +1,7 @@
 "use client"
 
 import { Send, Sparkles } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import TrendChart from "@/components/querylens/trend-chart"
 import {
@@ -225,6 +225,60 @@ function AssistantMessage({
   )
 }
 
+function ThinkingIndicator() {
+  const STAGES = [
+    "Parsing your question",
+    "Retrieving relevant context",
+    "Generating SQL queries",
+    "Executing against live sources",
+    "Analyzing results",
+    "Composing grounded answer",
+  ]
+
+  const [stageIndex, setStageIndex] = useState(0)
+
+  const advanceStage = useCallback(() => {
+    setStageIndex((current) =>
+      current < STAGES.length - 1 ? current + 1 : current,
+    )
+  }, [STAGES.length])
+
+  useEffect(() => {
+    const intervalId = setInterval(advanceStage, 2400)
+    return () => clearInterval(intervalId)
+  }, [advanceStage])
+
+  return (
+    <div className="ql-thinking-card px-5 py-5">
+      {/* header row */}
+      <div className="relative z-10 flex items-center gap-3">
+        <div className="ql-thinking-orb">
+          <div className="ql-thinking-dots">
+            <span className="ql-thinking-dot" />
+            <span className="ql-thinking-dot" />
+            <span className="ql-thinking-dot" />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm font-semibold text-foreground/90 ql-thinking-text">
+            QueryLens is thinking…
+          </p>
+          <div className="ql-thinking-stage">
+            <span className="ql-thinking-stage-dot" />
+            {STAGES[stageIndex]}
+          </div>
+        </div>
+      </div>
+
+      {/* progress shimmer bar */}
+      <div className="relative z-10 mt-4">
+        <div className="ql-thinking-bar" />
+      </div>
+    </div>
+  )
+}
+
 export default function ChatPanel({
   messages,
   isLoading,
@@ -268,12 +322,7 @@ export default function ChatPanel({
           ),
         )}
 
-        {isLoading && (
-          <div className="ql-enter rounded-[22px] border border-border px-4 py-4 text-sm text-muted-foreground">
-            QueryLens is assembling grounded evidence and checking the approved
-            live sources when needed.
-          </div>
-        )}
+        {isLoading && <ThinkingIndicator />}
 
         <div ref={scrollAnchorRef} />
       </div>
