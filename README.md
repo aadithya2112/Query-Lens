@@ -28,7 +28,7 @@ The product is built around the three pillars of the hackathon brief:
 
 ## Table of Contents
 
-- [🚀 Live Demo](#-live-demo)
+- [Live Demo](#-live-demo)
 - [Overview](#overview)
 - [Working Features](#working-features)
 - [Not Yet Implemented](#not-yet-implemented)
@@ -45,8 +45,6 @@ The product is built around the three pillars of the hackathon brief:
 - [Validation Commands](#validation-commands)
 - [Architecture Notes](#architecture-notes)
 - [Repository Structure](#repository-structure)
-- [Limitations](#limitations)
-- [Future Improvements](#future-improvements)
 - [Cleanup](#cleanup)
 
 ---
@@ -278,28 +276,6 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 ├─ .env.example
 └─ README.md
 ```
-
----
-
-## Limitations
-
-- The current milestone supports two analytical metrics plus one catalog/discovery path.
-- The sample portfolio is synthetic and designed for demo clarity, not statistical realism.
-- Interactive queries require Gemini to interpret supported questions. Deterministic parsing remains only as a developer and test harness mode.
-- Conversation memory is scoped to a browser session `chatId` and is not yet a multi-user product feature.
-- Database mode is meant for local Docker-backed use, not public deployment.
-- The current trace/debug details are lightweight and development-oriented.
-- Only one built-in dataset is supported today; reusable dataset onboarding is not implemented yet.
-
----
-
-## Future Improvements
-
-- Add reusable dataset onboarding for tabular datasets
-- Add `weekly briefing` to complete the fourth hackathon use case
-- Expand metric coverage beyond `cashflow_health_score`
-- Improve trace detail and retrieval transparency for richer trust UX
-- Add a submission/demo script with screenshots or recorded walkthrough
 
 ---
 
