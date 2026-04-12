@@ -32,7 +32,7 @@ function buildPostgresPreview(rows: WeeklyMetricRow[]): ResultTable {
     "accountCount",
   ]
 
-  const tableRows = rows.slice(0, 6).map((row) => ({
+  const tableRows = rows.map((row) => ({
     weekStart: row.weekStart,
     recordType: row.recordType,
     regionName: row.regionName,
@@ -45,7 +45,7 @@ function buildPostgresPreview(rows: WeeklyMetricRow[]): ResultTable {
     columns,
     rows: tableRows,
     totalRows: rows.length,
-    truncated: rows.length > tableRows.length,
+    truncated: false,
   }
 }
 
@@ -59,7 +59,7 @@ function buildMongoPreview(rows: ContextEvent[]): ResultTable {
     "summary",
   ]
 
-  const tableRows = rows.slice(0, 6).map((row) => ({
+  const tableRows = rows.map((row) => ({
     collection: row.collection,
     occurredAt: row.occurredAt,
     severity: row.severity,
@@ -72,7 +72,7 @@ function buildMongoPreview(rows: ContextEvent[]): ResultTable {
     columns,
     rows: tableRows,
     totalRows: rows.length,
-    truncated: rows.length > tableRows.length,
+    truncated: false,
   }
 }
 

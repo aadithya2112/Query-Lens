@@ -118,7 +118,9 @@ export default function TrendChart({ analysis, compact = false }: TrendChartProp
                 contentStyle={{
                   borderRadius: "16px",
                   border: "1px solid rgba(201, 167, 106, 0.18)",
-                  background: "rgba(12, 18, 27, 0.96)",
+                  background: "rgba(12, 18, 27, 0.6)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   color: "#f7fafc",
                 }}
                 formatter={(value: number) => [formatNumericValue(value), "Value"]}
@@ -175,11 +177,14 @@ export default function TrendChart({ analysis, compact = false }: TrendChartProp
                 contentStyle={{
                   borderRadius: "16px",
                   border: "1px solid rgba(201, 167, 106, 0.18)",
-                  background: "rgba(12, 18, 27, 0.96)",
+                  background: "rgba(12, 18, 27, 0.6)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   color: "#f7fafc",
                 }}
                 formatter={(value: number) => [formatNumericValue(value), chartSpec.yKey]}
                 labelFormatter={(label) => `${label}`}
+                cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}
               />
               <Bar
                 dataKey={chartSpec.yKey}
@@ -226,11 +231,14 @@ export default function TrendChart({ analysis, compact = false }: TrendChartProp
                 contentStyle={{
                   borderRadius: "16px",
                   border: "1px solid rgba(201, 167, 106, 0.18)",
-                  background: "rgba(12, 18, 27, 0.96)",
+                  background: "rgba(12, 18, 27, 0.6)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   color: "#f7fafc",
                 }}
                 formatter={(value: number) => [formatNumericValue(value), chartSpec.yKey]}
                 labelFormatter={(label) => `${label}`}
+                cursor={{ stroke: "rgba(255, 255, 255, 0.1)", strokeWidth: 1, strokeDasharray: "4 4" }}
               />
               <Area
                 dataKey={chartSpec.yKey}

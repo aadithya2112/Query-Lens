@@ -1,6 +1,8 @@
-import Link from "next/link"
+"use client"
 
-import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -45,29 +47,34 @@ function PreviewTable({
   description: string
   table: ResultTable
 }) {
+  const pageSize = 10
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.ceil(table.rows.length / pageSize)
+  
+  const startIndex = (currentPage - 1) * pageSize
+  const visibleRows = table.rows.slice(startIndex, startIndex + pageSize)
+
   return (
-    <section className="rounded-3xl border border-border bg-card/50 p-5">
-      <div className="flex items-start justify-between gap-3">
+    <section className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl p-6 lg:p-8 flex flex-col h-full shadow-2xl">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <h2 className="text-xl font-semibold text-white/90 tracking-tight">{title}</h2>
+          <p className="mt-1.5 text-sm text-[#86868b]">{description}</p>
         </div>
-        <span className="rounded-full border border-border px-2 py-1 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-          {table.truncated
-            ? `${table.rows.length} of ${table.totalRows}`
-            : `${table.totalRows} rows`}
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-white/70 whitespace-nowrap shadow-inner">
+          {table.totalRows} rows
         </span>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-border">
-        <div className="max-h-85 overflow-auto">
+      <div className="mt-6 flex-1 flex flex-col overflow-hidden rounded-2xl border border-white/10 shadow-inner bg-black/20">
+        <div className="flex-1 overflow-auto">
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background/95">
-              <TableRow className="hover:bg-transparent">
+            <TableHeader className="sticky top-0 z-10 bg-[#1c1c1e]/80 backdrop-blur-md border-b border-white/10">
+              <TableRow className="hover:bg-transparent border-b-transparent">
                 {table.columns.map((column) => (
                   <TableHead
                     key={column}
-                    className="h-10 px-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground"
+                    className="h-11 px-4 font-mono text-[11px] uppercase tracking-[0.16em] text-[#86868b]"
                   >
                     {column}
                   </TableHead>
@@ -75,14 +82,17 @@ function PreviewTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {table.rows.map((row, rowIndex) => (
-                <TableRow key={`${title}-row-${rowIndex}`}>
+              {visibleRows.map((row, rowIndex) => (
+                <TableRow 
+                  key={`${title}-row-${startIndex + rowIndex}`}
+                  className="hover:bg-white/5 border-b-white/5 transition-colors"
+                >
                   {table.columns.map((column) => (
                     <TableCell
-                      key={`${title}-${rowIndex}-${column}`}
-                      className="px-3 py-2"
+                      key={`${title}-${startIndex + rowIndex}-${column}`}
+                      className="px-4 py-3"
                     >
-                      <span className="block max-w-95 truncate text-sm text-foreground">
+                      <span className="block max-w-95 truncate text-sm text-white/80 font-medium">
                         {formatValue(row[column] ?? null)}
                       </span>
                     </TableCell>
@@ -92,6 +102,37 @@ function PreviewTable({
             </TableBody>
           </Table>
         </div>
+        
+        {totalPages > 1 && (
+          <div className="border-t border-white/10 bg-white/5 p-3 flex items-center justify-between">
+            <p className="text-xs text-[#86868b] px-2 font-medium">
+              Viewing {startIndex + 1} - {Math.min(startIndex + pageSize, table.rows.length)}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs font-semibold text-white/90 min-w-[50px] text-center">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -99,44 +140,45 @@ function PreviewTable({
 
 export default function SourceContextView({ payload }: SourceContextViewProps) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/70">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-white/30 pb-20">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-              QueryLens
+            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#86868b]">
+              QueryLens PRO
             </p>
-            <h1 className="mt-1 text-xl font-semibold">Source context</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/90">Source Context</h1>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/demo">
+          <Button asChild variant="outline" size="sm" className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white transition-all backdrop-blur-lg">
+            <Link href="/demo" className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
-              Back to workspace
+              <span className="font-medium">Back to Workspace</span>
             </Link>
           </Button>
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6">
-        <section className="rounded-3xl border border-border bg-card/50 p-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-base font-semibold">Data summary</h2>
-            <span className="rounded-full border border-border px-2 py-1 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+      <main className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 sm:px-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        
+        <section className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+          <div className="flex flex-wrap items-center gap-4">
+            <h2 className="text-xl font-semibold tracking-tight text-white/90">Data Summary</h2>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-400/90 shadow-inner">
               {payload.sourceMode === "database"
                 ? "Live database mode"
                 : "Fixture mode"}
             </span>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
             {payload.summaries.map((summary) => (
               <article
                 key={summary.title}
-                className="rounded-2xl border border-border bg-background/60 p-4"
+                className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-transform hover:bg-white/10"
               >
-                <p className="text-sm font-semibold text-foreground">
+                <p className="text-sm font-semibold text-white/90 tracking-tight">
                   {summary.title}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                <p className="mt-2 text-sm leading-relaxed text-[#86868b]">
                   {summary.description}
                 </p>
               </article>
@@ -144,21 +186,21 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-border bg-card/50 p-5">
-          <h2 className="text-base font-semibold">Connected sources</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <section className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+          <h2 className="text-xl font-semibold tracking-tight text-white/90">Connected Sources</h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
             {payload.sourceHealth.map((source) => (
               <article
                 key={source.id}
-                className="rounded-2xl border border-border bg-background/60 p-4"
+                className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-transform hover:bg-white/10"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">{source.name}</p>
-                  <span className="rounded-full border border-border px-2 py-1 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  <p className="text-sm font-semibold text-white/90">{source.name}</p>
+                  <span className="rounded-full border border-white/10 bg-[#27c93f]/20 text-[#27c93f] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em]">
                     {source.status}
                   </span>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                <p className="mt-3 text-sm leading-relaxed text-[#86868b]">
                   {source.detail}
                 </p>
               </article>
@@ -166,28 +208,28 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <article className="rounded-3xl border border-border bg-card/50 p-5">
-            <h2 className="text-base font-semibold">PostgreSQL objects</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+        <section className="grid gap-8 lg:grid-cols-2">
+          <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+            <h2 className="text-xl font-semibold tracking-tight text-white/90">PostgreSQL Objects</h2>
+            <p className="mt-2 text-sm text-[#86868b]">
               Tables that power portfolio facts and metric aggregation.
             </p>
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-6 space-y-4">
               {payload.postgresSchema.map((table) => (
                 <li
                   key={table.name}
-                  className="rounded-2xl border border-border bg-background/60 p-4"
+                  className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-colors hover:bg-white/10"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold">{table.name}</p>
-                    <span className="font-mono text-xs text-muted-foreground">
+                    <p className="text-sm font-semibold tracking-tight text-white/90">{table.name}</p>
+                    <span className="font-mono text-xs text-[#86868b]">
                       {table.rowCount.toLocaleString()} rows
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-2 text-sm text-[#86868b] leading-relaxed">
                     {table.description}
                   </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-[#86868b] bg-black/20 p-2 rounded-lg border border-white/5">
                     {table.columns.slice(0, 6).join(", ")}
                     {table.columns.length > 6 ? " ..." : ""}
                   </p>
@@ -196,27 +238,27 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
             </ul>
           </article>
 
-          <article className="rounded-3xl border border-border bg-card/50 p-5">
-            <h2 className="text-base font-semibold">MongoDB objects</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+          <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+            <h2 className="text-xl font-semibold tracking-tight text-white/90">MongoDB Objects</h2>
+            <p className="mt-2 text-sm text-[#86868b]">
               Collections used as qualitative context alongside metric shifts.
             </p>
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-6 space-y-4">
               {payload.mongoSchema.map((collection) => (
                 <li
                   key={collection.name}
-                  className="rounded-2xl border border-border bg-background/60 p-4"
+                  className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-colors hover:bg-white/10"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold">{collection.name}</p>
-                    <span className="font-mono text-xs text-muted-foreground">
+                    <p className="text-sm font-semibold tracking-tight text-white/90">{collection.name}</p>
+                    <span className="font-mono text-xs text-[#86868b]">
                       {collection.rowCount.toLocaleString()} docs
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-2 text-sm text-[#86868b] leading-relaxed">
                     {collection.description}
                   </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-[#86868b] bg-black/20 p-2 rounded-lg border border-white/5">
                     {collection.columns.slice(0, 6).join(", ")}
                     {collection.columns.length > 6 ? " ..." : ""}
                   </p>
@@ -226,14 +268,14 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           </article>
         </section>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-8 mt-4">
           <PreviewTable
-            title="PostgreSQL preview"
+            title="PostgreSQL Context Preview"
             description="A quick sample from weekly portfolio facts used in analysis responses."
             table={payload.postgresPreview}
           />
           <PreviewTable
-            title="MongoDB preview"
+            title="MongoDB Context Preview"
             description="A quick sample from contextual event documents used for corroboration."
             table={payload.mongoPreview}
           />

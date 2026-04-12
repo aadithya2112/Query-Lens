@@ -107,11 +107,11 @@ function QueryRunsDisclosure({ analysis }: { analysis: Phase1AnalysisResponse })
   }
 
   return (
-    <details className="mt-4 rounded-[22px] border border-border bg-background/30 px-4 py-4">
-      <summary className="cursor-pointer list-none font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors">
+    <div className="mt-4 rounded-[22px] border border-border bg-background/30 px-4 py-4">
+      <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-4">
         Queries used
-      </summary>
-      <div className="mt-4 space-y-4">
+      </div>
+      <div className="space-y-4">
         {analysis.queryRuns.map((queryRun) => (
           <div
             key={queryRun.id}
@@ -139,7 +139,7 @@ function QueryRunsDisclosure({ analysis }: { analysis: Phase1AnalysisResponse })
           </div>
         ))}
       </div>
-    </details>
+    </div>
   )
 }
 
@@ -205,7 +205,7 @@ function AssistantMessage({
               Conversation context was used to interpret this reply.
             </p>
           )}
-          {analysis.supportedFollowUps.length > 0 && (
+          {analysis.supportedFollowUps.length > 0 && analysis.confidence >= 50 && !message.text.includes("could not complete that custom analysis safely") && (
             <div className="mt-4 flex flex-wrap gap-2">
               {analysis.supportedFollowUps.map((followUp) => (
                 <button
