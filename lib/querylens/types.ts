@@ -5,6 +5,7 @@ export type MetricId =
   | "dataset_catalog"
   | "custom_query_result"
 export type SupportedTimeframe = "this_week" | "last_week"
+export type PlannedTimeframe = SupportedTimeframe | "custom"
 export type QueryIntent =
   | "what_changed"
   | "breakdown"
@@ -32,6 +33,14 @@ export type ContextCollection =
 export interface ScopeFilter {
   region?: string
   sector?: string
+}
+
+export interface DateWindow {
+  startDate: string
+  endDate: string
+  dayCount: number
+  label: string
+  relativeTimeframe?: SupportedTimeframe
 }
 
 export interface MetricDefinition {
