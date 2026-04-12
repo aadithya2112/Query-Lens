@@ -275,6 +275,16 @@ export default function Workspace({
           <ResizablePanel
             defaultSize={65}
             minSize={40}
+            className="h-full min-h-0 overflow-y-auto bg-muted/10"
+          >
+            <div className="h-full overflow-y-auto">
+              <EvidencePanel analysis={activeAnalysis} />
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel
+            defaultSize={35}
+            minSize={25}
             className="flex h-full min-h-0 flex-col overflow-hidden"
           >
             <ChatPanel
@@ -283,16 +293,6 @@ export default function Workspace({
               onSend={handleSend}
               suggestedPrompts={suggestedPrompts}
             />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel
-            defaultSize={35}
-            minSize={25}
-            className="h-full min-h-0 overflow-y-auto bg-muted/10"
-          >
-            <div className="h-full overflow-y-auto">
-              <EvidencePanel analysis={activeAnalysis} />
-            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
