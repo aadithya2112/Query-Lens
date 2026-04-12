@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "load:sample-data": "tsx scripts/seed-phase1.ts",
+    "load:sample-data": "tsx --env-file .env scripts/seed-phase1.ts",
     "seed": "bun run load:sample-data",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"
