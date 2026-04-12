@@ -1,6 +1,6 @@
-# QueryLens
+# QueryLens - Giga Devs
 
-> **NatWest Group Hackathon — Talk to Data: Seamless Self-Service Intelligence**
+> **NatWest Group Hackathon — Talk to Data: Seamless Self-Service Intelligence - Giga Devs**
 
 ---
 
@@ -52,7 +52,7 @@ The product is built around the three pillars of the hackathon brief:
 
 QueryLens addresses the core problem in the hackathon brief: **many people struggle to get quick, accurate, and trustworthy answers from data** because of too many steps, unclear terminology, and lack of confidence in the results.
 
-The current shipped milestone is intentionally focused on one strong local demo dataset rather than a broad but partial product. The app is designed for a short local demo where a reviewer can boot the stack, run a few sample-dataset questions, and understand both the product story and the supporting architecture quickly.
+The current shipped milestone is intentionally focused on one strong local demo dataset rather than a broad but partial product. The app is designed for a short local demo where a reviewer can boot the stack, run a few sample-dataset questions, and understand both the product story and the supporting architecture quickly, works with both SQL and No SQL.
 
 The four use cases from the hackathon spec are all represented:
 
@@ -158,8 +158,14 @@ Use the sample prompts or ask:
 
 ```text
 What data is currently stored?
+```
+```text
 Why did SME cashflow health drop last week?
+```
+```text
 What makes up at-risk accounts by region and sector last week?
+```
+```text
 Compare cashflow health this week vs last week
 ```
 
