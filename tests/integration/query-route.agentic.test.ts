@@ -10,6 +10,10 @@ const {
   const dataAccess = {
     sourceMode: "database" as "database" | "fixture",
     listWeeklyMetrics: vi.fn(async () => []),
+    getDateCoverage: vi.fn(async () => ({
+      startDate: "2026-01-12",
+      endDate: "2026-04-05",
+    })),
     listWeeklyAccountStress: vi.fn(async () => []),
     listContextEvents: vi.fn(async () => []),
     getSourceHealth: vi.fn(async () => []),
@@ -105,7 +109,8 @@ describe("/api/query agentic fallback", () => {
         {
           name: "reject_analytics_query_plan",
           args: {
-            reason: "This needs a custom live query rather than a built-in intent.",
+            reason:
+              "This needs a custom live query rather than a built-in intent.",
           },
         },
       ],
@@ -155,7 +160,8 @@ describe("/api/query agentic fallback", () => {
               queryRunId: "query-run-1",
               type: "line",
               title: "Portfolio cashflow health trend",
-              explanation: "A line chart shows the week-over-week direction clearly.",
+              explanation:
+                "A line chart shows the week-over-week direction clearly.",
               labelKey: "week_start",
               valueKey: "cashflow_health_score",
             },
@@ -195,7 +201,8 @@ describe("/api/query agentic fallback", () => {
         {
           name: "reject_analytics_query_plan",
           args: {
-            reason: "This needs a custom live query rather than a built-in intent.",
+            reason:
+              "This needs a custom live query rather than a built-in intent.",
           },
         },
       ],
@@ -216,7 +223,9 @@ describe("/api/query agentic fallback", () => {
 
     expect(response.status).toBe(200)
     expect(payload.fallback).toBe(true)
-    expect(payload.summary).toContain("needs QueryLens connected to live Postgres and MongoDB")
+    expect(payload.summary).toContain(
+      "needs QueryLens connected to live Postgres and MongoDB",
+    )
     expect(geminiChatSendMock).not.toHaveBeenCalled()
   })
 })
