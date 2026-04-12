@@ -14,7 +14,7 @@ describe("dataset definitions", () => {
     expect(dataset.supportedIntentIds).toContain("what_changed")
     expect(dataset.supportedIntentIds).toContain("breakdown")
     expect(dataset.supportedIntentIds).toContain("compare")
-    expect(dataset.supportedTimeframes).toEqual(["this_week", "last_week"])
+    expect(dataset.supportedTimeframes).toEqual(["this_week", "last_week", "custom"])
     expect(dataset.dimensions).toEqual(["portfolio", "region", "sector"])
   })
 

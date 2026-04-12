@@ -14,11 +14,23 @@ describe("query planner", () => {
       datasetId: "sme_portfolio",
       intent: "what_changed",
       metricId: "cashflow_health_score",
+      dateWindow: {
+        startDate: "2026-03-30",
+        endDate: "2026-04-05",
+      },
       timeframe: "last_week",
       scopeDimensions: ["portfolio"],
       comparisonWindow: {
         timeframe: "last_week",
         comparisonBasis: "prior_period",
+        targetWindow: {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+        },
+        comparisonDateWindow: {
+          startDate: "2026-03-23",
+          endDate: "2026-03-29",
+        },
       },
     })
   })
@@ -44,6 +56,10 @@ describe("query planner", () => {
       intent: "breakdown",
       metricId: "at_risk_account_count",
       timeframe: "last_week",
+      dateWindow: {
+        startDate: "2026-03-30",
+        endDate: "2026-04-05",
+      },
       breakdownDimension: "region_sector",
       scopeDimensions: ["portfolio"],
     })
@@ -76,6 +92,14 @@ describe("query planner", () => {
         mode: "timeframe",
         leftTimeframe: "this_week",
         rightTimeframe: "last_week",
+        leftWindow: {
+          startDate: "2026-04-06",
+          endDate: "2026-04-12",
+        },
+        rightWindow: {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+        },
         leftLabel: "This week",
         rightLabel: "Last week",
       },
@@ -95,6 +119,10 @@ describe("query planner", () => {
         mode: "peer",
         dimension: "region",
         selectedTimeframe: "last_week",
+        selectedWindow: {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+        },
         leftLabel: "North West",
         rightLabel: "London & South East",
       },
@@ -114,6 +142,10 @@ describe("query planner", () => {
         mode: "peer",
         dimension: "sector",
         selectedTimeframe: "this_week",
+        selectedWindow: {
+          startDate: "2026-04-06",
+          endDate: "2026-04-12",
+        },
         leftLabel: "Hospitality",
         rightLabel: "Retail",
       },
@@ -144,7 +176,64 @@ describe("query planner", () => {
     const result = planDeterministicQuery("Why did cashflow health drop last month?")
 
     expect(result.plan).toBeUndefined()
-    expect(result.fallbackReason).toContain("this week")
+    expect(result.fallbackReason).toContain("exact date")
+  })
+
+  it("creates a custom-range what-changed plan when the intent is the same but the dates change", () => {
+    const result = planDeterministicQuery(
+      "Why did SME cashflow health drop from Apr 2, 2026 to Apr 8, 2026?"
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "what_changed",
+      timeframe: "custom",
+      dateWindow: {
+        startDate: "2026-04-02",
+        endDate: "2026-04-08",
+        dayCount: 7,
+      },
+      comparisonWindow: {
+        timeframe: "custom",
+        comparisonDateWindow: {
+          startDate: "2026-03-26",
+          endDate: "2026-04-01",
+          dayCount: 7,
+        },
+      },
+    })
+  })
+
+  it("creates an explicit custom timeframe compare plan with equal-length windows", () => {
+    const result = planDeterministicQuery(
+      "Compare cashflow health from Apr 2, 2026 to Apr 8, 2026 vs from Mar 26, 2026 to Apr 1, 2026."
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "compare",
+      timeframe: "custom",
+      compareSpec: {
+        mode: "timeframe",
+        leftWindow: {
+          startDate: "2026-04-02",
+          endDate: "2026-04-08",
+          dayCount: 7,
+        },
+        rightWindow: {
+          startDate: "2026-03-26",
+          endDate: "2026-04-01",
+          dayCount: 7,
+        },
+      },
+    })
+  })
+
+  it("rejects explicit compare windows with unequal lengths", () => {
+    const result = planDeterministicQuery(
+      "Compare cashflow health from Apr 2, 2026 to Apr 8, 2026 vs from Mar 30, 2026 to Apr 1, 2026."
+    )
+
+    expect(result.plan).toBeUndefined()
+    expect(result.fallbackReason).toContain("same length")
   })
 
   it("validates plan support against the built-in dataset definition", () => {
@@ -153,12 +242,32 @@ describe("query planner", () => {
       rawQuestion: "Compare this week and last week",
       intent: "what_changed",
       metricId: "cashflow_health_score",
+      dateWindow: {
+        startDate: "2026-03-30",
+        endDate: "2026-04-05",
+        dayCount: 7,
+        label: "Mar 30 - Apr 5, 2026",
+        relativeTimeframe: "last_week",
+      },
       timeframe: "last_week",
       scope: {},
       scopeDimensions: ["portfolio"],
       comparisonWindow: {
         timeframe: "last_week",
         comparisonBasis: "prior_period",
+        targetWindow: {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+          dayCount: 7,
+          label: "Mar 30 - Apr 5, 2026",
+          relativeTimeframe: "last_week",
+        },
+        comparisonDateWindow: {
+          startDate: "2026-03-23",
+          endDate: "2026-03-29",
+          dayCount: 7,
+          label: "Mar 23 - 29, 2026",
+        },
       },
     })
 
@@ -171,12 +280,26 @@ describe("query planner", () => {
       rawQuestion: "Break down cashflow health by region",
       intent: "breakdown",
       metricId: "cashflow_health_score",
+      dateWindow: {
+        startDate: "2026-03-30",
+        endDate: "2026-04-05",
+        dayCount: 7,
+        label: "Mar 30 - Apr 5, 2026",
+        relativeTimeframe: "last_week",
+      },
       timeframe: "last_week",
       scope: {},
       scopeDimensions: ["portfolio"],
       comparisonWindow: {
         timeframe: "last_week",
         comparisonBasis: "prior_period",
+        targetWindow: {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+          dayCount: 7,
+          label: "Mar 30 - Apr 5, 2026",
+          relativeTimeframe: "last_week",
+        },
       },
       breakdownDimension: "region",
     })
@@ -191,12 +314,33 @@ describe("query planner", () => {
       rawQuestion: "Compare cashflow health this week vs last week",
       intent: "compare",
       metricId: "cashflow_health_score",
+      dateWindow: {
+        startDate: "2026-04-06",
+        endDate: "2026-04-12",
+        dayCount: 7,
+        label: "Apr 6 - 12, 2026",
+        relativeTimeframe: "this_week",
+      },
       timeframe: "this_week",
       scope: {},
       scopeDimensions: ["portfolio"],
       comparisonWindow: {
         timeframe: "this_week",
         comparisonBasis: "prior_period",
+        targetWindow: {
+          startDate: "2026-04-06",
+          endDate: "2026-04-12",
+          dayCount: 7,
+          label: "Apr 6 - 12, 2026",
+          relativeTimeframe: "this_week",
+        },
+        comparisonDateWindow: {
+          startDate: "2026-03-30",
+          endDate: "2026-04-05",
+          dayCount: 7,
+          label: "Mar 30 - Apr 5, 2026",
+          relativeTimeframe: "last_week",
+        },
       },
     })
 

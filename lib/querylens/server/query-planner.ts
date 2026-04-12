@@ -1,3 +1,8 @@
+import {
+  buildPriorEqualDateWindow,
+  getRelativeDateWindow,
+  resolveQuestionDateWindows,
+} from "@/lib/querylens/date-windows"
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { getDatasetDefinition, getDefaultDatasetId } from "@/lib/querylens/datasets"
 import {
@@ -9,26 +14,13 @@ import type {
   BreakdownDimension,
   CompareDimension,
   CompareSpec,
+  DateWindow,
   DiscoveryFocus,
+  PlannedTimeframe,
   QueryPlanResult,
   ScopeFilter,
   StructuredQueryPlan,
-  SupportedTimeframe,
 } from "@/lib/querylens/types"
-
-function resolveTimeframe(question: string): SupportedTimeframe | undefined {
-  const normalizedQuestion = normalizePhase1Text(question)
-
-  if (normalizedQuestion.includes("last week")) {
-    return "last_week"
-  }
-
-  if (normalizedQuestion.includes("this week")) {
-    return "this_week"
-  }
-
-  return undefined
-}
 
 function resolveScopeDimensions(scope: ScopeFilter) {
   if (scope.region && scope.sector) {
@@ -133,8 +125,32 @@ function resolveBreakdownDimension(
   return "region_sector"
 }
 
-function resolveTimeframeLabel(timeframe: SupportedTimeframe) {
-  return timeframe === "this_week" ? "This week" : "Last week"
+function resolvePlanningTimeframe(window: DateWindow): PlannedTimeframe {
+  return window.relativeTimeframe ?? "custom"
+}
+
+function buildPlanComparisonWindow(
+  targetWindow: DateWindow,
+  comparisonDateWindow?: DateWindow
+) {
+  return {
+    timeframe: resolvePlanningTimeframe(targetWindow),
+    comparisonBasis: "prior_period" as const,
+    targetWindow,
+    comparisonDateWindow,
+  }
+}
+
+function getWindowDisplayLabel(window: DateWindow) {
+  if (window.relativeTimeframe === "this_week") {
+    return "This week"
+  }
+
+  if (window.relativeTimeframe === "last_week") {
+    return "Last week"
+  }
+
+  return window.label
 }
 
 function parseCompareSubjects(question: string) {
@@ -208,7 +224,11 @@ function parseCompareSubjects(question: string) {
   return {}
 }
 
-function buildTimeframeCompareSpec(scope: ScopeFilter): CompareSpec | QueryPlanResult {
+function buildTimeframeCompareSpec(
+  scope: ScopeFilter,
+  leftWindow: DateWindow,
+  rightWindow: DateWindow
+): CompareSpec | QueryPlanResult {
   if (scope.region && scope.sector) {
     return {
       fallbackReason:
@@ -216,9 +236,16 @@ function buildTimeframeCompareSpec(scope: ScopeFilter): CompareSpec | QueryPlanR
     }
   }
 
+  if (leftWindow.dayCount !== rightWindow.dayCount) {
+    return {
+      fallbackReason:
+        "Timeframe compare needs two windows of the same length so QueryLens can keep the score comparison grounded.",
+    }
+  }
+
   const dataset = getSampleDataset()
-  const leftLabel = "This week"
-  const rightLabel = "Last week"
+  const leftLabel = getWindowDisplayLabel(leftWindow)
+  const rightLabel = getWindowDisplayLabel(rightWindow)
 
   const scopeLabel = scope.region
     ? dataset.regions.find((region) => region.id === scope.region)?.name
@@ -228,8 +255,10 @@ function buildTimeframeCompareSpec(scope: ScopeFilter): CompareSpec | QueryPlanR
 
   return {
     mode: "timeframe",
-    leftTimeframe: "this_week",
-    rightTimeframe: "last_week",
+    leftTimeframe: leftWindow.relativeTimeframe,
+    rightTimeframe: rightWindow.relativeTimeframe,
+    leftWindow,
+    rightWindow,
     leftScope: scope,
     rightScope: scope,
     leftLabel: scopeLabel ? `${scopeLabel} · ${leftLabel}` : leftLabel,
@@ -239,7 +268,7 @@ function buildTimeframeCompareSpec(scope: ScopeFilter): CompareSpec | QueryPlanR
 
 function buildPeerCompareSpec(
   question: string,
-  timeframe: SupportedTimeframe,
+  selectedWindow: DateWindow,
   scopeOverride?: ScopeFilter
 ): CompareSpec | QueryPlanResult {
   if (scopeOverride?.region || scopeOverride?.sector) {
@@ -271,7 +300,8 @@ function buildPeerCompareSpec(
   return {
     mode: "peer",
     dimension: parsed.dimension as CompareDimension,
-    selectedTimeframe: timeframe,
+    selectedTimeframe: selectedWindow.relativeTimeframe,
+    selectedWindow,
     leftScope: parsed.leftScope,
     rightScope: parsed.rightScope,
     leftLabel: parsed.leftLabel,
@@ -342,6 +372,10 @@ export function planDeterministicQuery(
   const datasetId = getDefaultDatasetId()
   const normalizedQuestion = normalizePhase1Text(question)
   const metric = resolveMetric(question)
+  const resolvedDateWindows = resolveQuestionDateWindows(question)
+  const primaryWindow = resolvedDateWindows.primaryWindow
+  const compareWindows = resolvedDateWindows.compareWindows
+  const discoveryWindow = getRelativeDateWindow("this_week")
 
   if (isDiscoveryIntent(normalizedQuestion)) {
     return validateQueryPlan({
@@ -349,13 +383,11 @@ export function planDeterministicQuery(
       rawQuestion: question,
       intent: "discovery",
       metricId: "dataset_catalog",
+      dateWindow: discoveryWindow,
       timeframe: "this_week",
       scope: {},
       scopeDimensions: ["portfolio"],
-      comparisonWindow: {
-        timeframe: "this_week",
-        comparisonBasis: "prior_period",
-      },
+      comparisonWindow: buildPlanComparisonWindow(discoveryWindow),
       discoveryFocus: resolveDiscoveryFocus(normalizedQuestion),
     })
   }
@@ -367,12 +399,10 @@ export function planDeterministicQuery(
     }
   }
 
-  const timeframe = resolveTimeframe(question)
-
-  if (!timeframe) {
+  if (!primaryWindow && !compareWindows) {
     return {
       fallbackReason:
-        "Try asking about 'this week' or 'last week' so QueryLens can compare the current weekly windows safely.",
+        "Try asking about an exact date, a date range, 'week of ...', 'this week', or 'last week' so QueryLens can resolve the analysis window safely.",
     }
   }
 
@@ -388,36 +418,52 @@ export function planDeterministicQuery(
 
   if (metric.id === "cashflow_health_score") {
     if (isCompareIntent(normalizedQuestion)) {
-      const timeframeCompare =
-        normalizedQuestion.includes("this week vs last week") ||
-        normalizedQuestion.includes("this week versus last week") ||
-        normalizedQuestion.includes("last week vs this week") ||
-        normalizedQuestion.includes("last week versus this week")
-
-      const compareSpec = timeframeCompare
-        ? buildTimeframeCompareSpec(scope)
-        : buildPeerCompareSpec(question, timeframe, scopeOverride)
+      const timeframeCompare = Boolean(compareWindows)
+      const compareSpec = compareWindows
+        ? buildTimeframeCompareSpec(
+            scope,
+            compareWindows.leftWindow,
+            compareWindows.rightWindow
+          )
+        : primaryWindow
+          ? buildPeerCompareSpec(question, primaryWindow, scopeOverride)
+          : {
+              fallbackReason:
+                "Compare questions need either two explicit date windows or one selected window for the peer comparison.",
+            }
 
       if ("fallbackReason" in compareSpec) {
         return compareSpec
       }
 
       const resolvedCompareSpec = compareSpec as CompareSpec
+      const planDateWindow = compareWindows?.leftWindow ?? primaryWindow
+      const planComparisonDateWindow =
+        compareWindows?.rightWindow ??
+        (primaryWindow ? buildPriorEqualDateWindow(primaryWindow) : undefined)
+
+      if (!planDateWindow) {
+        return {
+          fallbackReason:
+            "Compare questions need either two explicit date windows or one selected window for the peer comparison.",
+        }
+      }
 
       return validateQueryPlan({
         datasetId,
         rawQuestion: question,
         intent: "compare",
         metricId: "cashflow_health_score",
-        timeframe: timeframeCompare ? "this_week" : timeframe,
+        dateWindow: planDateWindow,
+        timeframe: resolvePlanningTimeframe(planDateWindow),
         scope: timeframeCompare ? scope : {},
         scopeDimensions: timeframeCompare
           ? [...resolveScopeDimensions(scope)]
           : [resolvedCompareSpec.dimension ?? "portfolio"],
-        comparisonWindow: {
-          timeframe: timeframeCompare ? "this_week" : timeframe,
-          comparisonBasis: "prior_period",
-        },
+        comparisonWindow: buildPlanComparisonWindow(
+          planDateWindow,
+          planComparisonDateWindow
+        ),
         compareSpec: resolvedCompareSpec,
       })
     }
@@ -434,13 +480,14 @@ export function planDeterministicQuery(
       rawQuestion: question,
       intent: "what_changed",
       metricId: "cashflow_health_score",
-      timeframe,
+      dateWindow: primaryWindow,
+      timeframe: resolvePlanningTimeframe(primaryWindow),
       scope,
       scopeDimensions: [...resolveScopeDimensions(scope)],
-      comparisonWindow: {
-        timeframe,
-        comparisonBasis: "prior_period",
-      },
+      comparisonWindow: buildPlanComparisonWindow(
+        primaryWindow,
+        buildPriorEqualDateWindow(primaryWindow)
+      ),
     })
   }
 
@@ -463,13 +510,14 @@ export function planDeterministicQuery(
     rawQuestion: question,
     intent: "breakdown",
     metricId: "at_risk_account_count",
-    timeframe,
+    dateWindow: primaryWindow,
+    timeframe: resolvePlanningTimeframe(primaryWindow),
     scope,
     scopeDimensions: [...resolveScopeDimensions(scope)],
-    comparisonWindow: {
-      timeframe,
-      comparisonBasis: "prior_period",
-    },
+    comparisonWindow: buildPlanComparisonWindow(
+      primaryWindow,
+      buildPriorEqualDateWindow(primaryWindow)
+    ),
     breakdownDimension: resolveBreakdownDimension(normalizedQuestion, scope),
   })
 }

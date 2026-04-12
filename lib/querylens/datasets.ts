@@ -16,7 +16,7 @@ const BUILT_IN_DATASET: DatasetDefinition = {
   dimensions: ["portfolio", "region", "sector"],
   metrics: getMetricManifest().metrics,
   supportedIntentIds: ["what_changed", "breakdown", "compare", "discovery"],
-  supportedTimeframes: ["this_week", "last_week"],
+  supportedTimeframes: ["this_week", "last_week", "custom"],
 }
 
 export function getDefaultDatasetId(): DatasetId {

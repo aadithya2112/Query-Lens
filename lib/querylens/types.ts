@@ -56,7 +56,7 @@ export interface MetricDefinition {
     overdueExposure: number
   }
   supportedDimensions: string[]
-  supportedTimeframes: string[]
+  supportedTimeframes: PlannedTimeframe[]
   synonyms: string[]
   exampleQuestions: string[]
 }
@@ -72,7 +72,7 @@ export interface DatasetDefinition {
   dimensions: Array<"portfolio" | "region" | "sector">
   metrics: MetricDefinition[]
   supportedIntentIds: string[]
-  supportedTimeframes: SupportedTimeframe[]
+  supportedTimeframes: PlannedTimeframe[]
 }
 
 export interface Region {
@@ -172,8 +172,10 @@ export interface SampleDataset {
 export type SeedDataset = SampleDataset
 
 export interface ComparisonWindow {
-  timeframe: SupportedTimeframe
+  timeframe: PlannedTimeframe
   comparisonBasis: "prior_period"
+  targetWindow: DateWindow
+  comparisonDateWindow?: DateWindow
 }
 
 export interface CompareSpec {
@@ -182,6 +184,9 @@ export interface CompareSpec {
   leftTimeframe?: SupportedTimeframe
   rightTimeframe?: SupportedTimeframe
   selectedTimeframe?: SupportedTimeframe
+  leftWindow?: DateWindow
+  rightWindow?: DateWindow
+  selectedWindow?: DateWindow
   leftScope: ScopeFilter
   rightScope: ScopeFilter
   leftLabel: string
@@ -193,7 +198,8 @@ export interface StructuredQueryPlan {
   rawQuestion: string
   intent: QueryIntent
   metricId: MetricId
-  timeframe: SupportedTimeframe
+  timeframe: PlannedTimeframe
+  dateWindow: DateWindow
   scope: ScopeFilter
   scopeDimensions: ScopeDimension[]
   comparisonWindow: ComparisonWindow
