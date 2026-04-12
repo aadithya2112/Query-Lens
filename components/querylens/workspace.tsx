@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { startTransition, useEffect, useState } from "react"
 
-import { Activity, Settings2 } from "lucide-react"
+import { Activity, Github, Home, Settings2 } from "lucide-react"
 
 import ChatPanel, {
   type ConversationMessage,
@@ -237,14 +237,30 @@ export default function Workspace({
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
-          <p className="hidden text-sm text-muted-foreground md:inline-block">
+        <div className="flex items-center gap-1">
+          <p className="hidden text-sm text-muted-foreground md:inline-block mr-2">
             Metric Focus:{" "}
             <span className="font-medium text-foreground">
               {activeMetricLabel}
             </span>
           </p>
-          <div className="h-4 w-px bg-border hidden md:block" />
+          <div className="h-4 w-px bg-border hidden md:block mr-1" />
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+            <Link href="/" aria-label="Home">
+              <Home className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+            <a
+              href="https://github.com/aadithya2112/Query-Lens"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="GitHub"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+          </Button>
+          <div className="h-4 w-px bg-border" />
           <Button asChild variant="ghost" size="sm" className="gap-2">
             <Link href="/explorer">
               <Settings2 className="h-4 w-4" />
