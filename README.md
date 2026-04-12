@@ -31,7 +31,6 @@ The product is built around the three pillars of the hackathon brief:
 - [Live Demo](#-live-demo)
 - [Overview](#overview)
 - [Working Features](#working-features)
-- [Not Yet Implemented](#not-yet-implemented)
 - [Tech Stack](#tech-stack)
 - [Recommended Local Demo Path](#recommended-local-demo-path)
   - [1. Install dependencies](#1-install-dependencies)
@@ -83,16 +82,6 @@ The four use cases from the hackathon spec are all represented:
 - Visible trust artifacts: weekly trend, ranked drivers, evidence cards, assumptions, and confidence
 - Dockerized local stack with reproducible sample data
 - Automated coverage with `Vitest` and a Playwright browser smoke test
-
----
-
-## Not Yet Implemented
-
-These are intentionally deferred and should not be treated as shipped:
-
-- `weekly briefing`
-- arbitrary file upload or open-ended source ingestion
-- raw SQL as a primary user workflow
 
 ---
 
