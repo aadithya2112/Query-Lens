@@ -1,17 +1,12 @@
 import { expect, test } from "@playwright/test"
 
-test("renders the explorer route and swaps previews from the SQL workbench", async ({
+test("renders the source context route with source summaries and previews", async ({
   page,
 }) => {
   await page.goto("/explorer")
 
-  await expect(page.getByText("Database explorer")).toBeVisible()
-  await expect(page.getByText("Unified source browser")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Run mock query" })).toBeVisible()
-
-  await page.getByRole("button", { name: "Order status summary" }).click()
-  await page.getByRole("button", { name: "Run mock query" }).click()
-
-  await expect(page.getByText("SQL result")).toBeVisible()
-  await expect(page.getByText("order_status_rollup")).toBeVisible()
+  await expect(page.getByText("Source context")).toBeVisible()
+  await expect(page.getByText("Connected sources")).toBeVisible()
+  await expect(page.getByText("PostgreSQL preview")).toBeVisible()
+  await expect(page.getByText("MongoDB preview")).toBeVisible()
 })

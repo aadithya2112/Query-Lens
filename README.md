@@ -53,7 +53,7 @@ This is the best way to run the product exactly as intended.
 ### 1. Install dependencies
 
 ```bash
-bun install
+npm install
 ```
 
 ### 2. Create local environment config
@@ -78,7 +78,7 @@ Interactive `/api/query` requests now require Gemini. Set:
 ### 3. Start the databases
 
 ```bash
-bun run db:up
+npm run db:up
 ```
 
 Wait until both `postgres` and `mongodb` are healthy.
@@ -86,13 +86,13 @@ Wait until both `postgres` and `mongodb` are healthy.
 ### 4. Load the sample dataset
 
 ```bash
-bun run seed
+npm run seed
 ```
 
 ### 5. Start the app
 
 ```bash
-bun run dev
+npm run dev
 ```
 
 Then open [http://localhost:3000](http://localhost:3000).
@@ -123,7 +123,7 @@ Expected result:
 If you want to run the UI without Docker, you can force fixture mode:
 
 ```bash
-QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 bun run dev
+QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 npm run dev
 ```
 
 This uses the same sample dataset story, but reads from in-repo fixtures instead of the live local databases.
@@ -168,10 +168,10 @@ Example response shape:
 Run the automated checks with:
 
 ```bash
-bun run lint
-bun run test
-bun run build
-bun run test:e2e
+npm run lint
+npm run test
+npm run build
+npm run test:e2e
 ```
 
 ## Architecture Notes
@@ -224,5 +224,5 @@ For the fuller diagram and request lifecycle, see [Architecture.md](./Architectu
 When you are done with the local stack:
 
 ```bash
-bun run db:down
+npm run db:down
 ```

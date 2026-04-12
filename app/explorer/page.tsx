@@ -1,14 +1,18 @@
 import type { Metadata } from "next"
 
-import ExplorerWorkspace from "@/components/explorer/workspace"
-import { getExplorerModel } from "@/lib/explorer/mock-data"
+import SourceContextView from "@/components/querylens/source-context-view"
+import { getSourceContextPayload } from "@/lib/querylens/server/source-context"
+
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-  title: "QueryLens Explorer",
+  title: "QueryLens Source Context",
   description:
-    "UI-only database explorer for browsing PostgreSQL tables and MongoDB collections with a mock SQL workbench.",
+    "Source context for QueryLens, including connected source summaries, schema objects, and quick PostgreSQL and MongoDB record previews.",
 }
 
-export default function ExplorerPage() {
-  return <ExplorerWorkspace model={getExplorerModel()} />
+export default async function ExplorerPage() {
+  const payload = await getSourceContextPayload()
+
+  return <SourceContextView payload={payload} />
 }

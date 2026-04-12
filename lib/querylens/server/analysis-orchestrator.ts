@@ -1,7 +1,10 @@
 import { canUseGemini } from "@/lib/querylens/server/ai-config"
 import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
-import { formatDateCoverage, isDateWindowWithinCoverage } from "@/lib/querylens/date-windows"
+import {
+  formatDateCoverage,
+  isDateWindowWithinCoverage,
+} from "@/lib/querylens/date-windows"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
 import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
@@ -10,6 +13,7 @@ import {
   buildWhatChangedFallbackResponse,
   executeWhatChangedPlan,
 } from "@/lib/querylens/server/executors/what-changed"
+import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import { getQueryLensRetrievalStore } from "@/lib/querylens/server/retrieval"
 import type {
@@ -23,9 +27,15 @@ import type {
 interface IntentExecutor {
   execute(args: {
     plan: StructuredQueryPlan
-    weeklyRows: Awaited<ReturnType<Awaited<ReturnType<typeof getQueryLensDataAccess>>["listWeeklyMetrics"]>>
+    weeklyRows: Awaited<
+      ReturnType<
+        Awaited<ReturnType<typeof getQueryLensDataAccess>>["listWeeklyMetrics"]
+      >
+    >
     dataAccess: Awaited<ReturnType<typeof getQueryLensDataAccess>>
-    composeNarrative: ReturnType<typeof getQueryEngineProvider>["composeNarrative"]
+    composeNarrative: ReturnType<
+      typeof getQueryEngineProvider
+    >["composeNarrative"]
     retrievalContext: RetrievalContext
   }): Promise<Phase1AnalysisResponse>
 }
@@ -69,7 +79,7 @@ function getPlanDateWindows(plan: StructuredQueryPlan) {
 
 export async function analyzeQuery(
   input: QueryRequestBody,
-  options: { executionContext?: QueryLensExecutionContext } = {}
+  options: { executionContext?: QueryLensExecutionContext } = {},
 ): Promise<Phase1AnalysisResponse> {
   const executionContext = options.executionContext ?? "interactive"
   const dataAccess = await getQueryLensDataAccess()
@@ -96,14 +106,26 @@ export async function analyzeQuery(
   const parseResult = await provider.planQuery(
     input.question,
     input.scope,
-    retrievalContext
+    retrievalContext,
   )
 
-  if (!parseResult.parsed) {
+  const deterministicParseResult =
+    !parseResult.parsed &&
+    executionContext === "interactive" &&
+    canUseGemini(executionContext) &&
+    parseResult.failureKind !== "model_unavailable"
+      ? planDeterministicQuery(input.question, input.scope)
+      : undefined
+
+  const resolvedParseResult = deterministicParseResult?.parsed
+    ? deterministicParseResult
+    : parseResult
+
+  if (!resolvedParseResult.parsed) {
     if (
       executionContext === "interactive" &&
       canUseGemini(executionContext) &&
-      parseResult.failureKind !== "model_unavailable"
+      resolvedParseResult.failureKind !== "model_unavailable"
     ) {
       if (dataAccess.sourceMode !== "database") {
         return buildWhatChangedFallbackResponse({
@@ -126,8 +148,12 @@ export async function analyzeQuery(
           retrievalContext.memoryMatches.length > 0 ||
           retrievalContext.recentMessages.length > 0,
         retrievalTrace: {
-          datasetMatches: retrievalContext.datasetMatches.map((match) => match.title),
-          memoryMatches: retrievalContext.memoryMatches.map((match) => match.title),
+          datasetMatches: retrievalContext.datasetMatches.map(
+            (match) => match.title,
+          ),
+          memoryMatches: retrievalContext.memoryMatches.map(
+            (match) => match.title,
+          ),
           recentMessagesCount: retrievalContext.recentMessages.length,
         },
       }
@@ -140,7 +166,10 @@ export async function analyzeQuery(
             response: enrichedAgenticResponse,
           })
         } catch (error) {
-          console.warn("QueryLens could not persist conversational memory.", error)
+          console.warn(
+            "QueryLens could not persist conversational memory.",
+            error,
+          )
         }
       }
 
@@ -149,16 +178,16 @@ export async function analyzeQuery(
 
     return buildWhatChangedFallbackResponse({
       fallbackReason:
-        parseResult.fallbackReason ??
+        resolvedParseResult.fallbackReason ??
         "The question could not be matched to the phase-1 vertical slice safely.",
       sourceMode: dataAccess.sourceMode,
       rows: weeklyRows,
     })
   }
 
-  const outOfCoverageWindow = getPlanDateWindows(parseResult.parsed).find(
-    (window) => !isDateWindowWithinCoverage(window, dateCoverage)
-  )
+  const outOfCoverageWindow = getPlanDateWindows(
+    resolvedParseResult.parsed,
+  ).find((window) => !isDateWindowWithinCoverage(window, dateCoverage))
 
   if (outOfCoverageWindow) {
     return buildWhatChangedFallbackResponse({
@@ -168,7 +197,7 @@ export async function analyzeQuery(
     })
   }
 
-  const executor = executors[parseResult.parsed.intent]
+  const executor = executors[resolvedParseResult.parsed.intent]
 
   if (!executor) {
     return buildWhatChangedFallbackResponse({
@@ -180,7 +209,7 @@ export async function analyzeQuery(
   }
 
   const response = await executor.execute({
-    plan: parseResult.parsed,
+    plan: resolvedParseResult.parsed,
     weeklyRows,
     dataAccess,
     composeNarrative: provider.composeNarrative,
@@ -189,12 +218,14 @@ export async function analyzeQuery(
 
   const enrichedResponse = {
     ...response,
-    metric: response.metric ?? parseResult.parsed.metricId,
+    metric: response.metric ?? resolvedParseResult.parsed.metricId,
     conversationContextUsed:
       retrievalContext.memoryMatches.length > 0 ||
       retrievalContext.recentMessages.length > 0,
     retrievalTrace: {
-      datasetMatches: retrievalContext.datasetMatches.map((match) => match.title),
+      datasetMatches: retrievalContext.datasetMatches.map(
+        (match) => match.title,
+      ),
       memoryMatches: retrievalContext.memoryMatches.map((match) => match.title),
       recentMessagesCount: retrievalContext.recentMessages.length,
     },

@@ -4,7 +4,10 @@ import {
   resolveQuestionDateWindows,
 } from "@/lib/querylens/date-windows"
 import { getSampleDataset } from "@/lib/querylens/seed-data"
-import { getDatasetDefinition, getDefaultDatasetId } from "@/lib/querylens/datasets"
+import {
+  getDatasetDefinition,
+  getDefaultDatasetId,
+} from "@/lib/querylens/datasets"
 import {
   normalizePhase1Text,
   resolvePhase1Scope,
@@ -44,8 +47,8 @@ function resolveMetric(question: string) {
 
   const directMatch = dataset.metrics.find((metric) =>
     metric.synonyms.some((synonym) =>
-      normalizedQuestion.includes(normalizePhase1Text(synonym))
-    )
+      normalizedQuestion.includes(normalizePhase1Text(synonym)),
+    ),
   )
 
   if (directMatch) {
@@ -53,11 +56,19 @@ function resolveMetric(question: string) {
   }
 
   if (/\bcash\s*flow\b|\bcashflow\b/.test(question.toLowerCase())) {
-    return dataset.metrics.find((metric) => metric.id === "cashflow_health_score")
+    return dataset.metrics.find(
+      (metric) => metric.id === "cashflow_health_score",
+    )
   }
 
-  if (/\bat risk\b|\bat-risk\b|\brisky\b|\bstressed accounts\b/.test(question.toLowerCase())) {
-    return dataset.metrics.find((metric) => metric.id === "at_risk_account_count")
+  if (
+    /\bat risk\b|\bat-risk\b|\brisky\b|\bstressed accounts\b/.test(
+      question.toLowerCase(),
+    )
+  ) {
+    return dataset.metrics.find(
+      (metric) => metric.id === "at_risk_account_count",
+    )
   }
 
   return undefined
@@ -65,13 +76,13 @@ function resolveMetric(question: string) {
 
 function isWhatChangedIntent(normalizedQuestion: string) {
   return /(why|what changed|drop|dropped|decline|declined|fell|fall)/.test(
-    normalizedQuestion
+    normalizedQuestion,
   )
 }
 
 function isBreakdownIntent(normalizedQuestion: string) {
   return /(break down|breakdown|make up|composition|split|show|by region|by sector|by region and sector)/.test(
-    normalizedQuestion
+    normalizedQuestion,
   )
 }
 
@@ -80,8 +91,8 @@ function isCompareIntent(normalizedQuestion: string) {
 }
 
 function isDiscoveryIntent(normalizedQuestion: string) {
-  return /(what data|what is stored|currently stored|what can i ask|what metrics|which metrics|which sources|what sources|what regions|what sectors|time range|time coverage|what data do we have|what is available|available data)/.test(
-    normalizedQuestion
+  return /(what data|type of data|data types?|what is stored|currently stored|currently used|what can i ask|what metrics|which metrics|which sources|what sources|what regions|what sectors|time range|time coverage|what data do we have|what is available|available data)/.test(
+    normalizedQuestion,
   )
 }
 
@@ -90,19 +101,31 @@ function resolveDiscoveryFocus(normalizedQuestion: string): DiscoveryFocus {
     return "metrics"
   }
 
-  if (/(which sources|what sources|connected sources)/.test(normalizedQuestion)) {
+  if (
+    /(which sources|what sources|connected sources)/.test(normalizedQuestion)
+  ) {
     return "sources"
   }
 
-  if (/(what regions|what sectors|dimensions|segments|categories)/.test(normalizedQuestion)) {
+  if (
+    /(what regions|what sectors|dimensions|segments|categories)/.test(
+      normalizedQuestion,
+    )
+  ) {
     return "dimensions"
   }
 
-  if (/(time range|time coverage|how far back|what period)/.test(normalizedQuestion)) {
+  if (
+    /(time range|time coverage|how far back|what period)/.test(
+      normalizedQuestion,
+    )
+  ) {
     return "time_coverage"
   }
 
-  if (/(what can i ask|supported questions|examples)/.test(normalizedQuestion)) {
+  if (
+    /(what can i ask|supported questions|examples)/.test(normalizedQuestion)
+  ) {
     return "questions"
   }
 
@@ -111,7 +134,7 @@ function resolveDiscoveryFocus(normalizedQuestion: string): DiscoveryFocus {
 
 function resolveBreakdownDimension(
   normalizedQuestion: string,
-  scope: ScopeFilter
+  scope: ScopeFilter,
 ): BreakdownDimension {
   if (
     normalizedQuestion.includes("region and sector") ||
@@ -145,7 +168,7 @@ function resolvePlanningTimeframe(window: DateWindow): PlannedTimeframe {
 
 function buildPlanComparisonWindow(
   targetWindow: DateWindow,
-  comparisonDateWindow?: DateWindow
+  comparisonDateWindow?: DateWindow,
 ) {
   return {
     timeframe: resolvePlanningTimeframe(targetWindow),
@@ -178,7 +201,9 @@ function parseCompareSubjects(question: string) {
     }
   }
 
-  const subjectMatch = normalizedQuestion.match(/compare\s+(.+?)\s+(?:vs|versus)\s+(.+)/)
+  const subjectMatch = normalizedQuestion.match(
+    /compare\s+(.+?)\s+(?:vs|versus)\s+(.+)/,
+  )
 
   if (!subjectMatch) {
     return {}
@@ -207,9 +232,11 @@ function parseCompareSubjects(question: string) {
 
   if (leftRegion && rightRegion) {
     const leftLabel =
-      dataset.regions.find((region) => region.id === leftRegion)?.name ?? rawLeft
+      dataset.regions.find((region) => region.id === leftRegion)?.name ??
+      rawLeft
     const rightLabel =
-      dataset.regions.find((region) => region.id === rightRegion)?.name ?? rawRight
+      dataset.regions.find((region) => region.id === rightRegion)?.name ??
+      rawRight
 
     return {
       dimension: "region" as const,
@@ -222,9 +249,11 @@ function parseCompareSubjects(question: string) {
 
   if (leftSector && rightSector) {
     const leftLabel =
-      dataset.sectors.find((sector) => sector.id === leftSector)?.name ?? rawLeft
+      dataset.sectors.find((sector) => sector.id === leftSector)?.name ??
+      rawLeft
     const rightLabel =
-      dataset.sectors.find((sector) => sector.id === rightSector)?.name ?? rawRight
+      dataset.sectors.find((sector) => sector.id === rightSector)?.name ??
+      rawRight
 
     return {
       dimension: "sector" as const,
@@ -241,7 +270,7 @@ function parseCompareSubjects(question: string) {
 function buildTimeframeCompareSpec(
   scope: ScopeFilter,
   leftWindow: DateWindow,
-  rightWindow: DateWindow
+  rightWindow: DateWindow,
 ): CompareSpec | QueryPlanResult {
   if (scope.region && scope.sector) {
     return {
@@ -283,7 +312,7 @@ function buildTimeframeCompareSpec(
 function buildPeerCompareSpec(
   question: string,
   selectedWindow: DateWindow,
-  scopeOverride?: ScopeFilter
+  scopeOverride?: ScopeFilter,
 ): CompareSpec | QueryPlanResult {
   if (scopeOverride?.region || scopeOverride?.sector) {
     return {
@@ -345,7 +374,9 @@ export function validateQueryPlan(plan: StructuredQueryPlan): QueryPlanResult {
     }
   }
 
-  const metric = dataset.metrics.find((candidate) => candidate.id === plan.metricId)
+  const metric = dataset.metrics.find(
+    (candidate) => candidate.id === plan.metricId,
+  )
 
   if (metric && !metric.supportedIntents.includes(plan.intent)) {
     return {
@@ -381,7 +412,7 @@ export function validateQueryPlan(plan: StructuredQueryPlan): QueryPlanResult {
 
 export function planDeterministicQuery(
   question: string,
-  scopeOverride?: ScopeFilter
+  scopeOverride?: ScopeFilter,
 ): QueryPlanResult {
   const datasetId = getDefaultDatasetId()
   const normalizedQuestion = normalizePhase1Text(question)
@@ -437,7 +468,7 @@ export function planDeterministicQuery(
         ? buildTimeframeCompareSpec(
             scope,
             compareWindows.leftWindow,
-            compareWindows.rightWindow
+            compareWindows.rightWindow,
           )
         : primaryWindow
           ? buildPeerCompareSpec(question, primaryWindow, scopeOverride)
@@ -476,7 +507,7 @@ export function planDeterministicQuery(
           : [resolvedCompareSpec.dimension ?? "portfolio"],
         comparisonWindow: buildPlanComparisonWindow(
           planDateWindow,
-          planComparisonDateWindow
+          planComparisonDateWindow,
         ),
         compareSpec: resolvedCompareSpec,
       })
@@ -507,7 +538,7 @@ export function planDeterministicQuery(
       scopeDimensions: [...resolveScopeDimensions(scope)],
       comparisonWindow: buildPlanComparisonWindow(
         primaryWindow,
-        buildPriorEqualDateWindow(primaryWindow)
+        buildPriorEqualDateWindow(primaryWindow),
       ),
     })
   }
@@ -544,7 +575,7 @@ export function planDeterministicQuery(
     scopeDimensions: [...resolveScopeDimensions(scope)],
     comparisonWindow: buildPlanComparisonWindow(
       primaryWindow,
-      buildPriorEqualDateWindow(primaryWindow)
+      buildPriorEqualDateWindow(primaryWindow),
     ),
     breakdownDimension: resolveBreakdownDimension(normalizedQuestion, scope),
   })

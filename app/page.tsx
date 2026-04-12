@@ -23,7 +23,7 @@ export default function Home() {
               size="lg"
               className="h-12 px-8 text-base"
             >
-              <Link href="/explorer">Explorer View</Link>
+              <Link href="/explorer">Source Context</Link>
             </Button>
             <Button
               asChild

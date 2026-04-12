@@ -1,15 +1,15 @@
-import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 
 import ExplorerPage from "@/app/explorer/page"
 
 describe("/explorer page", () => {
-  it("renders the explorer shell with the unified browser and workbench", () => {
-    const html = renderToStaticMarkup(React.createElement(ExplorerPage))
+  it("renders the source context experience", async () => {
+    const element = await ExplorerPage()
+    const html = renderToStaticMarkup(element)
 
-    expect(html).toContain("Database explorer")
-    expect(html).toContain("Unified source browser")
-    expect(html).toContain("Relational editor")
-    expect(html).toContain("public / customers")
+    expect(html).toContain("Source context")
+    expect(html).toContain("Connected sources")
+    expect(html).toContain("PostgreSQL preview")
+    expect(html).toContain("MongoDB preview")
   })
 })

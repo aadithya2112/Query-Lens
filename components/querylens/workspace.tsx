@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { startTransition, useEffect, useState } from "react"
 
 import { Activity, Settings2 } from "lucide-react"
@@ -8,21 +9,12 @@ import ChatPanel, {
   type ConversationMessage,
 } from "@/components/querylens/chat-panel"
 import EvidencePanel from "@/components/querylens/evidence-panel"
-import Sidebar from "@/components/querylens/sidebar"
 import { Button } from "@/components/ui/button"
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetDescription,
-} from "@/components/ui/sheet"
 import type {
   BootstrapPayload,
   Phase1AnalysisResponse,
@@ -34,7 +26,7 @@ const ACTIVE_ANALYSIS_STORAGE_KEY = "querylens.activeAnalysis"
 
 function buildInitialMessages(
   initialQuestion: string,
-  initialAnalysis: Phase1AnalysisResponse
+  initialAnalysis: Phase1AnalysisResponse,
 ): ConversationMessage[] {
   return [
     {
@@ -52,7 +44,10 @@ function buildInitialMessages(
 }
 
 function generateChatId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID()
   }
 
@@ -89,14 +84,14 @@ function buildAssistantMessage(
 
 function buildSuggestedPrompts(
   initialQuestion: string,
-  activeAnalysis: Phase1AnalysisResponse
+  activeAnalysis: Phase1AnalysisResponse,
 ) {
   return Array.from(
     new Set([
       "What data is currently stored?",
       initialQuestion,
       ...activeAnalysis.supportedFollowUps,
-    ])
+    ]),
   ).slice(0, 6)
 }
 
@@ -107,20 +102,25 @@ export default function Workspace({
   initialAnalysis,
 }: BootstrapPayload) {
   const [messages, setMessages] = useState<ConversationMessage[]>(
-    buildInitialMessages(initialQuestion, initialAnalysis)
+    buildInitialMessages(initialQuestion, initialAnalysis),
   )
   const [activeAnalysis, setActiveAnalysis] = useState(initialAnalysis)
   const [chatId, setChatId] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isRestored, setIsRestored] = useState(false)
-  const activeMetric = metrics.find((metric) => metric.id === activeAnalysis.metric)
+  const activeMetric = metrics.find(
+    (metric) => metric.id === activeAnalysis.metric,
+  )
   const activeMetricLabel =
     activeAnalysis.intent === "discovery"
       ? "Dataset discovery"
       : activeAnalysis.intent === "agentic_query"
         ? "Custom live query"
         : activeMetric?.label || "Cashflow"
-const suggestedPrompts = buildSuggestedPrompts(initialQuestion, activeAnalysis)
+  const suggestedPrompts = buildSuggestedPrompts(
+    initialQuestion,
+    activeAnalysis,
+  )
 
   useEffect(() => {
     const storedChatId = window.localStorage.getItem(CHAT_ID_STORAGE_KEY)
@@ -133,10 +133,10 @@ const suggestedPrompts = buildSuggestedPrompts(initialQuestion, activeAnalysis)
     setChatId(nextChatId)
 
     const storedMessages = readStoredState<ConversationMessage[]>(
-      CHAT_MESSAGES_STORAGE_KEY
+      CHAT_MESSAGES_STORAGE_KEY,
     )
     const storedAnalysis = readStoredState<Phase1AnalysisResponse>(
-      ACTIVE_ANALYSIS_STORAGE_KEY
+      ACTIVE_ANALYSIS_STORAGE_KEY,
     )
 
     if (storedMessages?.length) {
@@ -155,10 +155,13 @@ const suggestedPrompts = buildSuggestedPrompts(initialQuestion, activeAnalysis)
       return
     }
 
-    window.localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages))
+    window.localStorage.setItem(
+      CHAT_MESSAGES_STORAGE_KEY,
+      JSON.stringify(messages),
+    )
     window.localStorage.setItem(
       ACTIVE_ANALYSIS_STORAGE_KEY,
-      JSON.stringify(activeAnalysis)
+      JSON.stringify(activeAnalysis),
     )
   }, [activeAnalysis, isRestored, messages])
 
@@ -236,35 +239,18 @@ const suggestedPrompts = buildSuggestedPrompts(initialQuestion, activeAnalysis)
 
         <div className="flex items-center gap-3">
           <p className="hidden text-sm text-muted-foreground md:inline-block">
-              Metric Focus:{" "}
-              <span className="font-medium text-foreground">
-                {activeMetricLabel}
-              </span>
-            </p>
+            Metric Focus:{" "}
+            <span className="font-medium text-foreground">
+              {activeMetricLabel}
+            </span>
+          </p>
           <div className="h-4 w-px bg-border hidden md:block" />
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline-block">Source context</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="w-full sm:w-[400px] overflow-y-auto border-border bg-background sm:max-w-md">
-              <SheetHeader>
-                <SheetTitle>Analysis Context</SheetTitle>
-                <SheetDescription>
-                  Health data and underlying metric logic.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="mt-6">
-                <Sidebar
-                  analysis={activeAnalysis}
-                  metric={activeMetric}
-                  sourceHealth={sourceHealth}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
+          <Button asChild variant="ghost" size="sm" className="gap-2">
+            <Link href="/explorer">
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline-block">Source context</span>
+            </Link>
+          </Button>
         </div>
       </header>
 
