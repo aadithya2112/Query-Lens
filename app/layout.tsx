@@ -9,21 +9,8 @@ export const metadata: Metadata = {
   description: 'Trust-first SME cashflow analysis over a built-in sample dataset, with Postgres facts, Mongo context, and evidence-first weekly investigation.',
   generator: 'QueryLens',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/icon.svg',
+    apple: '/icon.svg',
   },
 }
 
