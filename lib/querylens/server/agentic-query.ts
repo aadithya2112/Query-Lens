@@ -272,6 +272,9 @@ Rules:
 - Use chart only when it is clearly helpful. Prefer line for time series, bar for ranked comparisons, and pie only for small composition views.
 - When selecting chart keys, they must exist in the referenced query run rows and the valueKey must be numeric.
 - Reuse queryRunIds exactly as returned by the query tools.
+- Make the final summary slightly fuller than a one-line recap.
+- The final summary should state the main conclusion and include at least one concrete supporting observation from the executed query results.
+- Keep the final summary factual, compact, and grounded only in the returned rows.
 
 Live schema snapshot:
 ${formatSchemaSnapshot(args.schema)}

@@ -130,15 +130,16 @@ export function buildLeadershipSummaryResponse(args: {
     .map((source) => source.sourceName)
   const supportingSourceLabel =
     supportingSources.length > 0
-      ? `This is grounded in ${supportingSources.join(" and ")}.`
-      : "This stays grounded in the current validated QueryLens evidence."
+      ? `${supportingSources.join(" and ")}`
+      : "the current validated QueryLens evidence"
+  const timeframeLabel = toSentenceFragment(sourceAnalysis.timeframe)
 
   const summaryParts = [
-    `${sourceAnalysis.activeScope} is the main area to watch for ${toSentenceFragment(sourceAnalysis.timeframe)}.`,
+    `${sourceAnalysis.activeScope} is the main area to watch for ${timeframeLabel}.`,
     firstDriver
       ? sentenceCase(firstDriver.description)
       : sentenceCase(sourceAnalysis.summary),
-    supportingSourceLabel,
+    `This leadership summary keeps the existing analysis intact, compresses it into the clearest grounded takeaway for that window, and stays grounded in ${supportingSourceLabel}.`,
   ]
 
   const summary = summaryParts.join(" ")
@@ -169,4 +170,3 @@ export function buildLeadershipSummaryResponse(args: {
     trustArtifacts: buildTrustArtifacts(derivedResponse),
   }
 }
-

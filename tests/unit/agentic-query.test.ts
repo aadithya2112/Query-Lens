@@ -114,7 +114,7 @@ describe("agentic query fallback", () => {
           args: {
             headline: "Cashflow health has improved across the available weeks",
             summary:
-              "The live weekly portfolio series shows a steady upward trend across the returned windows.",
+              "The live weekly portfolio series shows a steady upward trend across the returned windows, increasing from 74.1 to 76.4 in the executed rows.",
             timeframe: "Weekly trend across available weeks",
             comparisonBasis: "Portfolio cashflow health score over time",
             activeScope: "Portfolio",

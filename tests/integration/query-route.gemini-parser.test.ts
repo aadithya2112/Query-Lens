@@ -46,7 +46,7 @@ describe("/api/query Gemini parser mode", () => {
       json: {
         headline: "North West / Hospitality cashflow health fell 5.4 points",
         summary:
-          "Gemini tied the decline to weaker inbound coverage and corroborating settlement issues.",
+          "Gemini tied the decline to weaker inbound coverage, added corroborating settlement issues, and framed the answer against the prior validated week.",
         supportedFollowUps: [
           "Focus on the North West contribution to last week's drop",
           "Focus on hospitality SMEs last week",

@@ -141,7 +141,7 @@ export async function executeDiscoveryPlan(
     args.retrievalContext
   ).slice(0, 4)
 
-  const summary = `QueryLens currently has ${dataset.metrics.length} analytical metrics across ${dataset.supportedIntentIds.length} intent families for the ${dataset.label} dataset. The active source stack includes ${sourceHealth.map((source) => source.name).join(", ")}, with weekly coverage from ${coverageLabel}.`
+  const summary = `QueryLens currently has ${dataset.metrics.length} analytical metrics across ${dataset.supportedIntentIds.length} intent families for the ${dataset.label} dataset. The active source stack includes ${sourceHealth.map((source) => source.name).join(", ")}, with weekly coverage from ${coverageLabel}. That means discovery answers can stay grounded in explicit source coverage, retrieved catalog metadata, and the current sample-dataset boundaries before analytical planning begins.`
   const evidence = [
     ...sourceHealth.map((source) => ({
       sourceType:

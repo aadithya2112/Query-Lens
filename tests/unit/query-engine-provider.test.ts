@@ -209,5 +209,6 @@ describe("query engine provider", () => {
     })
 
     expect(result.summary).toContain("Portfolio moved down")
+    expect(result.summary).toContain("immediately preceding grounded period")
   }, TEST_TIMEOUT)
 })

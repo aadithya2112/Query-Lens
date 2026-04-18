@@ -282,8 +282,8 @@ export async function executeBreakdownPlan(
     ? `${topBucket.label} leads the at-risk account mix`
     : "No concentrated at-risk pocket was found in the selected range"
   const summary = topBucket
-    ? `${totalAtRisk} of ${totalAccounts} accounts were flagged at risk in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}. ${topBucket.label} accounted for ${topBucket.atRiskAccountCount} of them, with the highest concentration of low-balance and overdue stress.`
-    : `No accounts met the at-risk threshold in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}.`
+    ? `${totalAtRisk} of ${totalAccounts} accounts were flagged at risk in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}. ${topBucket.label} accounted for ${topBucket.atRiskAccountCount} of them, with the highest concentration of low-balance and overdue stress. The breakdown ranks the selected ${dimension.replace("_", " ")} buckets by observed account stress so the largest pressure pocket appears first.`
+    : `No accounts met the at-risk threshold in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}. QueryLens still checked the selected ${dimension.replace("_", " ")} view against the grounded low-balance and overdue rules for that window.`
 
   return {
     intent: "breakdown",

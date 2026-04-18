@@ -9,6 +9,7 @@ describe("analysis orchestrator", () => {
     expect(payload.fallback).not.toBe(true)
     expect(payload.metric).toBe("cashflow_health_score")
     expect(payload.drivers.length).toBeGreaterThanOrEqual(2)
+    expect(payload.summary).toContain("immediately preceding grounded period")
     expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
     expect(payload.evidence.some((item) => item.sourceType === "mongodb")).toBe(true)
   })
@@ -54,6 +55,7 @@ describe("analysis orchestrator", () => {
     expect(payload.fallback).not.toBe(true)
     expect(payload.metric).toBe("cashflow_health_score")
     expect(payload.comparisonSummary?.mode).toBe("timeframe")
+    expect(payload.summary).toContain("validated windows and scopes")
     expect(payload.evidence.some((item) => item.sourceType === "postgres")).toBe(true)
   })
 
@@ -79,6 +81,7 @@ describe("analysis orchestrator", () => {
     expect(payload.intent).toBe("discovery")
     expect(payload.metric).toBe("dataset_catalog")
     expect(payload.discoverySummary?.datasetLabel).toBe("SME portfolio")
+    expect(payload.summary).toContain("sample-dataset boundaries")
     expect(payload.catalogSections?.length).toBeGreaterThan(0)
     expect(payload.evidence.length).toBeGreaterThan(0)
   })
@@ -92,6 +95,7 @@ describe("analysis orchestrator", () => {
     expect(payload.intent).toBe("breakdown")
     expect(payload.metric).toBe("at_risk_account_count")
     expect(payload.timeframe).toContain("Selected range")
+    expect(payload.summary).toContain("pressure pocket")
   })
 
   it("persists conversational context when chatId is present", async () => {

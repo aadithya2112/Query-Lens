@@ -97,7 +97,8 @@ describe("phase-1 provider selection", () => {
     geminiGenerateMock.mockResolvedValue({
       json: {
         headline: "Portfolio cashflow health fell 1.7 points",
-        summary: "Gemini summary.",
+        summary:
+          "Gemini summary ties the weekly drop to weaker payment coverage, notes the settlement issues in context, and keeps the comparison anchored to the prior validated week.",
         supportedFollowUps: [
           "Focus on the North West contribution to last week's drop",
           "Focus on hospitality SMEs last week",
@@ -151,7 +152,7 @@ describe("phase-1 provider selection", () => {
     })
 
     expect(geminiGenerateMock).toHaveBeenCalledOnce()
-    expect(result.summary).toBe("Gemini summary.")
+    expect(result.summary).toContain("Gemini summary ties the weekly drop")
   }, TEST_TIMEOUT)
 
   it("falls back to deterministic narrative when the key is missing", async () => {
@@ -181,6 +182,7 @@ describe("phase-1 provider selection", () => {
 
     expect(geminiGenerateMock).not.toHaveBeenCalled()
     expect(result.summary).toContain("Portfolio moved down")
+    expect(result.summary).toContain("immediately preceding grounded period")
   }, TEST_TIMEOUT)
 
   it("falls back when Gemini returns an invalid narrative payload", async () => {
@@ -219,6 +221,7 @@ describe("phase-1 provider selection", () => {
 
     expect(geminiGenerateMock).toHaveBeenCalledOnce()
     expect(result.summary).toContain("Portfolio moved down")
+    expect(result.summary).toContain("immediately preceding grounded period")
     expect(result.supportedFollowUps).toContain("What changed this week instead?")
   }, TEST_TIMEOUT)
 
@@ -232,6 +235,7 @@ describe("phase-1 provider selection", () => {
 
     expect(geminiGenerateMock).not.toHaveBeenCalled()
     expect(payload.initialAnalysis.summary).toContain("Portfolio moved down")
+    expect(payload.initialAnalysis.summary).toContain("immediately preceding grounded period")
   }, TEST_TIMEOUT)
 
   it("uses Gemini tool-calling to parse supported paraphrases", async () => {
@@ -255,7 +259,8 @@ describe("phase-1 provider selection", () => {
     geminiGenerateMock.mockResolvedValueOnce({
       json: {
         headline: "North West / Hospitality cashflow health fell 5.4 points",
-        summary: "Gemini summary.",
+        summary:
+          "Gemini summary explains that North West hospitality weakened on payment coverage, adds the settlement context, and frames the answer against the prior grounded week.",
         supportedFollowUps: [
           "Focus on the North West contribution to last week's drop",
           "Focus on hospitality SMEs last week",

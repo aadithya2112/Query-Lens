@@ -96,6 +96,7 @@ function buildHeadline(activeScopeLabel: string, currentScore: number, previousS
 }
 
 function buildDeterministicNarrative({
+  parsed,
   activeScopeLabel,
   currentScore,
   previousScore,
@@ -107,9 +108,10 @@ function buildDeterministicNarrative({
   const worstDriver = drivers[0]
   const leadContext = contextEvents[0]
   const direction = delta < 0 ? "down" : "up"
+  const timeframeLabel = formatContextualDateWindowLabel(parsed.dateWindow)
 
   const summaryParts = [
-    `${activeScopeLabel} moved ${direction} from ${previousScore.toFixed(1)} to ${currentScore.toFixed(1)} week over week.`,
+    `${activeScopeLabel} moved ${direction} from ${previousScore.toFixed(1)} to ${currentScore.toFixed(1)} over ${timeframeLabel}.`,
   ]
 
   if (worstDriver) {
@@ -119,6 +121,10 @@ function buildDeterministicNarrative({
   if (leadContext) {
     summaryParts.push(`${leadContext.summary} ${leadContext.detail}`)
   }
+
+  summaryParts.push(
+    `This answer compares the selected window with the immediately preceding grounded period in the same scope.`
+  )
 
   return {
     headline: buildHeadline(activeScopeLabel, currentScore, previousScore),
@@ -169,7 +175,9 @@ ${contextLines}
 
 Write:
 - a concise headline
-- a 2-3 sentence summary grounded in the supplied drivers and context
+- a single readable summary paragraph of 3-4 grounded sentences
+- make the summary a little fuller than a terse recap: include the outcome, the clearest driver, any corroborating context if present, and a brief framing of the comparison window
+- stay factual and evidence-linked, with no advice or speculation
 - the full allowed follow-up list exactly as provided
 `.trim()
 }

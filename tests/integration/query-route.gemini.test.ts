@@ -44,7 +44,7 @@ describe("/api/query Gemini narrative mode", () => {
       json: {
         headline: "Portfolio cashflow health fell 1.7 points",
         summary:
-          "Gemini narrative tied the drop to payment coverage deterioration and settlement issues.",
+          "Gemini narrative tied the drop to payment coverage deterioration, added settlement issues as corroborating context, and kept the answer anchored to the prior validated week.",
         supportedFollowUps: [
           "Focus on the North West contribution to last week's drop",
           "Focus on hospitality SMEs last week",

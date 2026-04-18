@@ -392,8 +392,8 @@ export async function executeComparePlan(
     ? `${compareSpec.leftLabel} and ${compareSpec.rightLabel} are effectively level`
     : `${comparisonSummary.winnerLabel} leads the cashflow comparison`
   const summary = comparisonSummary.tie
-    ? `${compareSpec.leftLabel} and ${compareSpec.rightLabel} both scored ${comparisonSummary.leftValue.toFixed(1)} in the selected compare view, so the main differences come from component mix rather than the headline score.`
-    : `${comparisonSummary.winnerLabel} leads by ${comparisonSummary.delta.toFixed(1)} points in the selected compare view. QueryLens highlights where payment coverage, balance resilience, and stress indicators create the clearest separation.`
+    ? `${compareSpec.leftLabel} and ${compareSpec.rightLabel} both scored ${comparisonSummary.leftValue.toFixed(1)} in the selected compare view, so the main differences come from component mix rather than the headline score. QueryLens therefore focuses the explanation on which grounded components still separate the two sides even though the headline metric is level.`
+    : `${comparisonSummary.winnerLabel} leads by ${comparisonSummary.delta.toFixed(1)} points in the selected compare view. QueryLens highlights where payment coverage, balance resilience, and stress indicators create the clearest separation. The comparison stays anchored to the validated windows and scopes defined in this side-by-side view.`
   const targetWindow =
     compareSpec.mode === "timeframe"
       ? compareSpec.leftWindow ??

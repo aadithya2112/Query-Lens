@@ -137,7 +137,7 @@ describe("/api/query agentic fallback", () => {
           args: {
             headline: "Cashflow health has improved across the available weeks",
             summary:
-              "The returned weekly portfolio series slopes upward across the visible window.",
+              "The returned weekly portfolio series slopes upward across the visible window, rising from 74.1 to 76.4 in the executed result set.",
             timeframe: "Weekly trend across available weeks",
             comparisonBasis: "Portfolio cashflow health score over time",
             activeScope: "Portfolio",
