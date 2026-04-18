@@ -3,7 +3,10 @@ import {
   formatContextualDateWindowLabel,
   formatPriorPeriodComparisonLabel,
 } from "@/lib/querylens/date-windows"
-import { buildWhatChangedFollowUps } from "@/lib/querylens/follow-ups"
+import {
+  buildWhatChangedFollowUpActions,
+  buildWhatChangedFollowUps,
+} from "@/lib/querylens/follow-ups"
 import { formatWeekLabel, getSampleDataset } from "@/lib/querylens/seed-data"
 import {
   calculateConfidenceScore,
@@ -19,6 +22,7 @@ import type {
   EvidenceItem,
   Phase1AnalysisResponse,
   ScopeFilter,
+  ScopeType,
   StructuredQueryPlan,
   WeeklyMetricRow,
 } from "@/lib/querylens/types"
@@ -105,6 +109,57 @@ function filterRegionSectorRows(rows: WeeklyMetricRow[], scope: ScopeFilter) {
 
     return true
   })
+}
+
+function buildDeltaRanking(args: {
+  targetRows: WeeklyMetricRow[]
+  comparisonRows: WeeklyMetricRow[]
+  recordType: ScopeType
+  scope: ScopeFilter
+}) {
+  return args.targetRows
+    .filter((row) => {
+      if (row.recordType !== args.recordType) {
+        return false
+      }
+
+      if (args.scope.region && row.regionId !== args.scope.region) {
+        return false
+      }
+
+      if (args.scope.sector && row.sectorId !== args.scope.sector) {
+        return false
+      }
+
+      return true
+    })
+    .map((row) => {
+      const prior = args.comparisonRows.find(
+        (candidate) =>
+          candidate.recordType === row.recordType &&
+          candidate.regionId === row.regionId &&
+          candidate.sectorId === row.sectorId,
+      )
+
+      return prior
+        ? {
+            row,
+            delta: roundTo(row.cashflowHealthScore - prior.cashflowHealthScore),
+          }
+        : undefined
+    })
+    .filter(
+      (
+        candidate,
+      ): candidate is { row: WeeklyMetricRow; delta: number } => Boolean(candidate),
+    )
+    .sort((left, right) => {
+      if (left.delta !== right.delta) {
+        return left.delta - right.delta
+      }
+
+      return left.row.cashflowHealthScore - right.row.cashflowHealthScore
+    })
 }
 
 function buildDrivers(
@@ -398,6 +453,24 @@ export async function executeWhatChangedPlan(
   const regionSectorRows = [...targetRows, ...comparisonRows].filter(
     (row) => row.recordType === "region_sector"
   )
+  const regionRanking = buildDeltaRanking({
+    targetRows,
+    comparisonRows,
+    recordType: "region",
+    scope: {},
+  })
+  const sectorRanking = buildDeltaRanking({
+    targetRows,
+    comparisonRows,
+    recordType: "sector",
+    scope: {},
+  })
+  const scopedSectorRanking = buildDeltaRanking({
+    targetRows,
+    comparisonRows,
+    recordType: "region_sector",
+    scope: args.plan.scope.region ? { region: args.plan.scope.region } : {},
+  })
   const contextEvents = await args.dataAccess.listContextEvents({
     targetStart: targetWindow.startDate,
     targetEnd: targetWindow.endDate,
@@ -435,6 +508,24 @@ export async function executeWhatChangedPlan(
     contextEvents,
     allowedFollowUps,
   })
+  const weakestRegionLabel = !args.plan.scope.region
+    ? regionRanking[0]?.row.regionName ?? undefined
+    : undefined
+  const weakestSectorLabel = args.plan.scope.region
+    ? scopedSectorRanking[0]?.row.sectorName ?? undefined
+    : !args.plan.scope.sector
+      ? sectorRanking[0]?.row.sectorName ?? undefined
+      : undefined
+  const healthyPeerLabel = !args.plan.scope.region
+    ? regionRanking
+        .slice()
+        .sort(
+          (left, right) =>
+            right.row.cashflowHealthScore - left.row.cashflowHealthScore,
+        )
+        .find((candidate) => candidate.row.regionName !== weakestRegionLabel)?.row
+        .regionName ?? undefined
+    : undefined
 
   return {
     intent: "what_changed",
@@ -450,6 +541,13 @@ export async function executeWhatChangedPlan(
     evidence,
     assumptions: buildAssumptions(args.plan.scope),
     supportedFollowUps: narrative.supportedFollowUps,
+    followUpActions: buildWhatChangedFollowUpActions({
+      targetWindow,
+      scope: args.plan.scope,
+      weakestRegionLabel,
+      weakestSectorLabel,
+      healthyPeerLabel,
+    }),
     sourceMode: args.dataAccess.sourceMode,
   }
 }

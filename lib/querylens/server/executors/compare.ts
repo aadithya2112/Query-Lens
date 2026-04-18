@@ -2,7 +2,10 @@ import {
   formatContextualDateWindowLabel,
   getRelativeDateWindow,
 } from "@/lib/querylens/date-windows"
-import { buildCompareFollowUps } from "@/lib/querylens/follow-ups"
+import {
+  buildCompareFollowUpActions,
+  buildCompareFollowUps,
+} from "@/lib/querylens/follow-ups"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
 import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
@@ -427,6 +430,15 @@ export async function executeComparePlan(
     supportedFollowUps: buildCompareFollowUps({
       targetWindow,
       comparisonWindow,
+    }),
+    followUpActions: buildCompareFollowUpActions({
+      targetWindow,
+      weakerLabel:
+        comparisonSummary.tie ||
+        comparisonSummary.winnerLabel === compareSpec.rightLabel
+          ? compareSpec.leftLabel
+          : compareSpec.rightLabel,
+      compareDimension: compareSpec.dimension,
     }),
     comparisonSummary,
     sourceMode: args.dataAccess.sourceMode,

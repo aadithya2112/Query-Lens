@@ -1,10 +1,19 @@
 import { z } from "zod"
 
 import { analyzeQuery } from "@/lib/querylens/server/analysis-orchestrator"
+import type { QueryRequestBody } from "@/lib/querylens/types"
 
 const queryRequestSchema = z.object({
   question: z.string().min(1, "Question is required."),
   chatId: z.string().min(1).optional(),
+  action: z
+    .enum(["run_follow_up_question", "leadership_summary"])
+    .optional(),
+  followUpContext: z
+    .object({
+      sourceAnalysis: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
   scope: z
     .object({
       region: z.string().optional(),
@@ -15,7 +24,7 @@ const queryRequestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const payload = queryRequestSchema.parse(await request.json())
+    const payload = queryRequestSchema.parse(await request.json()) as QueryRequestBody
     const response = await analyzeQuery(payload)
     return Response.json(response)
   } catch (error) {

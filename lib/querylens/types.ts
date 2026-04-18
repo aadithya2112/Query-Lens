@@ -266,6 +266,9 @@ export interface PieChartSpec extends BaseChartSpec {
 }
 
 export type ChartSpec = CartesianChartSpec | PieChartSpec
+export type QueryAction = "run_follow_up_question" | "leadership_summary"
+export type InterpretationMode = "direct" | "guided_reroute" | "fallback"
+export type ResponsePresentationMode = "default" | "leadership_summary"
 
 export interface ResultTable {
   columns: string[]
@@ -311,6 +314,37 @@ export interface CatalogSection {
   items: string[]
 }
 
+export interface FollowUpAction {
+  id: string
+  label: string
+  question: string
+  actionType: QueryAction
+  intentHint?: QueryIntent | "leadership_summary"
+}
+
+export interface InterpretationMetadata {
+  mode: InterpretationMode
+  originalQuestion: string
+  resolvedQuestion?: string
+  explanation: string
+}
+
+export interface TrustArtifactSource {
+  sourceType: EvidenceItem["sourceType"] | "manifest"
+  sourceName: string
+  scope: string
+  timeRange: string
+  note: string
+}
+
+export interface TrustArtifacts {
+  howProduced: string[]
+  sourcesUsed: TrustArtifactSource[]
+  directlyObserved: string[]
+  inferred: string[]
+  assumptionsUsed: string[]
+}
+
 export interface RetrievalTrace {
   datasetMatches: string[]
   memoryMatches: string[]
@@ -331,20 +365,30 @@ export interface Phase1AnalysisResponse {
   evidence: EvidenceItem[]
   assumptions: string[]
   supportedFollowUps: string[]
+  followUpActions?: FollowUpAction[]
   comparisonSummary?: ComparisonSummary
   discoverySummary?: DiscoverySummary
   catalogSections?: CatalogSection[]
+  interpretation?: InterpretationMetadata
+  trustArtifacts?: TrustArtifacts
   resultTable?: ResultTable
   queryRuns?: QueryRun[]
   conversationContextUsed?: boolean
   retrievalTrace?: RetrievalTrace
   fallback?: boolean
+  presentationMode?: ResponsePresentationMode
   sourceMode: "database" | "fixture"
+}
+
+export interface FollowUpContext {
+  sourceAnalysis?: Phase1AnalysisResponse
 }
 
 export interface QueryRequestBody {
   question: string
   chatId?: string
+  action?: QueryAction
+  followUpContext?: FollowUpContext
   scope?: ScopeFilter
 }
 
@@ -378,6 +422,10 @@ export interface StoredConversationMessage {
   role: "user" | "assistant"
   text: string
   createdAt: string
+  intent?: QueryIntent
+  metricId?: MetricId
+  activeScope?: string
+  timeframe?: string
 }
 
 export interface RetrievalContext {

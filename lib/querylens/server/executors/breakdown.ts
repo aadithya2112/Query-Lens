@@ -1,5 +1,8 @@
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
-import { buildBreakdownFollowUps } from "@/lib/querylens/follow-ups"
+import {
+  buildBreakdownFollowUpActions,
+  buildBreakdownFollowUps,
+} from "@/lib/querylens/follow-ups"
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
 import {
@@ -282,6 +285,19 @@ export async function executeBreakdownPlan(
   })
 
   const drivers = buildDrivers(buckets)
+  const dataset = getSampleDataset()
+  const healthyPeerLabel =
+    dimension === "region" || dimension === "sector"
+      ? buckets.findLast(
+          (bucket) => bucket.label !== topBucket?.label && bucket.atRiskAccountCount >= 0,
+        )?.label
+      : undefined
+  const topBucketRegionLabel = topBucket?.scope.region
+    ? dataset.regions.find((region) => region.id === topBucket.scope.region)?.name
+    : undefined
+  const topBucketSectorLabel = topBucket?.scope.sector
+    ? dataset.sectors.find((sector) => sector.id === topBucket.scope.sector)?.name
+    : undefined
   const headline = topBucket
     ? `${topBucket.label} leads the at-risk account mix`
     : "No concentrated at-risk pocket was found in the selected range"
@@ -317,6 +333,14 @@ export async function executeBreakdownPlan(
     ),
     supportedFollowUps: buildBreakdownFollowUps({
       targetWindow,
+    }),
+    followUpActions: buildBreakdownFollowUpActions({
+      targetWindow,
+      dimension,
+      topBucketLabel: topBucket?.label,
+      healthyPeerLabel,
+      topBucketRegionLabel,
+      topBucketSectorLabel,
     }),
     sourceMode: args.dataAccess.sourceMode,
   }
