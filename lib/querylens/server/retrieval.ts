@@ -1,5 +1,6 @@
 import { Pool } from "pg"
 
+import { getDatasetSemantics } from "@/lib/querylens/dataset-semantics"
 import { getDatasetDefinition, getDatasetMetricManifest } from "@/lib/querylens/datasets"
 import {
   cosineSimilarity,
@@ -89,6 +90,7 @@ export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
   const dataset = getDatasetDefinition()
   const manifest = getDatasetMetricManifest()
   const sample = getSampleDataset()
+  const semantics = getDatasetSemantics()
   const supportedQuestions = manifest.metrics.flatMap((metric) => metric.exampleQuestions)
 
   return [
@@ -96,7 +98,7 @@ export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
       id: "dataset-overview",
       kind: "overview",
       title: "Dataset overview",
-      content: `${dataset.label} is the active built-in sample dataset. ${dataset.description}`,
+      content: `${dataset.label} is the active built-in sample dataset. ${dataset.description} Current story anchors: stress pocket ${semantics.story.stressPocket}, healthy control ${semantics.story.healthyControl}, softer secondary pocket ${semantics.story.softeningPocket}, and recovery pocket ${semantics.story.recoveryPocket}.`,
     },
     {
       id: "dataset-metrics",

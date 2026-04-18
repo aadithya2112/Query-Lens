@@ -18,6 +18,7 @@ import {
 import type {
   BootstrapPayload,
   Phase1AnalysisResponse,
+  QueryAction,
 } from "@/lib/querylens/types"
 
 const CHAT_ID_STORAGE_KEY = "querylens.chatId"
@@ -165,7 +166,13 @@ export default function Workspace({
     )
   }, [activeAnalysis, isRestored, messages])
 
-  const handleSend = async (question: string) => {
+  const handleSend = async (
+    question: string,
+    options?: {
+      action?: QueryAction
+      sourceAnalysis?: Phase1AnalysisResponse
+    },
+  ) => {
     const trimmed = question.trim()
     if (!trimmed || isLoading) {
       return
@@ -191,6 +198,12 @@ export default function Workspace({
         body: JSON.stringify({
           question: trimmed,
           chatId: chatId || undefined,
+          action: options?.action,
+          followUpContext: options?.sourceAnalysis
+            ? {
+                sourceAnalysis: options.sourceAnalysis,
+              }
+            : undefined,
         }),
       })
 

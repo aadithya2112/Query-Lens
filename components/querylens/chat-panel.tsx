@@ -12,7 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { Phase1AnalysisResponse } from "@/lib/querylens/types"
+import type {
+  FollowUpAction,
+  Phase1AnalysisResponse,
+  QueryAction,
+} from "@/lib/querylens/types"
 
 export interface ConversationMessage {
   id: string
@@ -24,8 +28,30 @@ export interface ConversationMessage {
 interface ChatPanelProps {
   messages: ConversationMessage[]
   isLoading: boolean
-  onSend: (question: string) => Promise<void> | void
+  onSend: (
+    question: string,
+    options?: {
+      action?: QueryAction
+      sourceAnalysis?: Phase1AnalysisResponse
+    },
+  ) => Promise<void> | void
   suggestedPrompts: string[]
+}
+
+function resolveVisibleActions(
+  analysis: Phase1AnalysisResponse,
+): FollowUpAction[] {
+  if (analysis.followUpActions && analysis.followUpActions.length > 0) {
+    return analysis.followUpActions
+  }
+
+  return analysis.supportedFollowUps.map((question, index) => ({
+    id: `fallback-action-${index + 1}`,
+    label:
+      index === 0 ? "Next step" : index === 1 ? "Drill deeper" : "Try another view",
+    question,
+    actionType: "run_follow_up_question" as const,
+  }))
 }
 
 function formatTableValue(value: string | number | boolean | null) {
@@ -148,9 +174,16 @@ function AssistantMessage({
   onSend,
 }: {
   message: ConversationMessage
-  onSend: (question: string) => void
+  onSend: (
+    question: string,
+    options?: {
+      action?: QueryAction
+      sourceAnalysis?: Phase1AnalysisResponse
+    },
+  ) => void
 }) {
   const analysis = message.analysis
+  const followUpActions = analysis ? resolveVisibleActions(analysis) : []
 
   return (
     <div className="ql-enter rounded-3xl border border-border bg-card/50 px-4 py-4">
@@ -181,6 +214,17 @@ function AssistantMessage({
         </p>
       </div>
 
+      {analysis?.interpretation?.mode === "guided_reroute" && (
+        <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-200/80">
+            Guided reroute
+          </p>
+          <p className="mt-2 text-sm leading-6 text-amber-50/90">
+            {analysis.interpretation.explanation}
+          </p>
+        </div>
+      )}
+
       {analysis?.chartSpec && (
         <div className="mt-4">
           <TrendChart analysis={analysis} compact />
@@ -205,16 +249,26 @@ function AssistantMessage({
               Conversation context was used to interpret this reply.
             </p>
           )}
-          {analysis.supportedFollowUps.length > 0 && analysis.confidence >= 50 && !message.text.includes("could not complete that custom analysis safely") && (
+          {followUpActions.length > 0 &&
+            analysis.confidence >= 50 &&
+            !message.text.includes("could not complete that custom analysis safely") && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {analysis.supportedFollowUps.map((followUp) => (
+              {followUpActions.map((followUp) => (
                 <button
-                  key={followUp}
+                  key={followUp.id}
                   className="rounded-full border border-border px-3 py-1.5 text-left text-xs bg-muted/20 text-muted-foreground transition hover:border-muted-foreground hover:text-foreground"
-                  onClick={() => onSend(followUp)}
+                  onClick={() =>
+                    onSend(followUp.question, {
+                      action: followUp.actionType,
+                      sourceAnalysis:
+                        followUp.actionType === "leadership_summary"
+                          ? analysis
+                          : undefined,
+                    })
+                  }
                   type="button"
                 >
-                  {followUp}
+                  {followUp.label}
                 </button>
               ))}
             </div>

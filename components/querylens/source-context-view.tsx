@@ -147,7 +147,7 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#86868b]">
               QueryLens PRO
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/90">Source Context</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/90">Source context</h1>
           </div>
           <Button asChild variant="outline" size="sm" className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white transition-all backdrop-blur-lg">
             <Link href="/demo" className="flex items-center gap-2">
@@ -187,7 +187,7 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
         </section>
 
         <section className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
-          <h2 className="text-xl font-semibold tracking-tight text-white/90">Connected Sources</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-white/90">Connected sources</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {payload.sourceHealth.map((source) => (
               <article
@@ -270,12 +270,12 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
 
         <div className="flex flex-col gap-8 mt-4">
           <PreviewTable
-            title="PostgreSQL Context Preview"
+            title="PostgreSQL preview"
             description="A quick sample from weekly portfolio facts used in analysis responses."
             table={payload.postgresPreview}
           />
           <PreviewTable
-            title="MongoDB Context Preview"
+            title="MongoDB preview"
             description="A quick sample from contextual event documents used for corroboration."
             table={payload.mongoPreview}
           />

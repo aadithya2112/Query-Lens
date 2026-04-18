@@ -1,4 +1,5 @@
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
+import { getScopeLabel } from "@/lib/querylens/dataset-semantics"
 import {
   buildBreakdownFollowUpActions,
   buildBreakdownFollowUps,
@@ -35,30 +36,6 @@ interface BreakdownBucket {
   overdueAccountCount: number
   share: number
   scope: ScopeFilter
-}
-
-function getScopeLabel(scope: ScopeFilter) {
-  const dataset = getSampleDataset()
-  const regionName = scope.region
-    ? dataset.regions.find((region) => region.id === scope.region)?.name
-    : undefined
-  const sectorName = scope.sector
-    ? dataset.sectors.find((sector) => sector.id === scope.sector)?.name
-    : undefined
-
-  if (regionName && sectorName) {
-    return `${regionName} / ${sectorName}`
-  }
-
-  if (regionName) {
-    return regionName
-  }
-
-  if (sectorName) {
-    return sectorName
-  }
-
-  return "Portfolio"
 }
 
 function getBucketId(row: WeeklyAccountStressRow, dimension: BreakdownDimension) {
@@ -288,9 +265,12 @@ export async function executeBreakdownPlan(
   const dataset = getSampleDataset()
   const healthyPeerLabel =
     dimension === "region" || dimension === "sector"
-      ? buckets.findLast(
-          (bucket) => bucket.label !== topBucket?.label && bucket.atRiskAccountCount >= 0,
-        )?.label
+      ? [...buckets]
+          .reverse()
+          .find(
+            (bucket) =>
+              bucket.label !== topBucket?.label && bucket.atRiskAccountCount >= 0,
+          )?.label
       : undefined
   const topBucketRegionLabel = topBucket?.scope.region
     ? dataset.regions.find((region) => region.id === topBucket.scope.region)?.name

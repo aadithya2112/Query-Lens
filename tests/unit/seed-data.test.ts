@@ -31,4 +31,53 @@ describe("sample dataset", () => {
     expect(targetWeek!.cashflowHealthScore).toBeLessThan(25)
     expect(targetWeek!.overdueShare).toBeGreaterThan(0.5)
   })
+
+  it("keeps London & South East professional services as a clear healthy control", () => {
+    const regionSectorRows = getSampleDataset().weeklyMetrics.filter(
+      (row) =>
+        row.recordType === "region_sector" &&
+        row.weekStart === "2026-03-30",
+    )
+
+    const londonProfessionalServices = regionSectorRows.find(
+      (row) =>
+        row.regionId === "london_south_east" &&
+        row.sectorId === "professional_services",
+    )
+    const northWestHospitality = regionSectorRows.find(
+      (row) =>
+        row.regionId === "north_west" && row.sectorId === "hospitality",
+    )
+    const midlandsRetail = regionSectorRows.find(
+      (row) => row.regionId === "midlands" && row.sectorId === "retail",
+    )
+
+    expect(londonProfessionalServices).toBeDefined()
+    expect(northWestHospitality).toBeDefined()
+    expect(midlandsRetail).toBeDefined()
+    expect(londonProfessionalServices!.cashflowHealthScore).toBe(100)
+    expect(londonProfessionalServices!.cashflowHealthScore).toBeGreaterThan(
+      northWestHospitality!.cashflowHealthScore,
+    )
+    expect(londonProfessionalServices!.cashflowHealthScore).toBeGreaterThan(
+      midlandsRetail!.cashflowHealthScore,
+    )
+  })
+
+  it("shows a partial recovery in North West hospitality this week", () => {
+    const regionSectorRows = getSampleDataset().weeklyMetrics.filter(
+      (row) =>
+        row.recordType === "region_sector" &&
+        row.regionId === "north_west" &&
+        row.sectorId === "hospitality",
+    )
+    const lastWeek = regionSectorRows.find((row) => row.weekStart === "2026-03-30")
+    const currentWeek = regionSectorRows.find((row) => row.weekStart === "2026-04-06")
+
+    expect(lastWeek).toBeDefined()
+    expect(currentWeek).toBeDefined()
+    expect(currentWeek!.cashflowHealthScore).toBeGreaterThan(
+      lastWeek!.cashflowHealthScore,
+    )
+  })
 })

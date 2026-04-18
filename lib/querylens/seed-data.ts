@@ -25,33 +25,42 @@ const REGIONS: Region[] = [
   { id: "north_west", name: "North West" },
   { id: "london_south_east", name: "London & South East" },
   { id: "midlands", name: "Midlands" },
+  { id: "scotland", name: "Scotland" },
 ]
 
 const SECTORS: Sector[] = [
   { id: "hospitality", name: "Hospitality" },
   { id: "retail", name: "Retail" },
   { id: "professional_services", name: "Professional Services" },
+  { id: "manufacturing", name: "Manufacturing" },
 ]
 
 const REGION_FACTORS = {
-  north_west: { inbound: 1.02, outbound: 0.99, balance: 1.01, utilization: 0.02 },
+  north_west: { inbound: 0.99, outbound: 1.02, balance: 0.98, utilization: 0.04 },
   london_south_east: {
-    inbound: 1.1,
-    outbound: 1.07,
-    balance: 1.08,
-    utilization: -0.01,
+    inbound: 1.12,
+    outbound: 1.02,
+    balance: 1.12,
+    utilization: -0.03,
   },
-  midlands: { inbound: 0.96, outbound: 0.95, balance: 0.97, utilization: 0.01 },
+  midlands: { inbound: 0.98, outbound: 0.99, balance: 0.99, utilization: 0.01 },
+  scotland: { inbound: 1.01, outbound: 0.96, balance: 1.03, utilization: 0.0 },
 } as const
 
 const SECTOR_FACTORS = {
-  hospitality: { inbound: 0.92, outbound: 1.04, balance: 0.94, utilization: 0.08 },
-  retail: { inbound: 1.01, outbound: 0.99, balance: 1.0, utilization: 0.03 },
+  hospitality: { inbound: 0.91, outbound: 1.05, balance: 0.93, utilization: 0.09 },
+  retail: { inbound: 0.99, outbound: 1.0, balance: 0.98, utilization: 0.04 },
   professional_services: {
-    inbound: 1.08,
-    outbound: 0.9,
-    balance: 1.12,
-    utilization: -0.04,
+    inbound: 1.09,
+    outbound: 0.88,
+    balance: 1.14,
+    utilization: -0.05,
+  },
+  manufacturing: {
+    inbound: 1.02,
+    outbound: 0.97,
+    balance: 1.01,
+    utilization: 0.02,
   },
 } as const
 
@@ -71,14 +80,35 @@ function getScenarioModifier(
     overdueShift: Math.max(0, 0.045 - weekIndex * 0.0025),
   }
 
+  if (weekIndex === 9) {
+    if (regionId === "midlands" && sectorId === "retail") {
+      scenario.inboundModifier *= 0.96
+      scenario.outboundModifier *= 1.03
+      scenario.balanceModifier *= 0.95
+      scenario.utilizationShift += 0.05
+      scenario.lowBalanceShift += 0.06
+      scenario.overdueShift += 0.03
+    }
+  }
+
   if (weekIndex === 10) {
     if (regionId === "north_west" && sectorId === "hospitality") {
-      scenario.inboundModifier *= 0.72
-      scenario.outboundModifier *= 1.19
-      scenario.balanceModifier *= 0.78
-      scenario.utilizationShift += 0.2
-      scenario.lowBalanceShift += 0.24
-      scenario.overdueShift += 0.14
+      scenario.inboundModifier *= 0.68
+      scenario.outboundModifier *= 1.21
+      scenario.balanceModifier *= 0.74
+      scenario.utilizationShift += 0.23
+      scenario.lowBalanceShift += 0.28
+      scenario.overdueShift += 0.16
+    } else if (
+      regionId === "midlands" &&
+      sectorId === "retail"
+    ) {
+      scenario.inboundModifier *= 0.95
+      scenario.outboundModifier *= 1.04
+      scenario.balanceModifier *= 0.94
+      scenario.utilizationShift += 0.06
+      scenario.lowBalanceShift += 0.07
+      scenario.overdueShift += 0.04
     } else if (sectorId === "hospitality") {
       scenario.inboundModifier *= 0.91
       scenario.outboundModifier *= 1.08
@@ -86,6 +116,19 @@ function getScenarioModifier(
       scenario.utilizationShift += 0.07
       scenario.lowBalanceShift += 0.05
       scenario.overdueShift += 0.03
+    } else if (
+      regionId === "london_south_east" &&
+      sectorId === "professional_services"
+    ) {
+      scenario.inboundModifier *= 1.04
+      scenario.outboundModifier *= 0.97
+      scenario.balanceModifier *= 1.03
+      scenario.utilizationShift -= 0.03
+    } else if (sectorId === "professional_services") {
+      scenario.inboundModifier *= 0.99
+      scenario.outboundModifier *= 1.02
+      scenario.balanceModifier *= 0.98
+      scenario.utilizationShift += 0.01
     } else if (regionId === "north_west") {
       scenario.inboundModifier *= 0.95
       scenario.outboundModifier *= 1.03
@@ -97,15 +140,34 @@ function getScenarioModifier(
 
   if (weekIndex === 11) {
     if (regionId === "north_west" && sectorId === "hospitality") {
-      scenario.inboundModifier *= 0.82
-      scenario.outboundModifier *= 1.11
-      scenario.balanceModifier *= 0.88
-      scenario.utilizationShift += 0.1
-      scenario.lowBalanceShift += 0.12
-      scenario.overdueShift += 0.07
+      scenario.inboundModifier *= 0.88
+      scenario.outboundModifier *= 1.07
+      scenario.balanceModifier *= 0.93
+      scenario.utilizationShift += 0.08
+      scenario.lowBalanceShift += 0.1
+      scenario.overdueShift += 0.05
+    } else if (regionId === "midlands" && sectorId === "retail") {
+      scenario.inboundModifier *= 0.98
+      scenario.outboundModifier *= 1.01
+      scenario.balanceModifier *= 0.98
+      scenario.utilizationShift += 0.03
+      scenario.lowBalanceShift += 0.03
+      scenario.overdueShift += 0.01
     } else if (sectorId === "hospitality") {
       scenario.inboundModifier *= 0.96
       scenario.outboundModifier *= 1.02
+    } else if (
+      regionId === "london_south_east" &&
+      sectorId === "professional_services"
+    ) {
+      scenario.inboundModifier *= 1.03
+      scenario.outboundModifier *= 0.98
+      scenario.balanceModifier *= 1.02
+      scenario.utilizationShift -= 0.02
+    } else if (sectorId === "professional_services") {
+      scenario.inboundModifier *= 0.995
+      scenario.outboundModifier *= 1.01
+      scenario.balanceModifier *= 0.99
     }
   }
 
@@ -113,36 +175,43 @@ function getScenarioModifier(
 }
 
 function buildAccounts(): Account[] {
-  const segments: Account["segment"][] = ["starter", "growth", "established"]
+  const segments: Account["segment"][] = ["micro", "growth", "established"]
   const accounts: Account[] = []
 
   REGIONS.forEach((region, regionIndex) => {
     SECTORS.forEach((sector, sectorIndex) => {
       for (let index = 0; index < 2; index += 1) {
-        const variant = regionIndex * 6 + sectorIndex * 2 + index + 1
+        const variant =
+          regionIndex * SECTORS.length * 2 + sectorIndex * 2 + index + 1
         const regionFactor = REGION_FACTORS[region.id as keyof typeof REGION_FACTORS]
         const sectorFactor = SECTOR_FACTORS[sector.id as keyof typeof SECTOR_FACTORS]
         const baseDailyInbound = roundTo(
-          8_000 * regionFactor.inbound * sectorFactor.inbound * (1 + index * 0.08),
+          7_600 * regionFactor.inbound * sectorFactor.inbound * (1 + index * 0.08),
           2
         )
         const baseDailyOutbound = roundTo(
-          6_900 * regionFactor.outbound * sectorFactor.outbound * (1 + index * 0.06),
+          6_500 * regionFactor.outbound * sectorFactor.outbound * (1 + index * 0.06),
           2
         )
         const baseBalance = roundTo(
-          98_000 * regionFactor.balance * sectorFactor.balance * (1 + index * 0.04),
+          94_000 * regionFactor.balance * sectorFactor.balance * (1 + index * 0.04),
           2
         )
 
         accounts.push({
           id: `acc_${variant.toString().padStart(2, "0")}`,
-          businessName: `${region.name} ${sector.name} ${index + 1}`,
+          businessName: `${region.name} ${sector.name} ${index === 0 ? "Micro" : "Growth"} ${index + 1}`,
           regionId: region.id,
           sectorId: sector.id,
           segment: segments[(regionIndex + sectorIndex + index) % segments.length],
           lowBalanceThreshold:
-            sector.id === "hospitality" ? 34_000 : sector.id === "retail" ? 30_000 : 26_000,
+            sector.id === "hospitality"
+              ? 36_000
+              : sector.id === "retail"
+                ? 31_000
+                : sector.id === "manufacturing"
+                  ? 29_000
+                  : 26_000,
           baseDailyInbound,
           baseDailyOutbound,
           baseBalance,
@@ -434,6 +503,17 @@ function buildContextEvents(
         "north_west",
         "hospitality"
       ),
+      buildEvent(
+        "cmp_03",
+        "complaints",
+        `${lastWeekStart}T17:10:00Z`,
+        lastWeekStart,
+        "low",
+        "Midlands retailers flagged softer weekend takings.",
+        "A handful of Midlands retail clients reported slower card turnover and tighter end-of-day balances, but not at the same severity as North West hospitality.",
+        "midlands",
+        "retail"
+      ),
     ],
     service_incidents: [
       buildEvent(
@@ -457,6 +537,17 @@ function buildContextEvents(
         "Operations confirmed the payment-settlement queue returned to expected latency this week.",
         "north_west",
         null
+      ),
+      buildEvent(
+        "svc_03",
+        "service_incidents",
+        `${lastWeekStart}T10:20:00Z`,
+        lastWeekStart,
+        "low",
+        "No material disruption was recorded in London professional services.",
+        "Operations checks showed London & South East professional services merchants kept normal settlement timings through the same period.",
+        "london_south_east",
+        "professional_services"
       ),
     ],
     risk_alerts: [
@@ -482,6 +573,17 @@ function buildContextEvents(
         null,
         "hospitality"
       ),
+      buildEvent(
+        "risk_03",
+        "risk_alerts",
+        `${lastWeekStart}T15:00:00Z`,
+        lastWeekStart,
+        "medium",
+        "Midlands retail showed a smaller but visible stress pickup.",
+        "The risk engine recorded a modest rise in low-balance days for Midlands retail accounts, though the movement stayed well below the North West hospitality spike.",
+        "midlands",
+        "retail"
+      ),
     ],
     rm_notes: [
       buildEvent(
@@ -505,6 +607,17 @@ function buildContextEvents(
         "Early-week notes suggest payment timings are improving, although balances are still below their normal range.",
         "north_west",
         "hospitality"
+      ),
+      buildEvent(
+        "rm_03",
+        "rm_notes",
+        `${lastWeekStart}T12:30:00Z`,
+        lastWeekStart,
+        "low",
+        "Relationship managers described London professional services as stable.",
+        "Cash positions for London & South East professional services clients remained comfortably above threshold, making them the clearest healthy control in the current portfolio story.",
+        "london_south_east",
+        "professional_services"
       ),
     ],
   }

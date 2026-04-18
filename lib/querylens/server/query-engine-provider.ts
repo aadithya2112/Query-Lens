@@ -1,6 +1,7 @@
 import { FunctionCallingConfigMode, type FunctionDeclaration } from "@google/genai"
 import { z } from "zod"
 
+import { getSupportedEntityLabels } from "@/lib/querylens/dataset-semantics"
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
 import { DEFAULT_WHAT_CHANGED_FOLLOW_UPS } from "@/lib/querylens/follow-ups"
 import {
@@ -296,6 +297,8 @@ function formatRetrievedContext(retrievalContext?: RetrievalContext) {
 }
 
 function buildPlannerPrompt(question: string, retrievalContext?: RetrievalContext) {
+  const supportedEntities = getSupportedEntityLabels()
+
   return `
 You are planning a QueryLens analytics query.
 
@@ -318,8 +321,8 @@ Supported product boundaries:
   - metric: dataset_catalog
   - discoveryFocus: overview, metrics, sources, dimensions, time_coverage, or questions
 - deterministic parsing resolves exact dates, date ranges, week-of phrases, region, sector, and peer entities after you choose the intent and mode
-- supported regions: North West, London & South East, Midlands
-- supported sectors: Hospitality, Retail, Professional Services
+- supported regions: ${supportedEntities.regions.join(", ")}
+- supported sectors: ${supportedEntities.sectors.join(", ")}
 
 Use retrieved context to resolve references like "that", "there", "those metrics", or "that region".
 

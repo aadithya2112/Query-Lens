@@ -90,7 +90,7 @@ export interface Account {
   businessName: string
   regionId: string
   sectorId: string
-  segment: "starter" | "growth" | "established"
+  segment: "micro" | "growth" | "established"
   lowBalanceThreshold: number
   baseDailyInbound: number
   baseDailyOutbound: number

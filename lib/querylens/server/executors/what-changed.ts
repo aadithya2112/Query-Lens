@@ -3,11 +3,12 @@ import {
   formatContextualDateWindowLabel,
   formatPriorPeriodComparisonLabel,
 } from "@/lib/querylens/date-windows"
+import { getScopeLabel } from "@/lib/querylens/dataset-semantics"
 import {
   buildWhatChangedFollowUpActions,
   buildWhatChangedFollowUps,
 } from "@/lib/querylens/follow-ups"
-import { formatWeekLabel, getSampleDataset } from "@/lib/querylens/seed-data"
+import { formatWeekLabel } from "@/lib/querylens/seed-data"
 import {
   calculateConfidenceScore,
   calculateWeightedDriverImpact,
@@ -42,30 +43,6 @@ interface WhatChangedExecutorArgs {
   }) => Promise<
     Pick<Phase1AnalysisResponse, "headline" | "summary" | "supportedFollowUps">
   >
-}
-
-export function getScopeLabel(scope: ScopeFilter) {
-  const dataset = getSampleDataset()
-  const regionName = scope.region
-    ? dataset.regions.find((region) => region.id === scope.region)?.name
-    : undefined
-  const sectorName = scope.sector
-    ? dataset.sectors.find((sector) => sector.id === scope.sector)?.name
-    : undefined
-
-  if (regionName && sectorName) {
-    return `${regionName} / ${sectorName}`
-  }
-
-  if (regionName) {
-    return regionName
-  }
-
-  if (sectorName) {
-    return sectorName
-  }
-
-  return "Portfolio"
 }
 
 export function filterRowsForScope(rows: WeeklyMetricRow[], scope: ScopeFilter) {
