@@ -239,8 +239,8 @@ function ObservedVsInferred({ analysis }: EvidencePanelProps) {
           </h2>
         </div>
         <div className="mt-5 space-y-4">
-          {analysis.trustArtifacts.directlyObserved.map((item) => (
-            <div key={item} className="flex gap-3">
+          {analysis.trustArtifacts.directlyObserved.map((item, index) => (
+            <div key={`observed-${index}-${item}`} className="flex gap-3">
               <ChevronRight
                 size={16}
                 className="mt-1 shrink-0 text-muted-foreground"
@@ -259,8 +259,8 @@ function ObservedVsInferred({ analysis }: EvidencePanelProps) {
           </h2>
         </div>
         <div className="mt-5 space-y-4">
-          {analysis.trustArtifacts.inferred.map((item) => (
-            <div key={item} className="flex gap-3">
+          {analysis.trustArtifacts.inferred.map((item, index) => (
+            <div key={`inferred-${index}-${item}`} className="flex gap-3">
               <ChevronRight
                 size={16}
                 className="mt-1 shrink-0 text-muted-foreground"
@@ -342,8 +342,11 @@ function CatalogSections({ analysis }: EvidencePanelProps) {
             </p>
             {section.items.length > 0 && (
               <ul className="mt-3 space-y-2">
-                {section.items.map((item) => (
-                  <li key={item} className="text-sm text-muted-foreground">
+                {section.items.map((item, index) => (
+                  <li
+                    key={`catalog-item-${section.id}-${index}-${item}`}
+                    className="text-sm text-muted-foreground"
+                  >
                     {item}
                   </li>
                 ))}
