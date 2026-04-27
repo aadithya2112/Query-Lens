@@ -3,13 +3,18 @@ import type {
   BuiltInExecutionPlan,
 } from "@/lib/querylens/server/built-in-pipeline/types"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
-import type { RetrievalContext, WeeklyMetricRow } from "@/lib/querylens/types"
+import type {
+  DatasetProfileSnapshot,
+  RetrievalContext,
+  WeeklyMetricRow,
+} from "@/lib/querylens/types"
 
 export type BuiltInCapabilityName = BuiltInExecutionCapability
 
 export interface BuiltInCapabilityContext {
   executionPlan: BuiltInExecutionPlan
   dataAccess: QueryLensDataAccess
+  profileSnapshot: DatasetProfileSnapshot
   weeklyRows: WeeklyMetricRow[]
   retrievalContext: RetrievalContext
 }

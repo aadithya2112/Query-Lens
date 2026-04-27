@@ -212,6 +212,7 @@ interface StoredAgenticQueryRun {
 interface ExecuteAgenticFallbackArgs {
   question: string
   dataAccess: QueryLensDataAccess
+  schemaSnapshot: AgenticSchemaSnapshot
   retrievalContext: RetrievalContext
 }
 
@@ -488,7 +489,6 @@ function buildEvidenceFromQueryRuns(
 export async function executeAgenticFallback(
   args: ExecuteAgenticFallbackArgs
 ): Promise<Phase1AnalysisResponse> {
-  const schema = await args.dataAccess.getAgenticSchemaSnapshot()
   const chat = createGeminiChatSession({
     temperature: 0,
     tools: [{ functionDeclarations: agenticTools }],
@@ -508,7 +508,7 @@ export async function executeAgenticFallback(
     message: buildAgenticPrompt({
       question: args.question,
       retrievalContext: args.retrievalContext,
-      schema,
+      schema: args.schemaSnapshot,
     }),
   })
 

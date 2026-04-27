@@ -5,7 +5,9 @@ test("renders the phase-1 vertical slice and answers the flagship question", asy
 }) => {
   await page.goto("/")
 
-  await expect(page.getByRole("heading", { name: "Query Lens" })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Talk to Data. Brilliantly simple." })
+  ).toBeVisible()
   await page.getByRole("link", { name: "Launch Workspace" }).click()
 
   await expect(page.getByPlaceholder("Ask a question...")).toBeVisible({

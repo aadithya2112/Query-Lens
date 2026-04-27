@@ -1,3 +1,4 @@
+import { buildDatasetCatalogProfile } from "@/lib/querylens/server/profile-store"
 import { getDatasetDefinition } from "@/lib/querylens/datasets"
 import { buildDiscoveryCatalogSections } from "@/lib/querylens/server/retrieval"
 import type {
@@ -71,10 +72,11 @@ export async function profileDatasetCapability(args: {
   assertBuiltInCapability(args.context, "profile_dataset")
 
   const dataset = getDatasetDefinition(args.plan.datasetId)
-  const sourceHealth = await args.context.dataAccess.getSourceHealth()
+  const sourceHealth = args.context.profileSnapshot.sourceHealth
   const coverageLabel = buildCoverageLabel(args.context.weeklyRows)
+  const catalogProfile = buildDatasetCatalogProfile(args.context.profileSnapshot)
   const catalogSections = prioritizeCatalogSections({
-    sections: buildDiscoveryCatalogSections(),
+    sections: buildDiscoveryCatalogSections(catalogProfile),
     plan: args.plan,
     retrievalContext: args.context.retrievalContext,
   }).slice(0, 4)

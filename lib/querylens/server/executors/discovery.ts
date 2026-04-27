@@ -18,7 +18,6 @@ interface DiscoveryExecutorArgs {
   weeklyRows: WeeklyMetricRow[]
   dataAccess: {
     sourceMode: "database" | "fixture"
-    getSourceHealth: () => Promise<SourceHealth[]>
   }
   retrievalContext: RetrievalContext
 }

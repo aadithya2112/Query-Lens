@@ -1,4 +1,4 @@
-import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
+import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import type { AgenticSchemaObject } from "@/lib/querylens/server/agentic-types"
 import type {
   ContextEvent,
@@ -77,37 +77,33 @@ function buildMongoPreview(rows: ContextEvent[]): ResultTable {
 }
 
 export async function getSourceContextPayload(): Promise<SourceContextPayload> {
-  const dataAccess = await getQueryLensDataAccess()
+  const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
+  const profileSnapshot = await profileStore.getProfileSnapshot()
 
-  const [sourceHealth, schema, coverage, weeklyMetrics] = await Promise.all([
-    dataAccess.getSourceHealth(),
-    dataAccess.getAgenticSchemaSnapshot(),
-    dataAccess.getDateCoverage(),
-    dataAccess.listWeeklyMetrics(),
-  ])
+  const [weeklyMetrics] = await Promise.all([dataAccess.listWeeklyMetrics()])
 
   const contextEvents = await dataAccess.listContextEvents({
-    targetStart: coverage.startDate,
-    targetEnd: coverage.endDate,
+    targetStart: profileSnapshot.dateCoverage.startDate,
+    targetEnd: profileSnapshot.dateCoverage.endDate,
     scope: {},
   })
 
-  const postgresPrimaryObjects = schema.postgres
+  const postgresPrimaryObjects = profileSnapshot.schemaSnapshot.postgres
     .map((table) => table.name)
     .slice(0, 3)
     .join(", ")
 
-  const mongoPrimaryObjects = schema.mongodb
+  const mongoPrimaryObjects = profileSnapshot.schemaSnapshot.mongodb
     .map((collection) => collection.name)
     .join(", ")
 
   return {
     sourceMode: dataAccess.sourceMode,
-    sourceHealth,
+    sourceHealth: profileSnapshot.sourceHealth,
     summaries: [
       {
         title: "What data is present",
-        description: `QueryLens has ${schema.postgres.length} PostgreSQL tables and ${schema.mongodb.length} MongoDB collections available for analysis.`,
+        description: `QueryLens has ${profileSnapshot.schemaSnapshot.postgres.length} PostgreSQL tables and ${profileSnapshot.schemaSnapshot.mongodb.length} MongoDB collections available for analysis.`,
       },
       {
         title: "How data is used",
@@ -121,8 +117,8 @@ export async function getSourceContextPayload(): Promise<SourceContextPayload> {
             : "This workspace is running against the built-in fixture dataset with the same schema shape.",
       },
     ],
-    postgresSchema: schema.postgres,
-    mongoSchema: schema.mongodb,
+    postgresSchema: profileSnapshot.schemaSnapshot.postgres,
+    mongoSchema: profileSnapshot.schemaSnapshot.mongodb,
     postgresPreview: buildPostgresPreview(weeklyMetrics),
     mongoPreview: buildMongoPreview(contextEvents),
   }

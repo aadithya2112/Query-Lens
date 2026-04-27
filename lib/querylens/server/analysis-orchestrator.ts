@@ -2,9 +2,9 @@ import { canUseGemini } from "@/lib/querylens/server/ai-config"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
 import { runBuiltInAnalysisPipeline } from "@/lib/querylens/server/built-in-pipeline"
+import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import { presentBuiltInFallback, enrichPhase1Response } from "@/lib/querylens/server/built-in-pipeline/presentation"
 import { buildLeadershipSummaryResponse } from "@/lib/querylens/server/response-enrichment"
-import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import { getQueryLensRetrievalStore } from "@/lib/querylens/server/retrieval"
 import type {
   Phase1AnalysisResponse,
@@ -38,7 +38,8 @@ export async function analyzeQuery(
   options: { executionContext?: QueryLensExecutionContext } = {},
 ): Promise<Phase1AnalysisResponse> {
   const executionContext = options.executionContext ?? "interactive"
-  const dataAccess = await getQueryLensDataAccess()
+  const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
+  const profileSnapshot = await profileStore.getProfileSnapshot()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
   const dateCoverage = await dataAccess.getDateCoverage()
   const retrievalStore = await getQueryLensRetrievalStore()
@@ -87,6 +88,7 @@ export async function analyzeQuery(
     input,
     executionContext,
     dataAccess,
+    profileSnapshot,
     weeklyRows,
     dateCoverage,
     retrievalContext,
@@ -127,6 +129,7 @@ export async function analyzeQuery(
     const agenticResponse = await executeAgenticFallback({
       question: input.question,
       dataAccess,
+      schemaSnapshot: profileSnapshot.schemaSnapshot,
       retrievalContext,
     })
 

@@ -475,6 +475,71 @@ export interface SourceHealth {
   recordCount?: number
 }
 
+export type QueryLensSourceMode = "database" | "fixture"
+
+export interface DatasetSourceCount {
+  sourceId: SourceHealth["id"]
+  sourceLabel: SourceHealth["name"]
+  recordCount: number
+}
+
+export interface DatasetProfileSnapshot {
+  datasetId: DatasetId
+  sourceMode: QueryLensSourceMode
+  dateCoverage: {
+    startDate: string
+    endDate: string
+  }
+  sourceHealth: SourceHealth[]
+  schemaSnapshot: import("@/lib/querylens/server/agentic-types").AgenticSchemaSnapshot
+  sourceCounts: DatasetSourceCount[]
+}
+
+export interface DatasetSemanticDraft {
+  datasetId: DatasetId
+  datasetLabel: string
+  description: string
+  sourceMode: QueryLensSourceMode
+  timeCoverage: string
+  dimensions: Array<{
+    id: ScopeType
+    label: string
+  }>
+  metrics: Array<{
+    id: MetricId
+    label: string
+    supportedIntents: QueryIntent[]
+  }>
+  sources: Array<{
+    id: string
+    label: string
+    type: "postgres" | "mongodb" | "manifest"
+    description: string
+    recordCount: number
+  }>
+  notes: string[]
+}
+
+export interface DatasetCatalogProfile {
+  datasetLabel: string
+  datasetDescription: string
+  sourceMode: QueryLensSourceMode
+  storyAnchors: SemanticStoryAnchors
+  timeCoverage: string
+  sourceLabels: string[]
+  sourceSummaries: Array<{
+    id: string
+    label: string
+    description: string
+    recordCount: number
+  }>
+  metricLabels: string[]
+  dimensionLabels: string[]
+  regionLabels: string[]
+  sectorLabels: string[]
+  supportedQuestions: string[]
+}
+
 export interface BootstrapPayload {
   initialQuestion: string
   metrics: MetricDefinition[]

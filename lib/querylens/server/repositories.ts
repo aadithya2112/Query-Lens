@@ -1,23 +1,24 @@
-import { MongoClient } from "mongodb"
-import { Pool } from "pg"
-
 import { getSampleDataset } from "@/lib/querylens/seed-data"
-import type {
-  AgenticQueryExecutionResult,
-  AgenticSchemaSnapshot,
-} from "@/lib/querylens/server/agentic-types"
+import type { AgenticQueryExecutionResult } from "@/lib/querylens/server/agentic-types"
+import {
+  CONTEXT_COLLECTIONS,
+  getMongoClientPromise,
+  getPgPool,
+  normalizeDateValue,
+  sortContextEvents,
+} from "@/lib/querylens/server/runtime-shared"
 import type {
   ContextCollection,
   ContextEvent,
   DailyAccountMetric,
+  QueryLensSourceMode,
   ScopeFilter,
-  SourceHealth,
   WeeklyAccountStressRow,
   WeeklyMetricRow,
 } from "@/lib/querylens/types"
 
 export interface QueryLensDataAccess {
-  sourceMode: "database" | "fixture"
+  sourceMode: QueryLensSourceMode
   listWeeklyMetrics(): Promise<WeeklyMetricRow[]>
   listDailyMetrics(args: {
     startDate: string
@@ -37,8 +38,6 @@ export interface QueryLensDataAccess {
     startDate: string
     endDate: string
   }>
-  getSourceHealth(): Promise<SourceHealth[]>
-  getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot>
   executeReadOnlySql(args: {
     statement: string
     maxRows: number
@@ -49,157 +48,6 @@ export interface QueryLensDataAccess {
     maxRows: number
   }): Promise<AgenticQueryExecutionResult>
 }
-
-declare global {
-  var __querylensPgPool: Pool | undefined
-  var __querylensMongoClientPromise: Promise<MongoClient> | undefined
-}
-
-const CONTEXT_COLLECTIONS: ContextCollection[] = [
-  "complaints",
-  "service_incidents",
-  "risk_alerts",
-  "rm_notes",
-]
-
-const AGENTIC_POSTGRES_TABLES = [
-  {
-    name: "regions",
-    description: "Reference table of supported SME regions.",
-    columns: ["id", "name"],
-  },
-  {
-    name: "sectors",
-    description: "Reference table of supported SME sectors.",
-    columns: ["id", "name"],
-  },
-  {
-    name: "accounts",
-    description: "Account master data with region, sector, segment, and baseline thresholds.",
-    columns: [
-      "id",
-      "business_name",
-      "region_id",
-      "sector_id",
-      "segment",
-      "low_balance_threshold",
-      "base_daily_inbound",
-      "base_daily_outbound",
-      "base_balance",
-      "base_utilization",
-    ],
-  },
-  {
-    name: "daily_account_metrics",
-    description: "Daily account facts including balances, payments, utilization, and stress flags.",
-    columns: [
-      "account_id",
-      "date",
-      "week_start",
-      "region_id",
-      "sector_id",
-      "inbound_payments",
-      "outbound_payments",
-      "end_balance",
-      "loan_utilization",
-      "low_balance_flag",
-      "overdue_flag",
-    ],
-  },
-  {
-    name: "weekly_portfolio_metrics",
-    description: "Weekly portfolio, region, sector, and region-sector aggregates with cashflow health components.",
-    columns: [
-      "week_start",
-      "week_end",
-      "record_type",
-      "region_id",
-      "sector_id",
-      "region_name",
-      "sector_name",
-      "account_count",
-      "inbound_payments",
-      "outbound_payments",
-      "opening_balance",
-      "closing_balance",
-      "low_balance_share",
-      "overdue_share",
-      "avg_utilization",
-      "inflow_outflow_score",
-      "balance_trend_score",
-      "low_balance_score",
-      "overdue_score",
-      "cashflow_health_score",
-    ],
-  },
-] as const
-
-const AGENTIC_MONGO_COLLECTIONS = [
-  {
-    name: "complaints",
-    description: "Customer complaint events tied to regions, sectors, and severity.",
-    columns: [
-      "id",
-      "occurredAt",
-      "weekStart",
-      "regionId",
-      "sectorId",
-      "regionName",
-      "sectorName",
-      "severity",
-      "summary",
-      "detail",
-    ],
-  },
-  {
-    name: "service_incidents",
-    description: "Operational incidents that can corroborate payment disruption or service stress.",
-    columns: [
-      "id",
-      "occurredAt",
-      "weekStart",
-      "regionId",
-      "sectorId",
-      "regionName",
-      "sectorName",
-      "severity",
-      "summary",
-      "detail",
-    ],
-  },
-  {
-    name: "risk_alerts",
-    description: "Risk alerts that provide contextual signals around exposure changes.",
-    columns: [
-      "id",
-      "occurredAt",
-      "weekStart",
-      "regionId",
-      "sectorId",
-      "regionName",
-      "sectorName",
-      "severity",
-      "summary",
-      "detail",
-    ],
-  },
-  {
-    name: "rm_notes",
-    description: "Relationship-manager notes used as qualitative corroborating context.",
-    columns: [
-      "id",
-      "occurredAt",
-      "weekStart",
-      "regionId",
-      "sectorId",
-      "regionName",
-      "sectorName",
-      "severity",
-      "summary",
-      "detail",
-    ],
-  },
-] as const
 
 interface WeeklyMetricDbRow {
   week_start: string | Date
@@ -222,10 +70,6 @@ interface WeeklyMetricDbRow {
   low_balance_score: number | string
   overdue_score: number | string
   cashflow_health_score: number | string
-}
-
-interface CountRow {
-  count: number | string
 }
 
 interface CoverageRow {
@@ -256,25 +100,6 @@ interface DailyMetricDbRow {
   loan_utilization: number | string
   low_balance_flag: boolean
   overdue_flag: boolean
-}
-
-function sortContextEvents(left: ContextEvent, right: ContextEvent) {
-  const severityOrder = { high: 0, medium: 1, low: 2 }
-  const severitySort = severityOrder[left.severity] - severityOrder[right.severity]
-  if (severitySort !== 0) return severitySort
-  return left.occurredAt.localeCompare(right.occurredAt)
-}
-
-function normalizeDateValue(value: string | Date) {
-  if (typeof value === "string") {
-    return value.slice(0, 10)
-  }
-
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, "0")
-  const day = String(value.getDate()).padStart(2, "0")
-
-  return `${year}-${month}-${day}`
 }
 
 function serializeQueryValue(value: unknown): string | number | boolean | null {
@@ -326,30 +151,6 @@ function normalizeQueryRows(
     ),
     totalRows: rows.length,
     truncated: rows.length > maxRows,
-  }
-}
-
-function buildFixtureAgenticSchemaSnapshot(): AgenticSchemaSnapshot {
-  const dataset = getSampleDataset()
-
-  return {
-    postgres: AGENTIC_POSTGRES_TABLES.map((table) => ({
-      ...table,
-      rowCount:
-        table.name === "regions"
-          ? dataset.regions.length
-          : table.name === "sectors"
-            ? dataset.sectors.length
-            : table.name === "accounts"
-              ? dataset.accounts.length
-              : table.name === "daily_account_metrics"
-                ? dataset.dailyMetrics.length
-                : dataset.weeklyMetrics.length,
-    })),
-    mongodb: AGENTIC_MONGO_COLLECTIONS.map((collection) => ({
-      ...collection,
-      rowCount: dataset.contextEvents[collection.name as ContextCollection].length,
-    })),
   }
 }
 
@@ -458,47 +259,6 @@ class FixtureDataAccess implements QueryLensDataAccess {
     }
   }
 
-  async getSourceHealth(): Promise<SourceHealth[]> {
-    const dataset = getSampleDataset()
-
-    return [
-      {
-        id: "postgres",
-        name: "Postgres facts",
-        type: "postgres",
-        status: "sample-fixture",
-        detail: `${dataset.accounts.length} accounts · ${dataset.dailyMetrics.length} daily rows · ${dataset.weeklyMetrics.length} weekly rows`,
-        recordCount: dataset.weeklyMetrics.length,
-      },
-      {
-        id: "mongodb",
-        name: "Mongo context",
-        type: "mongodb",
-        status: "sample-fixture",
-        detail: `${CONTEXT_COLLECTIONS.reduce(
-          (total, collection) => total + dataset.contextEvents[collection].length,
-          0
-        )} contextual documents across 4 collections`,
-        recordCount: CONTEXT_COLLECTIONS.reduce(
-          (total, collection) => total + dataset.contextEvents[collection].length,
-          0
-        ),
-      },
-      {
-        id: "manifest",
-        name: "Metric manifest",
-        type: "manifest",
-        status: "configured",
-        detail: "1 supported metric with fixed weekly definitions",
-        recordCount: 1,
-      },
-    ]
-  }
-
-  async getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot> {
-    return buildFixtureAgenticSchemaSnapshot()
-  }
-
   async executeReadOnlySql(): Promise<AgenticQueryExecutionResult> {
     throw new Error("Agentic SQL execution is only available in database mode.")
   }
@@ -506,34 +266,6 @@ class FixtureDataAccess implements QueryLensDataAccess {
   async executeReadOnlyMongoPipeline(): Promise<AgenticQueryExecutionResult> {
     throw new Error("Agentic Mongo execution is only available in database mode.")
   }
-}
-
-function getPgPool() {
-  if (!process.env.POSTGRES_URL) {
-    throw new Error("POSTGRES_URL is not configured.")
-  }
-
-  if (!globalThis.__querylensPgPool) {
-    globalThis.__querylensPgPool = new Pool({
-      connectionString: process.env.POSTGRES_URL,
-    })
-  }
-
-  return globalThis.__querylensPgPool
-}
-
-function getMongoClientPromise() {
-  if (!process.env.MONGODB_URL) {
-    throw new Error("MONGODB_URL is not configured.")
-  }
-
-  if (!globalThis.__querylensMongoClientPromise) {
-    globalThis.__querylensMongoClientPromise = new MongoClient(
-      process.env.MONGODB_URL
-    ).connect()
-  }
-
-  return globalThis.__querylensMongoClientPromise
 }
 
 class DatabaseDataAccess implements QueryLensDataAccess {
@@ -730,94 +462,6 @@ class DatabaseDataAccess implements QueryLensDataAccess {
     }
   }
 
-  async getSourceHealth(): Promise<SourceHealth[]> {
-    const pool = getPgPool()
-    const client = await getMongoClientPromise()
-    const db = client.db()
-
-    const [
-      accountCount,
-      dailyCount,
-      weeklyCount,
-      complaintsCount,
-      incidentsCount,
-      riskCount,
-      notesCount,
-    ] = await Promise.all([
-      pool.query<CountRow>("SELECT COUNT(*)::int AS count FROM accounts"),
-      pool.query<CountRow>("SELECT COUNT(*)::int AS count FROM daily_account_metrics"),
-      pool.query<CountRow>("SELECT COUNT(*)::int AS count FROM weekly_portfolio_metrics"),
-      db.collection("complaints").countDocuments(),
-      db.collection("service_incidents").countDocuments(),
-      db.collection("risk_alerts").countDocuments(),
-      db.collection("rm_notes").countDocuments(),
-    ])
-
-    const accountTotal = Number(accountCount.rows[0].count)
-    const dailyTotal = Number(dailyCount.rows[0].count)
-    const weeklyTotal = Number(weeklyCount.rows[0].count)
-    const mongoTotal =
-      complaintsCount + incidentsCount + riskCount + notesCount
-
-    return [
-      {
-        id: "postgres",
-        name: "Postgres facts",
-        type: "postgres",
-        status: "connected",
-        detail: `${accountTotal} accounts · ${dailyTotal} daily rows · ${weeklyTotal} weekly rows`,
-        recordCount: weeklyTotal,
-      },
-      {
-        id: "mongodb",
-        name: "Mongo context",
-        type: "mongodb",
-        status: "connected",
-        detail: `${mongoTotal} contextual documents across 4 collections`,
-        recordCount: mongoTotal,
-      },
-      {
-        id: "manifest",
-        name: "Metric manifest",
-        type: "manifest",
-        status: "configured",
-        detail: "1 supported metric with fixed weekly definitions",
-        recordCount: 1,
-      },
-    ]
-  }
-
-  async getAgenticSchemaSnapshot(): Promise<AgenticSchemaSnapshot> {
-    const pool = getPgPool()
-    const client = await getMongoClientPromise()
-    const db = client.db()
-
-    const postgresCounts = await Promise.all(
-      AGENTIC_POSTGRES_TABLES.map(async (table) => {
-        const result = await pool.query<CountRow>(
-          `SELECT COUNT(*)::int AS count FROM ${table.name}`
-        )
-
-        return {
-          ...table,
-          rowCount: Number(result.rows[0]?.count ?? 0),
-        }
-      })
-    )
-
-    const mongodbCounts = await Promise.all(
-      AGENTIC_MONGO_COLLECTIONS.map(async (collection) => ({
-        ...collection,
-        rowCount: await db.collection(collection.name).countDocuments(),
-      }))
-    )
-
-    return {
-      postgres: postgresCounts,
-      mongodb: mongodbCounts,
-    }
-  }
-
   async executeReadOnlySql(args: {
     statement: string
     maxRows: number
@@ -886,31 +530,10 @@ class DatabaseDataAccess implements QueryLensDataAccess {
   }
 }
 
-async function canUseDatabaseAdapter() {
-  if (
-    process.env.QUERYLENS_DATA_MODE === "fixture" ||
-    !process.env.POSTGRES_URL ||
-    !process.env.MONGODB_URL
-  ) {
-    return false
-  }
-
-  try {
-    const pool = getPgPool()
-    const mongo = await getMongoClientPromise()
-
-    await Promise.all([pool.query("SELECT 1"), mongo.db().command({ ping: 1 })])
-    return true
-  } catch (error) {
-    console.warn("QueryLens database adapters unavailable, falling back to the sample dataset.", error)
-    return false
-  }
+export function createFixtureDataAccess(): QueryLensDataAccess {
+  return new FixtureDataAccess()
 }
 
-export async function getQueryLensDataAccess(): Promise<QueryLensDataAccess> {
-  if (await canUseDatabaseAdapter()) {
-    return new DatabaseDataAccess()
-  }
-
-  return new FixtureDataAccess()
+export function createDatabaseDataAccess(): QueryLensDataAccess {
+  return new DatabaseDataAccess()
 }

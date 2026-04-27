@@ -10,6 +10,7 @@ import type {
 } from "@/lib/querylens/server/built-in-pipeline/types"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
+  DatasetProfileSnapshot,
   RetrievalContext,
   WeeklyMetricRow,
 } from "@/lib/querylens/types"
@@ -17,6 +18,7 @@ import type {
 export async function executeBuiltInPlan(args: {
   executionPlan: BuiltInExecutionPlan
   dataAccess: QueryLensDataAccess
+  profileSnapshot: DatasetProfileSnapshot
   weeklyRows: WeeklyMetricRow[]
   retrievalContext: RetrievalContext
 }): Promise<BuiltInExecutionResult> {
@@ -24,6 +26,7 @@ export async function executeBuiltInPlan(args: {
   const capabilityContext: BuiltInCapabilityContext = {
     executionPlan: args.executionPlan,
     dataAccess: args.dataAccess,
+    profileSnapshot: args.profileSnapshot,
     weeklyRows: args.weeklyRows,
     retrievalContext: args.retrievalContext,
   }

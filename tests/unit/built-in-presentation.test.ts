@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest"
 
 import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
+import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
-import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 
 describe("built-in presentation stage", () => {
   it("presents what-changed execution data through the narrative composer and enrichment layer", async () => {
-    const dataAccess = await getQueryLensDataAccess()
+    const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
     const weeklyRows = await dataAccess.listWeeklyMetrics()
     const dateCoverage = await dataAccess.getDateCoverage()
+    const profileSnapshot = await profileStore.getProfileSnapshot()
     const { executeBuiltInPlan } = await import(
       "@/lib/querylens/server/built-in-pipeline/execution"
     )
@@ -23,6 +24,7 @@ describe("built-in presentation stage", () => {
         dateCoverage,
       }),
       dataAccess,
+      profileSnapshot,
       weeklyRows,
       retrievalContext: {
         datasetMatches: [],
@@ -60,9 +62,10 @@ describe("built-in presentation stage", () => {
   })
 
   it("presents compare, breakdown, and discovery execution results without recomputing grounded artifacts", async () => {
-    const dataAccess = await getQueryLensDataAccess()
+    const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
     const weeklyRows = await dataAccess.listWeeklyMetrics()
     const dateCoverage = await dataAccess.getDateCoverage()
+    const profileSnapshot = await profileStore.getProfileSnapshot()
     const { executeBuiltInPlan } = await import(
       "@/lib/querylens/server/built-in-pipeline/execution"
     )
@@ -83,6 +86,7 @@ describe("built-in presentation stage", () => {
           dateCoverage,
         }),
         dataAccess,
+        profileSnapshot,
         weeklyRows,
         retrievalContext: {
           datasetMatches: [],
@@ -119,7 +123,7 @@ describe("built-in presentation stage", () => {
   })
 
   it("enriches shared fallback responses only in the presentation layer", async () => {
-    const dataAccess = await getQueryLensDataAccess()
+    const { dataAccess } = await getQueryLensDatasetRuntime()
     const weeklyRows = await dataAccess.listWeeklyMetrics()
     const { presentBuiltInFallback } = await import(
       "@/lib/querylens/server/built-in-pipeline/presentation"

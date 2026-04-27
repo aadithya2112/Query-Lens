@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
+import { buildDatasetCatalogProfile } from "@/lib/querylens/server/profile-store"
 import {
   cosineSimilarity,
   embedTexts,
@@ -12,8 +14,12 @@ import {
 } from "@/lib/querylens/server/retrieval"
 
 describe("retrieval scaffolding", () => {
-  it("builds high-signal catalog chunks for the sample dataset", () => {
-    const chunks = buildDatasetCatalogChunks()
+  it("builds high-signal catalog chunks from the runtime profile snapshot", async () => {
+    const { profileStore } = await getQueryLensDatasetRuntime()
+    const profileSnapshot = await profileStore.getProfileSnapshot()
+    const chunks = buildDatasetCatalogChunks(
+      buildDatasetCatalogProfile(profileSnapshot)
+    )
 
     expect(chunks.map((chunk) => chunk.kind)).toEqual(
       expect.arrayContaining([
@@ -26,7 +32,7 @@ describe("retrieval scaffolding", () => {
       ])
     )
     expect(chunks.find((chunk) => chunk.id === "dataset-sources")?.content).toContain(
-      "Semantic manifest",
+      "records profiled",
     )
     expect(
       chunks.find((chunk) => chunk.id === "dataset-supported-questions")?.content

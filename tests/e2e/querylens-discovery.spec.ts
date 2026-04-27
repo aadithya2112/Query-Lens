@@ -14,6 +14,7 @@ test("renders the discovery flow and restores the conversation after refresh", a
   await expect(page.getByText("Catalog and suggested paths")).toBeVisible()
   await expect(
     page.getByRole("heading", { name: "Dataset overview" })
+      .first()
   ).toBeVisible()
 
   await page.reload()

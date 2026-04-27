@@ -3,6 +3,10 @@ import { Pool } from "pg"
 
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import {
+  createFixtureDatasetProfileStore,
+  buildDatasetCatalogProfile,
+} from "@/lib/querylens/server/profile-store"
+import {
   buildDatasetCatalogChunks,
 } from "@/lib/querylens/server/retrieval"
 import {
@@ -13,6 +17,7 @@ import {
 
 async function seedPostgres(pool: Pool) {
   const dataset = getSampleDataset()
+  const profileStore = createFixtureDatasetProfileStore()
 
   await pool.query("BEGIN")
 
@@ -271,7 +276,9 @@ async function seedPostgres(pool: Pool) {
       )
     }
 
-    const catalogChunks = buildDatasetCatalogChunks()
+    const catalogChunks = buildDatasetCatalogChunks(
+      buildDatasetCatalogProfile(await profileStore.getProfileSnapshot())
+    )
     const catalogEmbeddings = await embedTexts({
       texts: catalogChunks.map((chunk) => chunk.content),
       task: "document",

@@ -9,14 +9,15 @@ import {
   type BuiltInCapabilityContext,
 } from "@/lib/querylens/server/built-in-pipeline/capabilities"
 import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
+import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
-import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 
 async function buildContext(question: string): Promise<BuiltInCapabilityContext> {
-  const dataAccess = await getQueryLensDataAccess()
+  const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
   const weeklyRows = await dataAccess.listWeeklyMetrics()
   const dateCoverage = await dataAccess.getDateCoverage()
+  const profileSnapshot = await profileStore.getProfileSnapshot()
   const plan = planDeterministicQuery(question).plan
 
   expect(plan).toBeDefined()
@@ -27,6 +28,7 @@ async function buildContext(question: string): Promise<BuiltInCapabilityContext>
       dateCoverage,
     }),
     dataAccess,
+    profileSnapshot,
     weeklyRows,
     retrievalContext: {
       datasetMatches: [],

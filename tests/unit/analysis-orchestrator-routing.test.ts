@@ -24,24 +24,48 @@ vi.mock("@/lib/querylens/server/agentic-query", () => ({
   executeAgenticFallback: executeAgenticFallbackMock,
 }))
 
-vi.mock("@/lib/querylens/server/repositories", () => ({
-  getQueryLensDataAccess: vi.fn(async () => ({
-    sourceMode: "database",
-    listWeeklyMetrics: vi.fn(async () => []),
-    getDateCoverage: vi.fn(async () => ({
-      startDate: "2026-01-12",
-      endDate: "2026-04-05",
-    })),
-    listWeeklyAccountStress: vi.fn(async () => []),
-    listDailyMetrics: vi.fn(async () => []),
-    listContextEvents: vi.fn(async () => []),
-    getSourceHealth: vi.fn(async () => []),
-    getAgenticSchemaSnapshot: vi.fn(async () => ({
-      postgres: [],
-      mongodb: [],
-    })),
-    executeReadOnlySql: vi.fn(),
-    executeReadOnlyMongoPipeline: vi.fn(),
+vi.mock("@/lib/querylens/server/dataset-runtime", () => ({
+  getQueryLensDatasetRuntime: vi.fn(async () => ({
+    dataAccess: {
+      sourceMode: "database",
+      listWeeklyMetrics: vi.fn(async () => []),
+      getDateCoverage: vi.fn(async () => ({
+        startDate: "2026-01-12",
+        endDate: "2026-04-05",
+      })),
+      listWeeklyAccountStress: vi.fn(async () => []),
+      listDailyMetrics: vi.fn(async () => []),
+      listContextEvents: vi.fn(async () => []),
+      executeReadOnlySql: vi.fn(),
+      executeReadOnlyMongoPipeline: vi.fn(),
+    },
+    profileStore: {
+      getProfileSnapshot: vi.fn(async () => ({
+        datasetId: "sme_portfolio",
+        sourceMode: "database",
+        dateCoverage: {
+          startDate: "2026-01-12",
+          endDate: "2026-04-05",
+        },
+        sourceHealth: [],
+        schemaSnapshot: {
+          postgres: [],
+          mongodb: [],
+        },
+        sourceCounts: [],
+      })),
+      getSemanticDraft: vi.fn(async () => ({
+        datasetId: "sme_portfolio",
+        datasetLabel: "SME portfolio",
+        description: "Synthetic SME portfolio",
+        sourceMode: "database",
+        timeCoverage: "2026-01-12 to 2026-04-05",
+        dimensions: [],
+        metrics: [],
+        sources: [],
+        notes: [],
+      })),
+    },
   })),
 }))
 

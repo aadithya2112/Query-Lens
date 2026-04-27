@@ -10,24 +10,13 @@ const {
   const dataAccess = {
     sourceMode: "database" as "database" | "fixture",
     listWeeklyMetrics: vi.fn(async () => []),
+    listDailyMetrics: vi.fn(async () => []),
     getDateCoverage: vi.fn(async () => ({
       startDate: "2026-01-12",
       endDate: "2026-04-05",
     })),
     listWeeklyAccountStress: vi.fn(async () => []),
     listContextEvents: vi.fn(async () => []),
-    getSourceHealth: vi.fn(async () => []),
-    getAgenticSchemaSnapshot: vi.fn(async () => ({
-      postgres: [
-        {
-          name: "weekly_portfolio_metrics",
-          description: "Weekly aggregates",
-          rowCount: 12,
-          columns: ["week_start", "cashflow_health_score"],
-        },
-      ],
-      mongodb: [],
-    })),
     executeReadOnlySql: vi.fn(async () => ({
       rowset: {
         columns: ["week_start", "cashflow_health_score"],
@@ -77,8 +66,44 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
 }))
 
-vi.mock("@/lib/querylens/server/repositories", () => ({
-  getQueryLensDataAccess: vi.fn(async () => mockDataAccess),
+vi.mock("@/lib/querylens/server/dataset-runtime", () => ({
+  getQueryLensDatasetRuntime: vi.fn(async () => ({
+    dataAccess: mockDataAccess,
+    profileStore: {
+      getProfileSnapshot: vi.fn(async () => ({
+        datasetId: "sme_portfolio",
+        sourceMode: mockDataAccess.sourceMode,
+        dateCoverage: {
+          startDate: "2026-01-12",
+          endDate: "2026-04-05",
+        },
+        sourceHealth: [],
+        schemaSnapshot: {
+          postgres: [
+            {
+              name: "weekly_portfolio_metrics",
+              description: "Weekly aggregates",
+              rowCount: 12,
+              columns: ["week_start", "cashflow_health_score"],
+            },
+          ],
+          mongodb: [],
+        },
+        sourceCounts: [],
+      })),
+      getSemanticDraft: vi.fn(async () => ({
+        datasetId: "sme_portfolio",
+        datasetLabel: "SME portfolio",
+        description: "Synthetic SME portfolio",
+        sourceMode: mockDataAccess.sourceMode,
+        timeCoverage: "2026-01-12 to 2026-04-05",
+        dimensions: [],
+        metrics: [],
+        sources: [],
+        notes: [],
+      })),
+    },
+  })),
 }))
 
 vi.mock("@/lib/querylens/server/retrieval", () => ({

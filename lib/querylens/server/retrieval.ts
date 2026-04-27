@@ -1,21 +1,16 @@
-import { Pool } from "pg"
-
-import { getDatasetDefinition, getDatasetMetricManifest } from "@/lib/querylens/datasets"
-import {
-  getSemanticManifest,
-  getSemanticSourceMappings,
-  getSemanticSupportedQuestions,
-  getSupportedEntityLabels,
-} from "@/lib/querylens/semantic-manifest"
+import { getDatasetMetricManifest } from "@/lib/querylens/datasets"
 import {
   cosineSimilarity,
   embedTexts,
   EMBEDDING_DIMENSIONS,
   formatVectorLiteral,
 } from "@/lib/querylens/server/embedding-service"
-import { getSampleDataset } from "@/lib/querylens/seed-data"
+import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
+import { buildDatasetCatalogProfile } from "@/lib/querylens/server/profile-store"
+import { getPgPool } from "@/lib/querylens/server/runtime-shared"
 import type {
   CatalogSection,
+  DatasetCatalogProfile,
   Phase1AnalysisResponse,
   QueryIntent,
   RetrievalContext,
@@ -49,7 +44,6 @@ export interface QueryLensRetrievalStore {
 }
 
 declare global {
-  var __querylensRetrievalPgPool: Pool | undefined
   var __querylensFixtureCatalogChunks:
     | Array<DatasetCatalogChunk & { embedding: number[] }>
     | undefined
@@ -62,49 +56,17 @@ declare global {
   var __querylensPgRetrievalReady: boolean | undefined
 }
 
-function getPgPool() {
-  if (!process.env.POSTGRES_URL) {
-    throw new Error("POSTGRES_URL is not configured.")
-  }
-
-  if (!globalThis.__querylensRetrievalPgPool) {
-    globalThis.__querylensRetrievalPgPool = new Pool({
-      connectionString: process.env.POSTGRES_URL,
-    })
-  }
-
-  return globalThis.__querylensRetrievalPgPool
-}
-
-function buildTimeCoverageLabel() {
-  const weeklyRows = getSampleDataset().weeklyMetrics
-    .filter((row) => row.recordType === "portfolio")
-    .sort((left, right) => left.weekStart.localeCompare(right.weekStart))
-
-  const first = weeklyRows[0]
-  const last = weeklyRows.at(-1)
-
-  if (!first || !last) {
-    return "No weekly coverage is currently available."
-  }
-
-  return `${first.weekStart} to ${last.weekEnd}`
-}
-
-export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
-  const dataset = getDatasetDefinition()
+export function buildDatasetCatalogChunks(
+  profile: DatasetCatalogProfile
+): DatasetCatalogChunk[] {
   const manifest = getDatasetMetricManifest()
-  const semanticManifest = getSemanticManifest()
-  const supportedEntities = getSupportedEntityLabels()
-  const supportedQuestions = getSemanticSupportedQuestions()
-  const sourceMappings = getSemanticSourceMappings()
 
   return [
     {
       id: "dataset-overview",
       kind: "overview",
       title: "Dataset overview",
-      content: `${dataset.label} is the active built-in sample dataset. ${dataset.description} Current story anchors: stress pocket ${semanticManifest.storyAnchors.stressPocket}, healthy control ${semanticManifest.storyAnchors.healthyControl}, softer secondary pocket ${semanticManifest.storyAnchors.softeningPocket}, and recovery pocket ${semanticManifest.storyAnchors.recoveryPocket}.`,
+      content: `${profile.datasetLabel} is the active ${profile.sourceMode === "database" ? "database-backed" : "built-in sample"} dataset. ${profile.datasetDescription} Current story anchors: stress pocket ${profile.storyAnchors.stressPocket}, healthy control ${profile.storyAnchors.healthyControl}, softer secondary pocket ${profile.storyAnchors.softeningPocket}, and recovery pocket ${profile.storyAnchors.recoveryPocket}.`,
     },
     {
       id: "dataset-metrics",
@@ -121,27 +83,27 @@ export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
       id: "dataset-dimensions",
       kind: "dimensions",
       title: "Available dimensions",
-      content: `QueryLens currently supports ${semanticManifest.dimensions.map((dimension) => dimension.label.toLowerCase()).join(", ")} as analysis dimensions. Regions: ${supportedEntities.regions.join(", ")}. Sectors: ${supportedEntities.sectors.join(", ")}.`,
+      content: `QueryLens currently supports ${profile.dimensionLabels.map((dimension) => dimension.toLowerCase()).join(", ")} as analysis dimensions. Regions: ${profile.regionLabels.join(", ")}. Sectors: ${profile.sectorLabels.join(", ")}.`,
     },
     {
       id: "dataset-sources",
       kind: "sources",
       title: "Connected sources",
-      content: sourceMappings
-        .map((source) => `${source.label}: ${source.description}.`)
+      content: profile.sourceSummaries
+        .map((source) => `${source.label}: ${source.description}. ${source.recordCount} records profiled.`)
         .join(" "),
     },
     {
       id: "dataset-time-coverage",
       kind: "time_coverage",
       title: "Time coverage",
-      content: `The current weekly coverage spans ${buildTimeCoverageLabel()}. Supported question windows are this week and last week.`,
+      content: `The current weekly coverage spans ${profile.timeCoverage}. Supported question windows are this week and last week.`,
     },
     {
       id: "dataset-supported-questions",
       kind: "questions",
       title: "Supported questions",
-      content: `You can ask about what changed, breakdowns, compares, and dataset discovery. Example questions: ${supportedQuestions.join(" | ")}`,
+      content: `You can ask about what changed, breakdowns, compares, and dataset discovery. Example questions: ${profile.supportedQuestions.join(" | ")}`,
     },
   ]
 }
@@ -155,8 +117,17 @@ function buildCatalogSectionFromChunk(chunk: DatasetCatalogChunk): CatalogSectio
   }
 }
 
-export function buildDiscoveryCatalogSections() {
-  return buildDatasetCatalogChunks().map(buildCatalogSectionFromChunk)
+export function buildDiscoveryCatalogSections(
+  profile: DatasetCatalogProfile
+) {
+  return buildDatasetCatalogChunks(profile).map(buildCatalogSectionFromChunk)
+}
+
+async function loadCatalogChunks() {
+  const { profileStore } = await getQueryLensDatasetRuntime()
+  const profileSnapshot = await profileStore.getProfileSnapshot()
+
+  return buildDatasetCatalogChunks(buildDatasetCatalogProfile(profileSnapshot))
 }
 
 function buildMemoryChunkTitle(response: Phase1AnalysisResponse) {
@@ -214,7 +185,7 @@ class FixtureRetrievalStore implements QueryLensRetrievalStore {
       return globalThis.__querylensFixtureCatalogChunks
     }
 
-    const chunks = buildDatasetCatalogChunks()
+    const chunks = await loadCatalogChunks()
     const embeddings = await embedTexts({
       texts: chunks.map((chunk) => chunk.content),
       task: "document",
@@ -417,7 +388,7 @@ class DatabaseRetrievalStore implements QueryLensRetrievalStore {
       return
     }
 
-    const chunks = buildDatasetCatalogChunks()
+    const chunks = await loadCatalogChunks()
     const embeddings = await embedTexts({
       texts: chunks.map((chunk) => chunk.content),
       task: "document",

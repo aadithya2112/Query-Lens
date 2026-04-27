@@ -11,6 +11,7 @@ import type {
 } from "@/lib/querylens/server/built-in-pipeline/types"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
+  DatasetProfileSnapshot,
   QueryRequestBody,
   RetrievalContext,
   WeeklyMetricRow,
@@ -20,6 +21,7 @@ export async function runBuiltInAnalysisPipeline(args: {
   input: QueryRequestBody
   executionContext: QueryLensExecutionContext
   dataAccess: QueryLensDataAccess
+  profileSnapshot: DatasetProfileSnapshot
   weeklyRows: WeeklyMetricRow[]
   dateCoverage: {
     startDate: string
@@ -67,6 +69,7 @@ export async function runBuiltInAnalysisPipeline(args: {
   const execution = await executeBuiltInPlan({
     executionPlan: planning.executionPlan,
     dataAccess: args.dataAccess,
+    profileSnapshot: args.profileSnapshot,
     weeklyRows: args.weeklyRows,
     retrievalContext: args.retrievalContext,
   })

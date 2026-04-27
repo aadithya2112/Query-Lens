@@ -11,26 +11,20 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
 }))
 
 import { executeAgenticFallback, validateMongoPipeline, validateReadOnlySql } from "@/lib/querylens/server/agentic-query"
+import type { AgenticSchemaSnapshot } from "@/lib/querylens/server/agentic-types"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 
 function createMockDataAccess(): QueryLensDataAccess {
   return {
     sourceMode: "database",
     listWeeklyMetrics: vi.fn(async () => []),
+    listDailyMetrics: vi.fn(async () => []),
+    getDateCoverage: vi.fn(async () => ({
+      startDate: "2026-01-12",
+      endDate: "2026-04-05",
+    })),
     listWeeklyAccountStress: vi.fn(async () => []),
     listContextEvents: vi.fn(async () => []),
-    getSourceHealth: vi.fn(async () => []),
-    getAgenticSchemaSnapshot: vi.fn(async () => ({
-      postgres: [
-        {
-          name: "weekly_portfolio_metrics",
-          description: "Weekly cashflow health aggregates.",
-          rowCount: 12,
-          columns: ["week_start", "cashflow_health_score"],
-        },
-      ],
-      mongodb: [],
-    })),
     executeReadOnlySql: vi.fn(async () => ({
       rowset: {
         columns: ["week_start", "cashflow_health_score"],
@@ -59,6 +53,18 @@ function createMockDataAccess(): QueryLensDataAccess {
       summary: "Returned 0 documents.",
     })),
   }
+}
+
+const schemaSnapshot: AgenticSchemaSnapshot = {
+  postgres: [
+    {
+      name: "weekly_portfolio_metrics",
+      description: "Weekly cashflow health aggregates.",
+      rowCount: 12,
+      columns: ["week_start", "cashflow_health_score"],
+    },
+  ],
+  mongodb: [],
 }
 
 describe("agentic query fallback", () => {
@@ -149,6 +155,7 @@ describe("agentic query fallback", () => {
     const response = await executeAgenticFallback({
       question: "How has cashflow health trended over time?",
       dataAccess,
+      schemaSnapshot,
       retrievalContext: {
         datasetMatches: [],
         memoryMatches: [],
