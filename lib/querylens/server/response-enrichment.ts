@@ -5,6 +5,7 @@ import type {
   TrustArtifactSource,
   TrustArtifacts,
 } from "@/lib/querylens/types"
+import { buildTrustArtifactsFromModel } from "@/lib/querylens/server/trust-model"
 
 function sentenceCase(value: string) {
   if (!value) {
@@ -94,6 +95,10 @@ export function buildInterpretation(args: {
 export function buildTrustArtifacts(
   response: Phase1AnalysisResponse,
 ): TrustArtifacts {
+  if (response.trust) {
+    return buildTrustArtifactsFromModel(response.trust)
+  }
+
   const directlyObserved = response.evidence
     .slice(0, 3)
     .map((item) => sentenceCase(item.supportingFact))

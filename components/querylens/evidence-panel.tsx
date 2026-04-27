@@ -17,6 +17,32 @@ interface EvidencePanelProps {
   analysis: Phase1AnalysisResponse
 }
 
+function resolveConfidenceScore(analysis: Phase1AnalysisResponse) {
+  return analysis.trust?.overall.score ?? analysis.confidence
+}
+
+function resolveHowProduced(analysis: Phase1AnalysisResponse) {
+  return analysis.trust?.howProduced ?? analysis.trustArtifacts?.howProduced ?? []
+}
+
+function resolveSourcesUsed(analysis: Phase1AnalysisResponse) {
+  return analysis.trust?.sources ?? analysis.trustArtifacts?.sourcesUsed ?? []
+}
+
+function resolveObservedFacts(analysis: Phase1AnalysisResponse) {
+  return analysis.trust?.observedFacts ?? analysis.trustArtifacts?.directlyObserved ?? []
+}
+
+function resolveInferredFindings(analysis: Phase1AnalysisResponse) {
+  return analysis.trust?.inferredFindings ?? analysis.trustArtifacts?.inferred ?? []
+}
+
+function resolveAssumptions(analysis: Phase1AnalysisResponse) {
+  return analysis.trust?.assumptions ??
+    analysis.trustArtifacts?.assumptionsUsed ??
+    analysis.assumptions
+}
+
 function formatTableValue(value: string | number | boolean | null) {
   if (value === null) {
     return "null"
@@ -82,7 +108,16 @@ function ComparisonCards({ analysis }: EvidencePanelProps) {
 }
 
 function TrustBar({ analysis }: EvidencePanelProps) {
-  const width = `${analysis.confidence}%`
+  const visibleConfidence = resolveConfidenceScore(analysis)
+  const width = `${visibleConfidence}%`
+  const trustComponents = analysis.trust?.components
+    ? [
+        ["Interpretation", analysis.trust.components.interpretation],
+        ["Coverage", analysis.trust.components.dataCoverage],
+        ["Corroboration", analysis.trust.components.sourceCorroboration],
+        ["Execution", analysis.trust.components.execution],
+      ]
+    : []
 
   return (
     <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 backdrop-blur-xl">
@@ -109,10 +144,40 @@ function TrustBar({ analysis }: EvidencePanelProps) {
             />
           </div>
           <p className="mt-2 font-mono text-xs text-foreground">
-            {analysis.confidence}% confidence
+            {visibleConfidence}% confidence
           </p>
+          {analysis.trust && (
+            <p className="mt-1 text-xs capitalize text-muted-foreground">
+              {analysis.trust.overall.label} trust
+            </p>
+          )}
         </div>
       </div>
+      {trustComponents.length > 0 && (
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {trustComponents.map(([label, component]) => (
+            <div
+              key={label}
+              className="rounded-[20px] border border-border bg-muted/10 px-4 py-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  {label}
+                </p>
+                <span className="text-xs capitalize text-muted-foreground">
+                  {component.label}
+                </span>
+              </div>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {component.score}%
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {component.reason}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -156,7 +221,9 @@ function InterpretationCard({ analysis }: EvidencePanelProps) {
 }
 
 function HowProducedCard({ analysis }: EvidencePanelProps) {
-  if (!analysis.trustArtifacts?.howProduced.length) {
+  const howProduced = resolveHowProduced(analysis)
+
+  if (!howProduced.length) {
     return null
   }
 
@@ -169,7 +236,7 @@ function HowProducedCard({ analysis }: EvidencePanelProps) {
         </h2>
       </div>
       <div className="mt-5 space-y-4">
-        {analysis.trustArtifacts.howProduced.map((step) => (
+        {howProduced.map((step) => (
           <div key={step} className="flex gap-3">
             <ChevronRight
               size={16}
@@ -184,7 +251,9 @@ function HowProducedCard({ analysis }: EvidencePanelProps) {
 }
 
 function SourcesUsedCard({ analysis }: EvidencePanelProps) {
-  if (!analysis.trustArtifacts?.sourcesUsed.length) {
+  const sourcesUsed = resolveSourcesUsed(analysis)
+
+  if (!sourcesUsed.length) {
     return null
   }
 
@@ -195,7 +264,7 @@ function SourcesUsedCard({ analysis }: EvidencePanelProps) {
         <h2 className="text-base font-semibold text-foreground">Sources Used</h2>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        {analysis.trustArtifacts.sourcesUsed.map((source) => (
+        {sourcesUsed.map((source) => (
           <div
             key={`${source.sourceType}-${source.sourceName}-${source.scope}`}
             className="rounded-[22px] border border-border bg-muted/10 px-4 py-4"
@@ -225,7 +294,10 @@ function SourcesUsedCard({ analysis }: EvidencePanelProps) {
 }
 
 function ObservedVsInferred({ analysis }: EvidencePanelProps) {
-  if (!analysis.trustArtifacts) {
+  const observedFacts = resolveObservedFacts(analysis)
+  const inferredFindings = resolveInferredFindings(analysis)
+
+  if (!observedFacts.length && !inferredFindings.length) {
     return null
   }
 
@@ -239,7 +311,7 @@ function ObservedVsInferred({ analysis }: EvidencePanelProps) {
           </h2>
         </div>
         <div className="mt-5 space-y-4">
-          {analysis.trustArtifacts.directlyObserved.map((item, index) => (
+          {observedFacts.map((item, index) => (
             <div key={`observed-${index}-${item}`} className="flex gap-3">
               <ChevronRight
                 size={16}
@@ -259,7 +331,7 @@ function ObservedVsInferred({ analysis }: EvidencePanelProps) {
           </h2>
         </div>
         <div className="mt-5 space-y-4">
-          {analysis.trustArtifacts.inferred.map((item, index) => (
+          {inferredFindings.map((item, index) => (
             <div key={`inferred-${index}-${item}`} className="flex gap-3">
               <ChevronRight
                 size={16}
@@ -268,6 +340,71 @@ function ObservedVsInferred({ analysis }: EvidencePanelProps) {
               <p className="text-sm leading-6 text-muted-foreground">{item}</p>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function UncertaintyAndLimitations({ analysis }: EvidencePanelProps) {
+  const uncertaintyNotes = analysis.trust?.uncertaintyNotes ?? []
+  const limitationNotes = analysis.trust?.limitationNotes ?? []
+
+  if (!uncertaintyNotes.length && !limitationNotes.length) {
+    return null
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+        <div className="flex items-center gap-2">
+          <CircleAlert size={16} className="text-muted-foreground" />
+          <h2 className="text-base font-semibold text-foreground">
+            Uncertainty notes
+          </h2>
+        </div>
+        <div className="mt-5 space-y-4">
+          {uncertaintyNotes.length > 0 ? (
+            uncertaintyNotes.map((note) => (
+              <div key={note} className="flex gap-3">
+                <ChevronRight
+                  size={16}
+                  className="mt-1 shrink-0 text-muted-foreground"
+                />
+                <p className="text-sm leading-6 text-muted-foreground">{note}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm leading-6 text-muted-foreground">
+              No additional uncertainty notes were recorded for this response.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+        <div className="flex items-center gap-2">
+          <CircleAlert size={16} className="text-muted-foreground" />
+          <h2 className="text-base font-semibold text-foreground">
+            Limitation notes
+          </h2>
+        </div>
+        <div className="mt-5 space-y-4">
+          {limitationNotes.length > 0 ? (
+            limitationNotes.map((note) => (
+              <div key={note} className="flex gap-3">
+                <ChevronRight
+                  size={16}
+                  className="mt-1 shrink-0 text-muted-foreground"
+                />
+                <p className="text-sm leading-6 text-muted-foreground">{note}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm leading-6 text-muted-foreground">
+              No additional limitation notes were recorded for this response.
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -498,6 +635,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
         <HowProducedCard analysis={analysis} />
         <SourcesUsedCard analysis={analysis} />
         <ObservedVsInferred analysis={analysis} />
+        <UncertaintyAndLimitations analysis={analysis} />
 
         <div className="flex flex-col gap-5">
           {isDiscovery ? <CatalogSections analysis={analysis} /> : null}
@@ -552,9 +690,8 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
               </h2>
             </div>
             <div className="mt-5 space-y-4">
-              {(analysis.trustArtifacts?.assumptionsUsed ?? analysis.assumptions)
-                .length > 0 ? (
-                (analysis.trustArtifacts?.assumptionsUsed ?? analysis.assumptions).map((assumption) => (
+              {resolveAssumptions(analysis).length > 0 ? (
+                resolveAssumptions(analysis).map((assumption) => (
                   <div key={assumption} className="flex gap-3">
                     <CircleAlert
                       size={16}

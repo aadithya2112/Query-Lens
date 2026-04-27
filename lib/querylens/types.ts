@@ -376,12 +376,53 @@ export interface InterpretationMetadata {
   explanation: string
 }
 
+export type TrustLevel = "low" | "medium" | "high"
+
+export interface TrustScore {
+  score: number
+  label: TrustLevel
+}
+
 export interface TrustArtifactSource {
   sourceType: EvidenceItem["sourceType"] | "manifest"
   sourceName: string
   scope: string
   timeRange: string
   note: string
+}
+
+export interface TrustComponentScore extends TrustScore {
+  reason: string
+}
+
+export interface TrustTraceEntry {
+  id: string
+  component:
+    | "interpretation"
+    | "dataCoverage"
+    | "sourceCorroboration"
+    | "execution"
+  score: number
+  label: TrustLevel
+  message: string
+}
+
+export interface TrustModel {
+  overall: TrustScore
+  components: {
+    interpretation: TrustComponentScore
+    dataCoverage: TrustComponentScore
+    sourceCorroboration: TrustComponentScore
+    execution: TrustComponentScore
+  }
+  trace: TrustTraceEntry[]
+  howProduced: string[]
+  uncertaintyNotes: string[]
+  limitationNotes: string[]
+  sources: TrustArtifactSource[]
+  observedFacts: string[]
+  inferredFindings: string[]
+  assumptions: string[]
 }
 
 export interface TrustArtifacts {
@@ -443,6 +484,7 @@ export interface Phase1AnalysisResponse {
   discoverySummary?: DiscoverySummary
   catalogSections?: CatalogSection[]
   interpretation?: InterpretationMetadata
+  trust?: TrustModel
   trustArtifacts?: TrustArtifacts
   resultTable?: ResultTable
   queryRuns?: QueryRun[]

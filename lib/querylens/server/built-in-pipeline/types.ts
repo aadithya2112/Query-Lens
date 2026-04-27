@@ -17,10 +17,13 @@ import type {
   ScopeFilter,
   SourceHealth,
   StructuredQueryPlan,
+  TrustModel,
 } from "@/lib/querylens/types"
 
 export type BuiltInIntent = "what_changed" | "breakdown" | "compare" | "discovery"
-export type BuiltInPresentationResult = Phase1AnalysisResponse
+export type BuiltInPresentationResult = Phase1AnalysisResponse & {
+  trust: TrustModel
+}
 
 export type BuiltInExecutionCapability =
   | "profile_dataset"
@@ -37,6 +40,11 @@ export type BuiltInAllowedOperation =
   | "catalog_profile_read"
   | "contextual_retrieval"
 
+export type BuiltInTrustCoverageKind =
+  | "validated_analytics"
+  | "metadata_catalog"
+  | "fallback"
+
 export type BuiltInValidationCheck =
   | "dataset_support"
   | "metric_support"
@@ -50,6 +58,18 @@ export interface BuiltInExecutionPlanValidationResult {
   check: BuiltInValidationCheck
   status: "passed" | "failed"
   message: string
+}
+
+export interface BuiltInTrustContext {
+  allowedSources: BuiltInAllowedSource[]
+  observedSources: Array<"postgres" | "mongodb" | "manifest">
+  coverageKind: BuiltInTrustCoverageKind
+  coverageLabel?: string
+  validationStatus?: "approved" | "rejected"
+  validationResults?: BuiltInExecutionPlanValidationResult[]
+  sourceHealth?: SourceHealth[]
+  uncertaintyNotes?: string[]
+  limitationNotes?: string[]
 }
 
 export interface BuiltInExecutionPlan {
@@ -113,6 +133,7 @@ export interface BuiltInExecutionFailure {
   fallbackReason: string
   interpretation?: BuiltInInterpretationSeed
   executionTrace?: ExecutionTrace
+  trustContext?: BuiltInTrustContext
 }
 
 interface BuiltInExecutionSuccessBase {
@@ -122,7 +143,6 @@ interface BuiltInExecutionSuccessBase {
   metric: MetricId
   timeframe: string
   comparisonBasis: string
-  confidence: number
   activeScope: string
   drivers: DriverItem[]
   chartSpec?: ChartSpec
@@ -130,6 +150,7 @@ interface BuiltInExecutionSuccessBase {
   assumptions: string[]
   sourceMode: Phase1AnalysisResponse["sourceMode"]
   executionTrace?: ExecutionTrace
+  trustContext: BuiltInTrustContext
 }
 
 export interface WhatChangedExecutionPayload

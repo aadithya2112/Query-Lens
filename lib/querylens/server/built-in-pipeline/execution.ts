@@ -42,6 +42,17 @@ export async function executeBuiltInPlan(args: {
         explanation:
           "QueryLens validated the execution plan before dispatch and declined to run an unapproved deterministic path.",
       },
+      trustContext: {
+        allowedSources: args.executionPlan.allowedSources,
+        observedSources: [],
+        coverageKind: "fallback",
+        validationStatus: args.executionPlan.validation.status,
+        validationResults: args.executionPlan.validation.results,
+        limitationNotes: [
+          args.executionPlan.validation.fallbackReason ??
+            "Execution plan validation rejected deterministic dispatch.",
+        ],
+      },
       executionTrace: appendExecutionTrace(args.executionPlan.trace, {
         id: "fallback.execution_validation",
         stage: "fallback",
@@ -96,6 +107,16 @@ export async function executeBuiltInPlan(args: {
           mode: "fallback",
           explanation:
             "QueryLens recognized the request shape but the dataset does not currently ship that built-in flow.",
+        },
+        trustContext: {
+          allowedSources: args.executionPlan.allowedSources,
+          observedSources: [],
+          coverageKind: "fallback",
+          validationStatus: args.executionPlan.validation.status,
+          validationResults: args.executionPlan.validation.results,
+          limitationNotes: [
+            "That query intent is not registered yet for the current dataset.",
+          ],
         },
         executionTrace: appendExecutionTrace(args.executionPlan.trace, {
           id: "fallback.unregistered_intent",

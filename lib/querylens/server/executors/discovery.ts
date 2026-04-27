@@ -1,4 +1,3 @@
-import { calculateConfidenceScore } from "@/lib/querylens/scoring"
 import {
   profileDatasetCapability,
   type BuiltInCapabilityContext,
@@ -112,12 +111,6 @@ export async function executeDiscoveryPlan(
     metric: "dataset_catalog",
     timeframe: `Coverage: ${coverageLabel}`,
     comparisonBasis: "Catalog, source, and metadata overview",
-    confidence: calculateConfidenceScore({
-      evidenceCount: evidence.length,
-      driverCount: catalogSections.length,
-      hasCrossSourceEvidence: sourceHealth.some((source) => source.type === "mongodb"),
-      fallback: false,
-    }),
     activeScope: dataset.label,
     drivers: buildDiscoveryDrivers({
       sourceHealth,
@@ -139,6 +132,20 @@ export async function executeDiscoveryPlan(
     },
     catalogSections,
     sourceMode: args.dataAccess.sourceMode,
+    trustContext: {
+      allowedSources: args.context.executionPlan.allowedSources,
+      observedSources: [
+        ...new Set(sourceHealth.map((source) => source.type)),
+      ] as Array<"postgres" | "mongodb" | "manifest">,
+      coverageKind: "metadata_catalog",
+      coverageLabel,
+      validationStatus: args.context.executionPlan.validation.status,
+      validationResults: args.context.executionPlan.validation.results,
+      sourceHealth,
+      limitationNotes: [
+        "Discovery answers stay within dataset metadata, source health, and retrieved catalog context rather than direct metric computation.",
+      ],
+    },
     presentation: {
       datasetLabel: dataset.label,
       metricCount: dataset.metrics.length,

@@ -5,17 +5,26 @@ import {
   buildInterpretation,
   buildTrustArtifacts,
 } from "@/lib/querylens/server/response-enrichment"
+import {
+  buildBuiltInTrustModel,
+  buildTrustArtifactsFromModel,
+} from "@/lib/querylens/server/trust-model"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import type {
   BreakdownExecutionPayload,
   BuiltInExecutionPayload,
   BuiltInInterpretationSeed,
   BuiltInPresentationResult,
+  BuiltInTrustContext,
   CompareExecutionPayload,
   DiscoveryExecutionPayload,
   WhatChangedExecutionPayload,
 } from "@/lib/querylens/server/built-in-pipeline/types"
-import type { ExecutionTrace, RetrievalContext } from "@/lib/querylens/types"
+import type {
+  ExecutionTrace,
+  Phase1AnalysisResponse,
+  RetrievalContext,
+} from "@/lib/querylens/types"
 
 function buildRetrievalTrace(retrievalContext: RetrievalContext) {
   return {
@@ -53,6 +62,38 @@ export function enrichPhase1Response(args: {
       args.retrievalContext.recentMessages.length > 0,
     retrievalTrace: buildRetrievalTrace(args.retrievalContext),
   }
+}
+
+type BuiltInResponseSeed = Omit<
+  Phase1AnalysisResponse,
+  "confidence" | "trust" | "trustArtifacts"
+>
+
+function finalizeBuiltInResponse(args: {
+  response: BuiltInResponseSeed
+  retrievalContext: RetrievalContext
+  inputQuestion: string
+  interpretation: BuiltInInterpretationSeed
+  trustContext: BuiltInTrustContext
+}): BuiltInPresentationResult {
+  const trust = buildBuiltInTrustModel({
+    response: args.response,
+    interpretation: args.interpretation,
+    executionTrace: args.response.executionTrace,
+    context: args.trustContext,
+  })
+
+  return enrichPhase1Response({
+    response: {
+      ...args.response,
+      confidence: trust.overall.score,
+      trust,
+      trustArtifacts: buildTrustArtifactsFromModel(trust),
+    },
+    retrievalContext: args.retrievalContext,
+    inputQuestion: args.inputQuestion,
+    interpretation: args.interpretation,
+  })
 }
 
 function presentWhatChanged(args: {
@@ -133,7 +174,7 @@ export async function presentBuiltInExecution(args: {
         executionContext: args.executionContext,
       })
 
-      return enrichPhase1Response({
+      return finalizeBuiltInResponse({
         response: {
           intent: "what_changed",
           headline: narrative.headline,
@@ -141,7 +182,6 @@ export async function presentBuiltInExecution(args: {
           metric: args.execution.metric,
           timeframe: args.execution.timeframe,
           comparisonBasis: args.execution.comparisonBasis,
-          confidence: args.execution.confidence,
           activeScope: args.execution.activeScope,
           drivers: args.execution.drivers,
           chartSpec: args.execution.chartSpec,
@@ -161,12 +201,13 @@ export async function presentBuiltInExecution(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.inputQuestion,
         interpretation: args.interpretation,
+        trustContext: args.execution.trustContext,
       })
     }
     case "compare": {
       const { headline, summary } = buildCompareHeadlineAndSummary(args.execution)
 
-      return enrichPhase1Response({
+      return finalizeBuiltInResponse({
         response: {
           intent: "compare",
           headline,
@@ -174,7 +215,6 @@ export async function presentBuiltInExecution(args: {
           metric: args.execution.metric,
           timeframe: args.execution.timeframe,
           comparisonBasis: args.execution.comparisonBasis,
-          confidence: args.execution.confidence,
           activeScope: args.execution.activeScope,
           drivers: args.execution.drivers,
           chartSpec: args.execution.chartSpec,
@@ -196,12 +236,13 @@ export async function presentBuiltInExecution(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.inputQuestion,
         interpretation: args.interpretation,
+        trustContext: args.execution.trustContext,
       })
     }
     case "breakdown": {
       const { headline, summary } = buildBreakdownHeadlineAndSummary(args.execution)
 
-      return enrichPhase1Response({
+      return finalizeBuiltInResponse({
         response: {
           intent: "breakdown",
           headline,
@@ -209,7 +250,6 @@ export async function presentBuiltInExecution(args: {
           metric: args.execution.metric,
           timeframe: args.execution.timeframe,
           comparisonBasis: args.execution.comparisonBasis,
-          confidence: args.execution.confidence,
           activeScope: args.execution.activeScope,
           drivers: args.execution.drivers,
           chartSpec: args.execution.chartSpec,
@@ -232,11 +272,12 @@ export async function presentBuiltInExecution(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.inputQuestion,
         interpretation: args.interpretation,
+        trustContext: args.execution.trustContext,
       })
     }
     case "discovery":
     default:
-      return enrichPhase1Response({
+      return finalizeBuiltInResponse({
         response: {
           intent: "discovery",
           headline: `QueryLens is currently grounded on the ${args.execution.presentation.datasetLabel} dataset`,
@@ -244,7 +285,6 @@ export async function presentBuiltInExecution(args: {
           metric: args.execution.metric,
           timeframe: args.execution.timeframe,
           comparisonBasis: args.execution.comparisonBasis,
-          confidence: args.execution.confidence,
           activeScope: args.execution.activeScope,
           drivers: args.execution.drivers,
           chartSpec: args.execution.chartSpec,
@@ -264,6 +304,7 @@ export async function presentBuiltInExecution(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.inputQuestion,
         interpretation: args.interpretation,
+        trustContext: args.execution.trustContext,
       })
   }
 }
@@ -276,16 +317,25 @@ export function presentBuiltInFallback(args: {
   inputQuestion: string
   interpretation: BuiltInInterpretationSeed
   executionTrace?: ExecutionTrace
+  trustContext?: BuiltInTrustContext
 }) {
-  return enrichPhase1Response({
-    response: buildBuiltInFallbackResponse({
-      fallbackReason: args.fallbackReason,
-      sourceMode: args.sourceMode,
-      rows: args.weeklyRows,
-      executionTrace: args.executionTrace,
-    }),
+  const response = buildBuiltInFallbackResponse({
+    fallbackReason: args.fallbackReason,
+    sourceMode: args.sourceMode,
+    rows: args.weeklyRows,
+    executionTrace: args.executionTrace,
+  })
+
+  return finalizeBuiltInResponse({
+    response,
     retrievalContext: args.retrievalContext,
     inputQuestion: args.inputQuestion,
     interpretation: args.interpretation,
+    trustContext: args.trustContext ?? {
+      allowedSources: [],
+      observedSources: [],
+      coverageKind: "fallback",
+      limitationNotes: [args.fallbackReason],
+    },
   })
 }

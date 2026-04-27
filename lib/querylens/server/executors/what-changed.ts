@@ -19,7 +19,7 @@ import type {
   BuiltInExecutionFailure,
   WhatChangedExecutionPayload,
 } from "@/lib/querylens/server/built-in-pipeline/types"
-import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import { roundTo } from "@/lib/querylens/scoring"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   ContextEvent,
@@ -310,6 +310,16 @@ export async function executeWhatChangedPlan(
       kind: "failure",
       fallbackReason:
         "The sample dataset could not resolve both comparison windows for that question.",
+      trustContext: {
+        allowedSources: args.context.executionPlan.allowedSources,
+        observedSources: [],
+        coverageKind: "fallback",
+        validationStatus: args.context.executionPlan.validation.status,
+        validationResults: args.context.executionPlan.validation.results,
+        limitationNotes: [
+          "The sample dataset could not resolve both comparison windows for that question.",
+        ],
+      },
     }
   }
 
@@ -361,11 +371,6 @@ export async function executeWhatChangedPlan(
     timeframeLabel,
     activeScopeLabel,
   })
-  const confidence = calculateConfidenceScore({
-    evidenceCount: evidence.length,
-    driverCount: drivers.length,
-    hasCrossSourceEvidence: evidence.some((item) => item.sourceType === "mongodb"),
-  })
   const chartSpec = buildCashflowHistoryChartSpec(
     historicalScopedRows,
     activeScopeLabel,
@@ -396,13 +401,19 @@ export async function executeWhatChangedPlan(
     metric: "cashflow_health_score",
     timeframe: timeframeLabel,
     comparisonBasis: comparisonLabel,
-    confidence,
     activeScope: activeScopeLabel,
     drivers,
     chartSpec,
     evidence,
     assumptions: buildAssumptions(args.plan.scope),
     sourceMode: args.dataAccess.sourceMode,
+    trustContext: {
+      allowedSources: args.context.executionPlan.allowedSources,
+      observedSources: [...new Set(evidence.map((item) => item.sourceType))],
+      coverageKind: "validated_analytics",
+      validationStatus: args.context.executionPlan.validation.status,
+      validationResults: args.context.executionPlan.validation.results,
+    },
     presentation: {
       currentScore: current.cashflowHealthScore,
       previousScore: previous.cashflowHealthScore,

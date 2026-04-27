@@ -1,7 +1,7 @@
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
 import { getScopeLabel } from "@/lib/querylens/dataset-semantics"
 import { getSampleDataset } from "@/lib/querylens/seed-data"
-import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import { roundTo } from "@/lib/querylens/scoring"
 import {
   aggregateAccountStressCapability,
   retrieveContextCapability,
@@ -280,14 +280,6 @@ export async function executeBreakdownPlan(
     timeframe: timeframeLabel,
     comparisonBasis:
       "Share of at-risk accounts within the selected date window and breakdown view",
-    confidence: calculateConfidenceScore({
-      evidenceCount: evidence.length,
-      driverCount: drivers.length,
-      hasCrossSourceEvidence: evidence.some(
-        (item) => item.sourceType === "mongodb"
-      ),
-      fallback: false,
-    }),
     activeScope: activeScopeLabel,
     drivers,
     chartSpec: buildChartSpec(buckets, targetWindow.label, dimension),
@@ -299,6 +291,13 @@ export async function executeBreakdownPlan(
       targetWindow.dayCount
     ),
     sourceMode: args.dataAccess.sourceMode,
+    trustContext: {
+      allowedSources: args.context.executionPlan.allowedSources,
+      observedSources: [...new Set(evidence.map((item) => item.sourceType))],
+      coverageKind: "validated_analytics",
+      validationStatus: args.context.executionPlan.validation.status,
+      validationResults: args.context.executionPlan.validation.results,
+    },
     presentation: {
       targetWindow,
       dimension,

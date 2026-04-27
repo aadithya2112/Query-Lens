@@ -38,6 +38,22 @@ interface ChatPanelProps {
   suggestedPrompts: string[]
 }
 
+export function getVisibleConfidenceScore(analysis: Phase1AnalysisResponse): number {
+  return analysis.trust?.overall.score ?? analysis.confidence
+}
+
+export function shouldShowFollowUpActions(args: {
+  analysis: Phase1AnalysisResponse
+  messageText: string
+  followUpCount: number
+}) {
+  return (
+    args.followUpCount > 0 &&
+    getVisibleConfidenceScore(args.analysis) >= 50 &&
+    !args.messageText.includes("could not complete that custom analysis safely")
+  )
+}
+
 function resolveVisibleActions(
   analysis: Phase1AnalysisResponse,
 ): FollowUpAction[] {
@@ -241,7 +257,7 @@ function AssistantMessage({
               {analysis.timeframe}
             </span>
             <span className="font-mono text-xs text-muted-foreground">
-              confidence {analysis.confidence}%
+              confidence {getVisibleConfidenceScore(analysis)}%
             </span>
           </div>
           {analysis.conversationContextUsed && (
@@ -249,9 +265,11 @@ function AssistantMessage({
               Conversation context was used to interpret this reply.
             </p>
           )}
-          {followUpActions.length > 0 &&
-            analysis.confidence >= 50 &&
-            !message.text.includes("could not complete that custom analysis safely") && (
+          {shouldShowFollowUpActions({
+            analysis,
+            messageText: message.text,
+            followUpCount: followUpActions.length,
+          }) && (
             <div className="mt-4 flex flex-wrap gap-2">
               {followUpActions.map((followUp) => (
                 <button

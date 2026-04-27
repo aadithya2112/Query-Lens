@@ -85,6 +85,7 @@ export async function runBuiltInAnalysisPipeline(args: {
         inputQuestion: args.input.question,
         interpretation: execution.interpretation ?? planning.interpretation,
         executionTrace: execution.executionTrace ?? planning.executionPlan.trace,
+        trustContext: execution.trustContext,
       }),
     }
   }

@@ -183,7 +183,7 @@ Separate the system that learns what a dataset is from the system that answers q
 - Discovery, bootstrap, source-context, retrieval, and seeding paths now consume the profile/runtime seam without changing shipped `discovery`, `what_changed`, `compare`, `breakdown`, fixture-mode, or database-mode behavior.
 - Tests now cover the runtime resolver, fixture profile snapshots, semantic draft generation, and the rewired consumers that depend on profiling instead of query-time repositories.
 
-## 6. Create A First-Class Trust And Confidence Model
+## 6. Create A First-Class Trust And Confidence Model [Completed]
 
 ### Goal
 Replace trust as a loose mix of score + artifacts with a structured trust model.
@@ -211,6 +211,12 @@ Replace trust as a loose mix of score + artifacts with a structured trust model.
 - Cleaner UI trust rendering
 - Better separation between analytics output and trust explanation
 
+### Completion Notes
+- Completed by introducing a first-class built-in trust model with typed component scores for interpretation, data coverage, source corroboration, and execution confidence.
+- Built-in `discovery`, `what_changed`, `compare`, `breakdown`, and built-in fallback responses now derive `confidence` and compatibility trust artifacts from the shared trust model instead of ad hoc scoring in executors.
+- The trust surface now renders explicit component breakdowns, uncertainty notes, limitation notes, and shared trust traces without changing shipped analytical behavior.
+- Tests now cover trust-model scoring rules, backward-compatible presentation fields, and follow-up gating against the derived trust score.
+
 ## Suggested Order
 
 1. Introduce a first-class semantic manifest layer. [Completed]
@@ -218,7 +224,7 @@ Replace trust as a loose mix of score + artifacts with a structured trust model.
 3. Create an explicit execution-plan contract. [Completed]
 4. Refactor intent executors into capability executors. [Completed]
 5. Split ingestion and profiling from query-time data access. [Completed]
-6. Create a first-class trust and confidence model.
+6. Create a first-class trust and confidence model. [Completed]
 
 ## Expected Outcome
 

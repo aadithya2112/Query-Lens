@@ -1,5 +1,5 @@
 import { getRelativeDateWindow } from "@/lib/querylens/date-windows"
-import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import { roundTo } from "@/lib/querylens/scoring"
 import {
   compareSlicesCapability,
   explainCompareGapCapability,
@@ -219,6 +219,16 @@ export async function executeComparePlan(
       kind: "failure",
       fallbackReason:
         "The compare request could not be resolved into a supported side-by-side view.",
+      trustContext: {
+        allowedSources: args.context.executionPlan.allowedSources,
+        observedSources: [],
+        coverageKind: "fallback",
+        validationStatus: args.context.executionPlan.validation.status,
+        validationResults: args.context.executionPlan.validation.results,
+        limitationNotes: [
+          "The compare request could not be resolved into a supported side-by-side view.",
+        ],
+      },
     }
   }
 
@@ -233,6 +243,16 @@ export async function executeComparePlan(
       kind: "failure",
       fallbackReason:
         "The sample dataset could not resolve both sides of that comparison safely.",
+      trustContext: {
+        allowedSources: args.context.executionPlan.allowedSources,
+        observedSources: [],
+        coverageKind: "fallback",
+        validationStatus: args.context.executionPlan.validation.status,
+        validationResults: args.context.executionPlan.validation.results,
+        limitationNotes: [
+          "The sample dataset could not resolve both sides of that comparison safely.",
+        ],
+      },
     }
   }
 
@@ -335,18 +355,19 @@ export async function executeComparePlan(
       compareSpec.mode === "timeframe"
         ? "Side-by-side cashflow health comparison across adjacent weekly windows"
         : "Side-by-side cashflow health comparison across two peers in the same selected week",
-    confidence: calculateConfidenceScore({
-      evidenceCount: evidence.length,
-      driverCount: drivers.length,
-      hasCrossSourceEvidence: evidence.some((item) => item.sourceType === "mongodb"),
-      fallback: false,
-    }),
     activeScope,
     drivers,
     chartSpec: buildChartSpec(compareSpec, leftRow, rightRow),
     evidence,
     assumptions: buildAssumptions(args.plan),
     sourceMode: args.dataAccess.sourceMode,
+    trustContext: {
+      allowedSources: args.context.executionPlan.allowedSources,
+      observedSources: [...new Set(evidence.map((item) => item.sourceType))],
+      coverageKind: "validated_analytics",
+      validationStatus: args.context.executionPlan.validation.status,
+      validationResults: args.context.executionPlan.validation.results,
+    },
     comparisonSummary,
     presentation: {
       targetWindow,
