@@ -3,22 +3,20 @@ import {
   getRelativeDateWindow,
 } from "@/lib/querylens/date-windows"
 import {
-  buildCompareFollowUpActions,
-  buildCompareFollowUps,
 } from "@/lib/querylens/follow-ups"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import { filterRowsForScope } from "@/lib/querylens/server/built-in-pipeline/common"
+import type {
+  BuiltInExecutionFailure,
+  CompareExecutionPayload,
+} from "@/lib/querylens/server/built-in-pipeline/types"
 import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
-import {
-  buildWhatChangedFallbackResponse,
-  filterRowsForScope,
-} from "@/lib/querylens/server/executors/what-changed"
 import type {
   CompareSpec,
   ContextEvent,
   DriverItem,
   EvidenceItem,
-  Phase1AnalysisResponse,
   ScopeFilter,
   StructuredQueryPlan,
   WeeklyMetricRow,
@@ -27,8 +25,6 @@ import type {
 interface CompareExecutorArgs {
   dataAccess: QueryLensDataAccess
   plan: StructuredQueryPlan
-  weeklyRows: WeeklyMetricRow[]
-  composeNarrative: unknown
 }
 
 function getMetricComponentGaps(left: WeeklyMetricRow, right: WeeklyMetricRow) {
@@ -343,16 +339,15 @@ async function getRowsForCompare(
 
 export async function executeComparePlan(
   args: CompareExecutorArgs
-): Promise<Phase1AnalysisResponse> {
+): Promise<CompareExecutionPayload | BuiltInExecutionFailure> {
   const compareSpec = args.plan.compareSpec
 
   if (!compareSpec) {
-    return buildWhatChangedFallbackResponse({
+    return {
+      kind: "failure",
       fallbackReason:
         "The compare request could not be resolved into a supported side-by-side view.",
-      sourceMode: args.dataAccess.sourceMode,
-      rows: args.weeklyRows,
-    })
+    }
   }
 
   const { leftRow, rightRow, timeframeLabel } = await getRowsForCompare(
@@ -361,12 +356,11 @@ export async function executeComparePlan(
   )
 
   if (!leftRow || !rightRow) {
-    return buildWhatChangedFallbackResponse({
+    return {
+      kind: "failure",
       fallbackReason:
         "The sample dataset could not resolve both sides of that comparison safely.",
-      sourceMode: args.dataAccess.sourceMode,
-      rows: args.weeklyRows,
-    })
+    }
   }
 
   const comparisonSummary = buildComparisonSummary(compareSpec, leftRow, rightRow)
@@ -388,12 +382,6 @@ export async function executeComparePlan(
     timeframeLabel,
   })
   const activeScope = `${compareSpec.leftLabel} vs ${compareSpec.rightLabel}`
-  const headline = comparisonSummary.tie
-    ? `${compareSpec.leftLabel} and ${compareSpec.rightLabel} are effectively level`
-    : `${comparisonSummary.winnerLabel} leads the cashflow comparison`
-  const summary = comparisonSummary.tie
-    ? `${compareSpec.leftLabel} and ${compareSpec.rightLabel} both scored ${comparisonSummary.leftValue.toFixed(1)} in the selected compare view, so the main differences come from component mix rather than the headline score. QueryLens therefore focuses the explanation on which grounded components still separate the two sides even though the headline metric is level.`
-    : `${comparisonSummary.winnerLabel} leads by ${comparisonSummary.delta.toFixed(1)} points in the selected compare view. QueryLens highlights where payment coverage, balance resilience, and stress indicators create the clearest separation. The comparison stays anchored to the validated windows and scopes defined in this side-by-side view.`
   const targetWindow =
     compareSpec.mode === "timeframe"
       ? compareSpec.leftWindow ??
@@ -405,11 +393,16 @@ export async function executeComparePlan(
       ? compareSpec.rightWindow ??
         getRelativeDateWindow(compareSpec.rightTimeframe ?? "last_week")
       : undefined
+  const weakerLabel =
+    comparisonSummary.tie ||
+    comparisonSummary.winnerLabel === compareSpec.rightLabel
+      ? compareSpec.leftLabel
+      : compareSpec.rightLabel
 
   return {
+    kind: "success",
     intent: "compare",
-    headline,
-    summary,
+    plan: args.plan,
     metric: "cashflow_health_score",
     timeframe: timeframeLabel,
     comparisonBasis:
@@ -427,20 +420,13 @@ export async function executeComparePlan(
     chartSpec: buildChartSpec(compareSpec, leftRow, rightRow),
     evidence,
     assumptions: buildAssumptions(args.plan),
-    supportedFollowUps: buildCompareFollowUps({
+    sourceMode: args.dataAccess.sourceMode,
+    comparisonSummary,
+    presentation: {
       targetWindow,
       comparisonWindow,
-    }),
-    followUpActions: buildCompareFollowUpActions({
-      targetWindow,
-      weakerLabel:
-        comparisonSummary.tie ||
-        comparisonSummary.winnerLabel === compareSpec.rightLabel
-          ? compareSpec.leftLabel
-          : compareSpec.rightLabel,
+      weakerLabel,
       compareDimension: compareSpec.dimension,
-    }),
-    comparisonSummary,
-    sourceMode: args.dataAccess.sourceMode,
+    },
   }
 }

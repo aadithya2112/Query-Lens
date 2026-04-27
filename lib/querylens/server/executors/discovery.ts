@@ -3,10 +3,10 @@ import { getDatasetDefinition } from "@/lib/querylens/datasets"
 import {
   buildDiscoveryCatalogSections,
 } from "@/lib/querylens/server/retrieval"
+import type { DiscoveryExecutionPayload } from "@/lib/querylens/server/built-in-pipeline/types"
 import type {
   CatalogSection,
   DriverItem,
-  Phase1AnalysisResponse,
   RetrievalContext,
   SourceHealth,
   StructuredQueryPlan,
@@ -131,7 +131,7 @@ function prioritizeSections(
 
 export async function executeDiscoveryPlan(
   args: DiscoveryExecutorArgs
-): Promise<Phase1AnalysisResponse> {
+): Promise<DiscoveryExecutionPayload> {
   const dataset = getDatasetDefinition(args.plan.datasetId)
   const sourceHealth = await args.dataAccess.getSourceHealth()
   const coverageLabel = buildCoverageLabel(args.weeklyRows)
@@ -141,7 +141,6 @@ export async function executeDiscoveryPlan(
     args.retrievalContext
   ).slice(0, 4)
 
-  const summary = `QueryLens currently has ${dataset.metrics.length} analytical metrics across ${dataset.supportedIntentIds.length} intent families for the ${dataset.label} dataset. The active source stack includes ${sourceHealth.map((source) => source.name).join(", ")}, with weekly coverage from ${coverageLabel}. That means discovery answers can stay grounded in explicit source coverage, retrieved catalog metadata, and the current sample-dataset boundaries before analytical planning begins.`
   const evidence = [
     ...sourceHealth.map((source) => ({
       sourceType:
@@ -163,9 +162,9 @@ export async function executeDiscoveryPlan(
   ]
 
   return {
+    kind: "success",
     intent: "discovery",
-    headline: `QueryLens is currently grounded on the ${dataset.label} dataset`,
-    summary,
+    plan: args.plan,
     metric: "dataset_catalog",
     timeframe: `Coverage: ${coverageLabel}`,
     comparisonBasis: "Catalog, source, and metadata overview",
@@ -187,12 +186,6 @@ export async function executeDiscoveryPlan(
       "Discovery answers are built from retrieved metadata, source health, and the current sample dataset boundaries.",
       "Analytical answers still require a supported metric, timeframe, and intent after planning.",
     ],
-    supportedFollowUps: [
-      "What metrics are available?",
-      "Which sources are connected?",
-      "Why did SME cashflow health drop last week?",
-      "Compare cashflow health this week vs last week",
-    ],
     discoverySummary: {
       datasetLabel: dataset.label,
       sourceLabels: sourceHealth.map((source) => source.name),
@@ -202,5 +195,12 @@ export async function executeDiscoveryPlan(
     },
     catalogSections,
     sourceMode: args.dataAccess.sourceMode,
+    presentation: {
+      datasetLabel: dataset.label,
+      metricCount: dataset.metrics.length,
+      supportedIntentCount: dataset.supportedIntentIds.length,
+      sourceHealth,
+      coverageLabel,
+    },
   }
 }

@@ -1,11 +1,8 @@
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
 import { getScopeLabel } from "@/lib/querylens/dataset-semantics"
-import {
-  buildBreakdownFollowUpActions,
-  buildBreakdownFollowUps,
-} from "@/lib/querylens/follow-ups"
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
+import type { BreakdownExecutionPayload } from "@/lib/querylens/server/built-in-pipeline/types"
 import {
   aggregateAccountStressRows,
   getScaledLowBalanceDayThreshold,
@@ -15,7 +12,6 @@ import type {
   BreakdownDimension,
   DriverItem,
   EvidenceItem,
-  Phase1AnalysisResponse,
   ScopeFilter,
   StructuredQueryPlan,
   WeeklyAccountStressRow,
@@ -24,7 +20,6 @@ import type {
 interface BreakdownExecutorArgs {
   dataAccess: QueryLensDataAccess
   plan: StructuredQueryPlan
-  composeNarrative: unknown
 }
 
 interface BreakdownBucket {
@@ -189,7 +184,7 @@ function buildAssumptions(
 
 export async function executeBreakdownPlan(
   args: BreakdownExecutorArgs
-): Promise<Phase1AnalysisResponse> {
+): Promise<BreakdownExecutionPayload> {
   const targetWindow = args.plan.comparisonWindow.targetWindow
   const activeScopeLabel = getScopeLabel(args.plan.scope)
   const dimension = args.plan.breakdownDimension ?? "region_sector"
@@ -278,17 +273,11 @@ export async function executeBreakdownPlan(
   const topBucketSectorLabel = topBucket?.scope.sector
     ? dataset.sectors.find((sector) => sector.id === topBucket.scope.sector)?.name
     : undefined
-  const headline = topBucket
-    ? `${topBucket.label} leads the at-risk account mix`
-    : "No concentrated at-risk pocket was found in the selected range"
-  const summary = topBucket
-    ? `${totalAtRisk} of ${totalAccounts} accounts were flagged at risk in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}. ${topBucket.label} accounted for ${topBucket.atRiskAccountCount} of them, with the highest concentration of low-balance and overdue stress. The breakdown ranks the selected ${dimension.replace("_", " ")} buckets by observed account stress so the largest pressure pocket appears first.`
-    : `No accounts met the at-risk threshold in ${activeScopeLabel.toLowerCase()} for ${targetWindow.label}. QueryLens still checked the selected ${dimension.replace("_", " ")} view against the grounded low-balance and overdue rules for that window.`
 
   return {
+    kind: "success",
     intent: "breakdown",
-    headline,
-    summary,
+    plan: args.plan,
     metric: "at_risk_account_count",
     timeframe: timeframeLabel,
     comparisonBasis:
@@ -311,17 +300,16 @@ export async function executeBreakdownPlan(
       lowBalanceDaysThreshold,
       targetWindow.dayCount
     ),
-    supportedFollowUps: buildBreakdownFollowUps({
-      targetWindow,
-    }),
-    followUpActions: buildBreakdownFollowUpActions({
+    sourceMode: args.dataAccess.sourceMode,
+    presentation: {
       targetWindow,
       dimension,
+      totalAtRisk,
+      totalAccounts,
       topBucketLabel: topBucket?.label,
       healthyPeerLabel,
       topBucketRegionLabel,
       topBucketSectorLabel,
-    }),
-    sourceMode: args.dataAccess.sourceMode,
+    },
   }
 }

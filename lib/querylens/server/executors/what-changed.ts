@@ -5,23 +5,24 @@ import {
 } from "@/lib/querylens/date-windows"
 import { getScopeLabel } from "@/lib/querylens/dataset-semantics"
 import {
-  buildWhatChangedFollowUpActions,
-  buildWhatChangedFollowUps,
-} from "@/lib/querylens/follow-ups"
-import { formatWeekLabel } from "@/lib/querylens/seed-data"
+  buildCashflowHistoryChartSpec,
+  filterRowsForScope,
+} from "@/lib/querylens/server/built-in-pipeline/common"
+import type {
+  BuiltInExecutionFailure,
+  WhatChangedExecutionPayload,
+} from "@/lib/querylens/server/built-in-pipeline/types"
 import {
   calculateConfidenceScore,
   calculateWeightedDriverImpact,
   roundTo,
 } from "@/lib/querylens/scoring"
-import { DEFAULT_FLAGSHIP_QUESTION } from "@/lib/querylens/server/analysis-provider"
 import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   ContextEvent,
   DriverItem,
   EvidenceItem,
-  Phase1AnalysisResponse,
   ScopeFilter,
   ScopeType,
   StructuredQueryPlan,
@@ -32,42 +33,6 @@ interface WhatChangedExecutorArgs {
   dataAccess: QueryLensDataAccess
   plan: StructuredQueryPlan
   weeklyRows: WeeklyMetricRow[]
-  composeNarrative: (input: {
-    parsed: StructuredQueryPlan
-    activeScopeLabel: string
-    currentScore: number
-    previousScore: number
-    drivers: DriverItem[]
-    contextEvents: ContextEvent[]
-    allowedFollowUps: string[]
-  }) => Promise<
-    Pick<Phase1AnalysisResponse, "headline" | "summary" | "supportedFollowUps">
-  >
-}
-
-export function filterRowsForScope(rows: WeeklyMetricRow[], scope: ScopeFilter) {
-  if (scope.region && scope.sector) {
-    return rows.filter(
-      (row) =>
-        row.recordType === "region_sector" &&
-        row.regionId === scope.region &&
-        row.sectorId === scope.sector
-    )
-  }
-
-  if (scope.region) {
-    return rows.filter(
-      (row) => row.recordType === "region" && row.regionId === scope.region
-    )
-  }
-
-  if (scope.sector) {
-    return rows.filter(
-      (row) => row.recordType === "sector" && row.sectorId === scope.sector
-    )
-  }
-
-  return rows.filter((row) => row.recordType === "portfolio")
 }
 
 function filterRegionSectorRows(rows: WeeklyMetricRow[], scope: ScopeFilter) {
@@ -322,67 +287,9 @@ function buildAssumptions(scope: ScopeFilter) {
   return assumptions
 }
 
-export function buildWhatChangedChartSpec(
-  rows: WeeklyMetricRow[],
-  activeScopeLabel: string
-) {
-  const series = rows.map((row) => ({
-    label: formatWeekLabel(row.weekStart),
-    weekStart: row.weekStart,
-    weekEnd: row.weekEnd,
-    score: row.cashflowHealthScore,
-  }))
-
-  return {
-    type: "line" as const,
-    title: `${activeScopeLabel} cashflow health over the last 12 weeks`,
-    xKey: "label" as const,
-    yKey: "score" as const,
-    data: series,
-    explanation:
-      "The chart tracks the sample dataset's weekly cashflow health score so the drop can be read in context, not as a one-off number.",
-  }
-}
-
-export function buildWhatChangedFallbackResponse(args: {
-  fallbackReason: string
-  sourceMode: "database" | "fixture"
-  rows: WeeklyMetricRow[]
-}): Phase1AnalysisResponse {
-  return {
-    intent: "what_changed",
-    headline: "QueryLens could not complete that request safely",
-    summary: args.fallbackReason,
-    metric: "cashflow_health_score",
-    timeframe: "Ask about this week or last week",
-    comparisonBasis: "The current sample dataset supports grounded weekly analysis over adjacent windows",
-    confidence: calculateConfidenceScore({
-      evidenceCount: 0,
-      driverCount: 0,
-      hasCrossSourceEvidence: false,
-      fallback: true,
-    }),
-    activeScope: "Portfolio",
-    drivers: [],
-    chartSpec: buildWhatChangedChartSpec(filterRowsForScope(args.rows, {}), "Portfolio"),
-    evidence: [],
-    assumptions: [
-      "QueryLens stays within the current sample dataset, supported metrics, and validated weekly windows.",
-    ],
-    supportedFollowUps: [
-      DEFAULT_FLAGSHIP_QUESTION,
-      "What makes up at-risk accounts by region and sector last week?",
-      "Compare cashflow health this week vs last week",
-      "Compare North West vs London & South East cashflow health last week",
-    ],
-    fallback: true,
-    sourceMode: args.sourceMode,
-  }
-}
-
 export async function executeWhatChangedPlan(
   args: WhatChangedExecutorArgs
-): Promise<Phase1AnalysisResponse> {
+): Promise<WhatChangedExecutionPayload | BuiltInExecutionFailure> {
   const activeScopeLabel = getScopeLabel(args.plan.scope)
   const historicalScopedRows = filterRowsForScope(args.weeklyRows, args.plan.scope)
   const targetWindow = args.plan.comparisonWindow.targetWindow
@@ -419,12 +326,11 @@ export async function executeWhatChangedPlan(
   const previous = filterRowsForScope(comparisonRows, args.plan.scope)[0]
 
   if (!current || !previous) {
-    return buildWhatChangedFallbackResponse({
+    return {
+      kind: "failure",
       fallbackReason:
         "The sample dataset could not resolve both comparison windows for that question.",
-      sourceMode: args.dataAccess.sourceMode,
-      rows: args.weeklyRows,
-    })
+    }
   }
 
   const regionSectorRows = [...targetRows, ...comparisonRows].filter(
@@ -471,20 +377,10 @@ export async function executeWhatChangedPlan(
     driverCount: drivers.length,
     hasCrossSourceEvidence: evidence.some((item) => item.sourceType === "mongodb"),
   })
-  const chartSpec = buildWhatChangedChartSpec(historicalScopedRows, activeScopeLabel)
-  const allowedFollowUps = buildWhatChangedFollowUps({
-    targetWindow,
-    comparisonWindow: comparisonDateWindow,
-  })
-  const narrative = await args.composeNarrative({
-    parsed: args.plan,
+  const chartSpec = buildCashflowHistoryChartSpec(
+    historicalScopedRows,
     activeScopeLabel,
-    currentScore: current.cashflowHealthScore,
-    previousScore: previous.cashflowHealthScore,
-    drivers,
-    contextEvents,
-    allowedFollowUps,
-  })
+  )
   const weakestRegionLabel = !args.plan.scope.region
     ? regionRanking[0]?.row.regionName ?? undefined
     : undefined
@@ -499,15 +395,15 @@ export async function executeWhatChangedPlan(
         .sort(
           (left, right) =>
             right.row.cashflowHealthScore - left.row.cashflowHealthScore,
-        )
+      )
         .find((candidate) => candidate.row.regionName !== weakestRegionLabel)?.row
         .regionName ?? undefined
     : undefined
 
   return {
+    kind: "success",
     intent: "what_changed",
-    headline: narrative.headline,
-    summary: narrative.summary,
+    plan: args.plan,
     metric: args.plan.metricId,
     timeframe: timeframeLabel,
     comparisonBasis: comparisonLabel,
@@ -517,14 +413,16 @@ export async function executeWhatChangedPlan(
     chartSpec,
     evidence,
     assumptions: buildAssumptions(args.plan.scope),
-    supportedFollowUps: narrative.supportedFollowUps,
-    followUpActions: buildWhatChangedFollowUpActions({
+    sourceMode: args.dataAccess.sourceMode,
+    presentation: {
+      currentScore: current.cashflowHealthScore,
+      previousScore: previous.cashflowHealthScore,
+      contextEvents,
       targetWindow,
-      scope: args.plan.scope,
+      comparisonWindow: comparisonDateWindow,
       weakestRegionLabel,
       weakestSectorLabel,
       healthyPeerLabel,
-    }),
-    sourceMode: args.dataAccess.sourceMode,
+    },
   }
 }
