@@ -58,7 +58,7 @@ Move dataset meaning out of scattered code paths and into one explicit semantic 
 - Planning, discovery metadata, entity resolution, and scope labels now project from the manifest-backed contract instead of scattered helpers and JSON fragments.
 - Existing shipped flows remain stable while the semantic layer now acts as the shared metadata source for future refactors.
 
-## 2. Separate Planning, Execution, And Presentation
+## 2. Separate Planning, Execution, And Presentation [Completed]
 
 ### Goal
 Create a clean pipeline where:
@@ -80,6 +80,12 @@ Create a clean pipeline where:
 - Easier testing
 - Easier debugging
 - Smaller mental load while building new features
+
+### Completion Notes
+- Completed by introducing explicit planning, execution, and presentation stages for the built-in `discovery`, `what_changed`, `compare`, and `breakdown` flows.
+- `analysis-orchestrator.ts` now coordinates context loading, persistence, and route selection while the built-in pipeline owns staged analysis.
+- `leadership_summary` and `agentic_query` intentionally remain on their existing paths until their own refactors.
+- External `/api/query` behavior stayed stable while the internal built-in pipeline became easier to test and evolve.
 
 ## 3. Create An Explicit Execution-Plan Contract [Completed]
 
@@ -151,7 +157,7 @@ Move from one-off intent-driven executors to reusable capability-driven executio
 - Execution-plan capability metadata now reflects actual contextual reads for compare and breakdown flows.
 - Capability tests cover the reusable execution paths and the runtime guard that prevents undeclared capability calls.
 
-## 5. Split Ingestion And Profiling From Query-Time Data Access
+## 5. Split Ingestion And Profiling From Query-Time Data Access [Completed]
 
 ### Goal
 Separate the system that learns what a dataset is from the system that answers questions against it.
@@ -170,6 +176,12 @@ Separate the system that learns what a dataset is from the system that answers q
 - Cleaner onboarding work
 - Less coupling between setup-time and query-time logic
 - Easier iteration on source support
+
+### Completion Notes
+- Completed by splitting dataset runtime responsibilities into a query-time data-access layer and a separate dataset profile store.
+- Query answering now stays focused on validated analytic reads, while source inspection, schema snapshots, source health, catalog profiling, and semantic draft generation live in dedicated profiling modules.
+- Discovery, bootstrap, source-context, retrieval, and seeding paths now consume the profile/runtime seam without changing shipped `discovery`, `what_changed`, `compare`, `breakdown`, fixture-mode, or database-mode behavior.
+- Tests now cover the runtime resolver, fixture profile snapshots, semantic draft generation, and the rewired consumers that depend on profiling instead of query-time repositories.
 
 ## 6. Create A First-Class Trust And Confidence Model
 
@@ -202,10 +214,10 @@ Replace trust as a loose mix of score + artifacts with a structured trust model.
 ## Suggested Order
 
 1. Introduce a first-class semantic manifest layer. [Completed]
-2. Separate planning, execution, and presentation.
+2. Separate planning, execution, and presentation. [Completed]
 3. Create an explicit execution-plan contract. [Completed]
 4. Refactor intent executors into capability executors. [Completed]
-5. Split ingestion and profiling from query-time data access.
+5. Split ingestion and profiling from query-time data access. [Completed]
 6. Create a first-class trust and confidence model.
 
 ## Expected Outcome
