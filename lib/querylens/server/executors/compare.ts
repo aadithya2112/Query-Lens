@@ -1,16 +1,16 @@
-import {
-  formatContextualDateWindowLabel,
-  getRelativeDateWindow,
-} from "@/lib/querylens/date-windows"
-import {
-} from "@/lib/querylens/follow-ups"
+import { getRelativeDateWindow } from "@/lib/querylens/date-windows"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
-import { filterRowsForScope } from "@/lib/querylens/server/built-in-pipeline/common"
+import {
+  compareSlicesCapability,
+  explainCompareGapCapability,
+  retrieveContextCapability,
+  type BuiltInCapabilityContext,
+  type CashflowComponentGap,
+} from "@/lib/querylens/server/built-in-pipeline/capabilities"
 import type {
   BuiltInExecutionFailure,
   CompareExecutionPayload,
 } from "@/lib/querylens/server/built-in-pipeline/types"
-import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   CompareSpec,
@@ -23,47 +23,42 @@ import type {
 } from "@/lib/querylens/types"
 
 interface CompareExecutorArgs {
+  context: BuiltInCapabilityContext
   dataAccess: QueryLensDataAccess
   plan: StructuredQueryPlan
 }
 
-function getMetricComponentGaps(left: WeeklyMetricRow, right: WeeklyMetricRow) {
-  return [
-    {
-      id: "coverage_gap",
-      title: "Payment coverage is the widest gap",
-      delta: roundTo(
-        Math.abs(left.inflowOutflowScore - right.inflowOutflowScore) * 0.4,
-        1
-      ),
-      description: `${left.regionName ?? left.sectorName ?? "The left side"} ran at ${(left.inboundPayments / left.outboundPayments).toFixed(2)}x coverage versus ${(right.inboundPayments / right.outboundPayments).toFixed(2)}x on the right side.`,
-    },
-    {
-      id: "balance_gap",
-      title: "Closing balance resilience separates the two sides",
-      delta: roundTo(
-        Math.abs(left.balanceTrendScore - right.balanceTrendScore) * 0.25,
-        1
-      ),
-      description: `The comparison closes at ${left.closingBalance.toLocaleString()} versus ${right.closingBalance.toLocaleString()}, creating a visible gap in end-of-week balance strength.`,
-    },
-    {
-      id: "stress_gap",
-      title: "Stress indicators remain meaningfully different",
-      delta: roundTo(
-        Math.abs(left.lowBalanceScore - right.lowBalanceScore) * 0.2 +
-          Math.abs(left.overdueScore - right.overdueScore) * 0.15,
-        1
-      ),
-      description: `Low-balance share is ${(left.lowBalanceShare * 100).toFixed(1)}% versus ${(right.lowBalanceShare * 100).toFixed(1)}%, while overdue exposure is ${(left.overdueShare * 100).toFixed(1)}% versus ${(right.overdueShare * 100).toFixed(1)}%.`,
-    },
-  ]
+function describeComponentGap(gap: CashflowComponentGap, left: WeeklyMetricRow, right: WeeklyMetricRow) {
+  switch (gap.id) {
+    case "coverage_gap":
+      return {
+        id: gap.id,
+        title: "Payment coverage is the widest gap",
+        delta: gap.weightedGap,
+        description: `${left.regionName ?? left.sectorName ?? "The left side"} ran at ${(gap.leftRatio ?? 0).toFixed(2)}x coverage versus ${(gap.rightRatio ?? 0).toFixed(2)}x on the right side.`,
+      }
+    case "balance_gap":
+      return {
+        id: gap.id,
+        title: "Closing balance resilience separates the two sides",
+        delta: gap.weightedGap,
+        description: `The comparison closes at ${(gap.leftClosingBalance ?? 0).toLocaleString()} versus ${(gap.rightClosingBalance ?? 0).toLocaleString()}, creating a visible gap in end-of-week balance strength.`,
+      }
+    case "stress_gap":
+      return {
+        id: gap.id,
+        title: "Stress indicators remain meaningfully different",
+        delta: gap.weightedGap,
+        description: `Low-balance share is ${((gap.leftLowBalanceShare ?? 0) * 100).toFixed(1)}% versus ${((gap.rightLowBalanceShare ?? 0) * 100).toFixed(1)}%, while overdue exposure is ${((gap.leftOverdueShare ?? 0) * 100).toFixed(1)}% versus ${((gap.rightOverdueShare ?? 0) * 100).toFixed(1)}%.`,
+      }
+  }
 }
 
 function buildDrivers(
   left: WeeklyMetricRow,
   right: WeeklyMetricRow,
-  compareSpec: CompareSpec
+  compareSpec: CompareSpec,
+  componentGaps: CashflowComponentGap[],
 ): DriverItem[] {
   const leftLeads = left.cashflowHealthScore >= right.cashflowHealthScore
   const strongerLabel = leftLeads ? compareSpec.leftLabel : compareSpec.rightLabel
@@ -71,7 +66,8 @@ function buildDrivers(
   const strongerRow = leftLeads ? left : right
   const weakerRow = leftLeads ? right : left
 
-  return getMetricComponentGaps(strongerRow, weakerRow)
+  return componentGaps
+    .map((gap) => describeComponentGap(gap, strongerRow, weakerRow))
     .sort((leftGap, rightGap) => rightGap.delta - leftGap.delta)
     .map((gap) => ({
       id: gap.id,
@@ -157,60 +153,13 @@ function buildComparisonSummary(
   }
 }
 
-async function getCompareContextEvents(args: {
-  dataAccess: QueryLensDataAccess
-  compareSpec: CompareSpec
-  weakerScope: ScopeFilter
-}) {
-  if (args.compareSpec.mode === "timeframe") {
-    const leftWindow =
-      args.compareSpec.leftWindow ??
-      getRelativeDateWindow(args.compareSpec.leftTimeframe ?? "this_week")
-    const rightWindow =
-      args.compareSpec.rightWindow ??
-      getRelativeDateWindow(args.compareSpec.rightTimeframe ?? "last_week")
-    const leftEvents = await args.dataAccess.listContextEvents({
-      targetStart: leftWindow.startDate,
-      targetEnd: leftWindow.endDate,
-      scope: args.compareSpec.leftScope,
-    })
-    const rightEvents = await args.dataAccess.listContextEvents({
-      targetStart: rightWindow.startDate,
-      targetEnd: rightWindow.endDate,
-      scope: args.compareSpec.rightScope,
-    })
-
-    return [...leftEvents, ...rightEvents]
-  }
-
-  const selectedWindow =
-    args.compareSpec.selectedWindow ??
-    getRelativeDateWindow(args.compareSpec.selectedTimeframe ?? "last_week")
-  const weakerEvents = await args.dataAccess.listContextEvents({
-    targetStart: selectedWindow.startDate,
-    targetEnd: selectedWindow.endDate,
-    scope: args.weakerScope,
-  })
-  const strongerScope =
-    args.weakerScope.region === args.compareSpec.leftScope.region &&
-    args.weakerScope.sector === args.compareSpec.leftScope.sector
-      ? args.compareSpec.rightScope
-      : args.compareSpec.leftScope
-  const strongerEvents = await args.dataAccess.listContextEvents({
-    targetStart: selectedWindow.startDate,
-    targetEnd: selectedWindow.endDate,
-    scope: strongerScope,
-  })
-
-  return [...weakerEvents, ...strongerEvents]
-}
-
 function buildEvidence(args: {
   compareSpec: CompareSpec
   left: WeeklyMetricRow
   right: WeeklyMetricRow
   contextEvents: ContextEvent[]
   timeframeLabel: string
+  componentGaps: CashflowComponentGap[]
 }) {
   const comparisonSummary = buildComparisonSummary(
     args.compareSpec,
@@ -228,9 +177,9 @@ function buildEvidence(args: {
     },
   ]
 
-  const biggestGap = getMetricComponentGaps(args.left, args.right).sort(
-    (leftGap, rightGap) => rightGap.delta - leftGap.delta
-  )[0]
+  const biggestGap = args.componentGaps
+    .map((gap) => describeComponentGap(gap, args.left, args.right))
+    .sort((leftGap, rightGap) => rightGap.delta - leftGap.delta)[0]
 
   if (biggestGap) {
     evidence.push({
@@ -260,83 +209,6 @@ function buildEvidence(args: {
   return evidence
 }
 
-async function getRowsForCompare(
-  dataAccess: QueryLensDataAccess,
-  compareSpec: CompareSpec
-): Promise<{ leftRow?: WeeklyMetricRow; rightRow?: WeeklyMetricRow; timeframeLabel: string }> {
-  if (compareSpec.mode === "timeframe") {
-    const leftWindow =
-      compareSpec.leftWindow ??
-      getRelativeDateWindow(compareSpec.leftTimeframe ?? "this_week")
-    const rightWindow =
-      compareSpec.rightWindow ??
-      getRelativeDateWindow(compareSpec.rightTimeframe ?? "last_week")
-    const [leftDailyMetrics, rightDailyMetrics] = await Promise.all([
-      dataAccess.listDailyMetrics({
-        startDate: leftWindow.startDate,
-        endDate: leftWindow.endDate,
-        scope: compareSpec.leftScope,
-      }),
-      dataAccess.listDailyMetrics({
-        startDate: rightWindow.startDate,
-        endDate: rightWindow.endDate,
-        scope: compareSpec.rightScope,
-      }),
-    ])
-    const leftRows = aggregateMetricWindowRows({
-      dailyMetrics: leftDailyMetrics,
-      startDate: leftWindow.startDate,
-      endDate: leftWindow.endDate,
-    })
-    const rightRows = aggregateMetricWindowRows({
-      dailyMetrics: rightDailyMetrics,
-      startDate: rightWindow.startDate,
-      endDate: rightWindow.endDate,
-    })
-
-    return {
-      leftRow: filterRowsForScope(leftRows, compareSpec.leftScope)[0],
-      rightRow: filterRowsForScope(rightRows, compareSpec.rightScope)[0],
-      timeframeLabel: `${leftWindow.label} vs ${rightWindow.label}`,
-    }
-  }
-
-  const selectedWindow =
-    compareSpec.selectedWindow ??
-    getRelativeDateWindow(compareSpec.selectedTimeframe ?? "last_week")
-  const [leftDailyMetrics, rightDailyMetrics] = await Promise.all([
-    dataAccess.listDailyMetrics({
-      startDate: selectedWindow.startDate,
-      endDate: selectedWindow.endDate,
-      scope: compareSpec.leftScope,
-    }),
-    dataAccess.listDailyMetrics({
-      startDate: selectedWindow.startDate,
-      endDate: selectedWindow.endDate,
-      scope: compareSpec.rightScope,
-    }),
-  ])
-  const leftRows = aggregateMetricWindowRows({
-    dailyMetrics: leftDailyMetrics,
-    startDate: selectedWindow.startDate,
-    endDate: selectedWindow.endDate,
-  })
-  const rightRows = aggregateMetricWindowRows({
-    dailyMetrics: rightDailyMetrics,
-    startDate: selectedWindow.startDate,
-    endDate: selectedWindow.endDate,
-  })
-
-  return {
-    leftRow: filterRowsForScope(leftRows, compareSpec.leftScope)[0],
-    rightRow: filterRowsForScope(rightRows, compareSpec.rightScope)[0],
-    timeframeLabel:
-      compareSpec.mode === "peer"
-        ? formatContextualDateWindowLabel(selectedWindow)
-        : selectedWindow.label,
-  }
-}
-
 export async function executeComparePlan(
   args: CompareExecutorArgs
 ): Promise<CompareExecutionPayload | BuiltInExecutionFailure> {
@@ -350,10 +222,11 @@ export async function executeComparePlan(
     }
   }
 
-  const { leftRow, rightRow, timeframeLabel } = await getRowsForCompare(
-    args.dataAccess,
-    compareSpec
-  )
+  const compareSlices = await compareSlicesCapability({
+    context: args.context,
+    compareSpec,
+  })
+  const { leftRow, rightRow, timeframeLabel } = compareSlices
 
   if (!leftRow || !rightRow) {
     return {
@@ -368,18 +241,71 @@ export async function executeComparePlan(
     comparisonSummary.tie || comparisonSummary.winnerLabel === compareSpec.rightLabel
       ? compareSpec.leftScope
       : compareSpec.rightScope
-  const contextEvents = await getCompareContextEvents({
-    dataAccess: args.dataAccess,
-    compareSpec,
-    weakerScope,
+  const contextRequests =
+    compareSpec.mode === "timeframe"
+      ? [
+          {
+            window:
+              compareSlices.leftWindow ??
+              getRelativeDateWindow(compareSpec.leftTimeframe ?? "this_week"),
+            scope: compareSpec.leftScope,
+          },
+          {
+            window:
+              compareSlices.rightWindow ??
+              getRelativeDateWindow(compareSpec.rightTimeframe ?? "last_week"),
+            scope: compareSpec.rightScope,
+          },
+        ]
+      : [
+          {
+            window:
+              compareSlices.selectedWindow ??
+              getRelativeDateWindow(compareSpec.selectedTimeframe ?? "last_week"),
+            scope: weakerScope,
+          },
+          {
+            window:
+              compareSlices.selectedWindow ??
+              getRelativeDateWindow(compareSpec.selectedTimeframe ?? "last_week"),
+            scope:
+              weakerScope.region === compareSpec.leftScope.region &&
+              weakerScope.sector === compareSpec.leftScope.sector
+                ? compareSpec.rightScope
+                : compareSpec.leftScope,
+          },
+        ]
+  const contextEvents = await retrieveContextCapability({
+    context: args.context,
+    requests: contextRequests,
   })
-  const drivers = buildDrivers(leftRow, rightRow, compareSpec)
+  const driverComponentGaps = explainCompareGapCapability({
+    context: args.context,
+    left: leftRow.cashflowHealthScore >= rightRow.cashflowHealthScore
+      ? leftRow
+      : rightRow,
+    right: leftRow.cashflowHealthScore >= rightRow.cashflowHealthScore
+      ? rightRow
+      : leftRow,
+  })
+  const evidenceComponentGaps = explainCompareGapCapability({
+    context: args.context,
+    left: leftRow,
+    right: rightRow,
+  })
+  const drivers = buildDrivers(
+    leftRow,
+    rightRow,
+    compareSpec,
+    driverComponentGaps,
+  )
   const evidence = buildEvidence({
     compareSpec,
     left: leftRow,
     right: rightRow,
     contextEvents,
     timeframeLabel,
+    componentGaps: evidenceComponentGaps,
   })
   const activeScope = `${compareSpec.leftLabel} vs ${compareSpec.rightLabel}`
   const targetWindow =

@@ -48,6 +48,17 @@ describe("built-in execution plan", () => {
       plan: planDeterministicQuery("What data is currently stored?").plan!,
       dateCoverage,
     })
+    const comparePlan = buildBuiltInExecutionPlan({
+      plan: planDeterministicQuery("Compare cashflow health this week vs last week")
+        .plan!,
+      dateCoverage,
+    })
+    const breakdownPlan = buildBuiltInExecutionPlan({
+      plan: planDeterministicQuery(
+        "What makes up at-risk accounts by region and sector last week?",
+      ).plan!,
+      dateCoverage,
+    })
 
     expect(whatChangedPlan.selectedCapabilities).toEqual([
       "aggregate_metric",
@@ -55,6 +66,18 @@ describe("built-in execution plan", () => {
       "retrieve_context",
     ])
     expect(whatChangedPlan.allowedSources).toEqual(["postgres", "mongodb"])
+    expect(comparePlan.selectedCapabilities).toEqual([
+      "aggregate_metric",
+      "compare_slices",
+      "explain_change",
+      "retrieve_context",
+    ])
+    expect(comparePlan.allowedSources).toEqual(["postgres", "mongodb"])
+    expect(breakdownPlan.selectedCapabilities).toEqual([
+      "aggregate_metric",
+      "retrieve_context",
+    ])
+    expect(breakdownPlan.allowedSources).toEqual(["postgres", "mongodb"])
     expect(discoveryPlan.selectedCapabilities).toEqual([
       "profile_dataset",
       "retrieve_context",

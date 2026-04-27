@@ -2,11 +2,13 @@ import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
 import { getScopeLabel } from "@/lib/querylens/dataset-semantics"
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
-import type { BreakdownExecutionPayload } from "@/lib/querylens/server/built-in-pipeline/types"
 import {
-  aggregateAccountStressRows,
-  getScaledLowBalanceDayThreshold,
-} from "@/lib/querylens/server/range-aggregation"
+  aggregateAccountStressCapability,
+  retrieveContextCapability,
+  type BuiltInCapabilityContext,
+} from "@/lib/querylens/server/built-in-pipeline/capabilities"
+import type { BreakdownExecutionPayload } from "@/lib/querylens/server/built-in-pipeline/types"
+import { getScaledLowBalanceDayThreshold } from "@/lib/querylens/server/range-aggregation"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   BreakdownDimension,
@@ -18,6 +20,7 @@ import type {
 } from "@/lib/querylens/types"
 
 interface BreakdownExecutorArgs {
+  context: BuiltInCapabilityContext
   dataAccess: QueryLensDataAccess
   plan: StructuredQueryPlan
 }
@@ -188,16 +191,15 @@ export async function executeBreakdownPlan(
   const targetWindow = args.plan.comparisonWindow.targetWindow
   const activeScopeLabel = getScopeLabel(args.plan.scope)
   const dimension = args.plan.breakdownDimension ?? "region_sector"
-  const dailyMetrics = await args.dataAccess.listDailyMetrics({
-    startDate: targetWindow.startDate,
-    endDate: targetWindow.endDate,
+  const aggregate = await aggregateAccountStressCapability({
+    context: args.context,
+    window: targetWindow,
     scope: args.plan.scope,
   })
-  const stressRows = aggregateAccountStressRows(dailyMetrics, targetWindow.startDate)
   const lowBalanceDaysThreshold = getScaledLowBalanceDayThreshold(targetWindow.dayCount)
 
   const { buckets, totalAtRisk } = buildBreakdownBuckets(
-    stressRows,
+    aggregate.stressRows,
     dimension,
     lowBalanceDaysThreshold
   )
@@ -207,17 +209,13 @@ export async function executeBreakdownPlan(
   )
   const topBucket = buckets[0]
 
-  const contextEvents = (
-    await Promise.all(
-      buckets.slice(0, 2).map((bucket) =>
-        args.dataAccess.listContextEvents({
-          targetStart: targetWindow.startDate,
-          targetEnd: targetWindow.endDate,
-          scope: bucket.scope,
-        })
-      )
-    )
-  ).flat()
+  const contextEvents = await retrieveContextCapability({
+    context: args.context,
+    requests: buckets.slice(0, 2).map((bucket) => ({
+      window: targetWindow,
+      scope: bucket.scope,
+    })),
+  })
   const timeframeLabel = formatContextualDateWindowLabel(targetWindow)
 
   const evidence: EvidenceItem[] = [

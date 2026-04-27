@@ -116,7 +116,7 @@ Introduce a typed execution-plan layer between planning and execution.
 - Built-in dispatch consumes the execution plan while existing intent executors continue to receive the original structured plan internally, keeping shipped flows stable.
 - Execution trace metadata now reaches successful and fallback responses through the presentation layer without changing existing response behavior.
 
-## 4. Refactor Intent Executors Into Capability Executors
+## 4. Refactor Intent Executors Into Capability Executors [Completed]
 
 ### Goal
 Move from one-off intent-driven executors to reusable capability-driven execution.
@@ -144,6 +144,12 @@ Move from one-off intent-driven executors to reusable capability-driven executio
 - Faster feature composition
 - Easier reuse across datasets
 - Cleaner path to weekly briefing and richer agentic flows
+
+### Completion Notes
+- Completed by adding a built-in capability layer for metric aggregation, compare slice resolution, context retrieval, dataset profiling, and cashflow change explanation.
+- Intent executors now compose payloads from reusable capability outputs while preserving shipped `discovery`, `what_changed`, `compare`, and `breakdown` behavior.
+- Execution-plan capability metadata now reflects actual contextual reads for compare and breakdown flows.
+- Capability tests cover the reusable execution paths and the runtime guard that prevents undeclared capability calls.
 
 ## 5. Split Ingestion And Profiling From Query-Time Data Access
 
@@ -198,7 +204,7 @@ Replace trust as a loose mix of score + artifacts with a structured trust model.
 1. Introduce a first-class semantic manifest layer. [Completed]
 2. Separate planning, execution, and presentation.
 3. Create an explicit execution-plan contract. [Completed]
-4. Refactor intent executors into capability executors.
+4. Refactor intent executors into capability executors. [Completed]
 5. Split ingestion and profiling from query-time data access.
 6. Create a first-class trust and confidence model.
 

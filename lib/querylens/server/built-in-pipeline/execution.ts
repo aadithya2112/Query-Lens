@@ -1,4 +1,5 @@
 import { appendExecutionTrace } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
+import type { BuiltInCapabilityContext } from "@/lib/querylens/server/built-in-pipeline/capabilities"
 import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
 import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
 import { executeDiscoveryPlan } from "@/lib/querylens/server/executors/discovery"
@@ -20,6 +21,12 @@ export async function executeBuiltInPlan(args: {
   retrievalContext: RetrievalContext
 }): Promise<BuiltInExecutionResult> {
   const plan = args.executionPlan.structuredPlan
+  const capabilityContext: BuiltInCapabilityContext = {
+    executionPlan: args.executionPlan,
+    dataAccess: args.dataAccess,
+    weeklyRows: args.weeklyRows,
+    retrievalContext: args.retrievalContext,
+  }
 
   if (args.executionPlan.validation.status === "rejected") {
     return {
@@ -48,6 +55,7 @@ export async function executeBuiltInPlan(args: {
   switch (args.executionPlan.intent) {
     case "what_changed":
       result = await executeWhatChangedPlan({
+        context: capabilityContext,
         dataAccess: args.dataAccess,
         plan,
         weeklyRows: args.weeklyRows,
@@ -55,18 +63,21 @@ export async function executeBuiltInPlan(args: {
       break
     case "compare":
       result = await executeComparePlan({
+        context: capabilityContext,
         dataAccess: args.dataAccess,
         plan,
       })
       break
     case "breakdown":
       result = await executeBreakdownPlan({
+        context: capabilityContext,
         dataAccess: args.dataAccess,
         plan,
       })
       break
     case "discovery":
       result = await executeDiscoveryPlan({
+        context: capabilityContext,
         plan,
         weeklyRows: args.weeklyRows,
         dataAccess: args.dataAccess,

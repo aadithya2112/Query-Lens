@@ -57,9 +57,9 @@ function getCapabilities(intent: BuiltInIntent): BuiltInExecutionCapability[] {
     case "what_changed":
       return ["aggregate_metric", "explain_change", "retrieve_context"]
     case "compare":
-      return ["aggregate_metric", "compare_slices"]
+      return ["aggregate_metric", "compare_slices", "explain_change", "retrieve_context"]
     case "breakdown":
-      return ["aggregate_metric"]
+      return ["aggregate_metric", "retrieve_context"]
     case "discovery":
       return ["profile_dataset", "retrieve_context"]
   }
@@ -71,7 +71,7 @@ function getAllowedSources(intent: BuiltInIntent): BuiltInAllowedSource[] {
       return ["postgres", "mongodb"]
     case "compare":
     case "breakdown":
-      return ["postgres"]
+      return ["postgres", "mongodb"]
     case "discovery":
       return ["manifest", "postgres", "mongodb"]
   }
@@ -83,7 +83,7 @@ function getAllowedOperations(intent: BuiltInIntent): BuiltInAllowedOperation[] 
       return ["read_only_aggregate", "read_only_lookup", "contextual_retrieval"]
     case "compare":
     case "breakdown":
-      return ["read_only_aggregate", "read_only_lookup"]
+      return ["read_only_aggregate", "read_only_lookup", "contextual_retrieval"]
     case "discovery":
       return ["catalog_profile_read", "read_only_lookup", "contextual_retrieval"]
   }

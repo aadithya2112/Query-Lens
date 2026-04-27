@@ -1,11 +1,10 @@
 import { calculateConfidenceScore } from "@/lib/querylens/scoring"
-import { getDatasetDefinition } from "@/lib/querylens/datasets"
 import {
-  buildDiscoveryCatalogSections,
-} from "@/lib/querylens/server/retrieval"
+  profileDatasetCapability,
+  type BuiltInCapabilityContext,
+} from "@/lib/querylens/server/built-in-pipeline/capabilities"
 import type { DiscoveryExecutionPayload } from "@/lib/querylens/server/built-in-pipeline/types"
 import type {
-  CatalogSection,
   DriverItem,
   RetrievalContext,
   SourceHealth,
@@ -14,6 +13,7 @@ import type {
 } from "@/lib/querylens/types"
 
 interface DiscoveryExecutorArgs {
+  context: BuiltInCapabilityContext
   plan: StructuredQueryPlan
   weeklyRows: WeeklyMetricRow[]
   dataAccess: {
@@ -21,21 +21,6 @@ interface DiscoveryExecutorArgs {
     getSourceHealth: () => Promise<SourceHealth[]>
   }
   retrievalContext: RetrievalContext
-}
-
-function buildCoverageLabel(weeklyRows: WeeklyMetricRow[]) {
-  const portfolioRows = weeklyRows
-    .filter((row) => row.recordType === "portfolio")
-    .sort((left, right) => left.weekStart.localeCompare(right.weekStart))
-
-  const first = portfolioRows[0]
-  const last = portfolioRows.at(-1)
-
-  if (!first || !last) {
-    return "Coverage information is not currently available."
-  }
-
-  return `${first.weekStart} to ${last.weekEnd}`
 }
 
 function buildChartSpec(sourceHealth: SourceHealth[], sectionCount: number) {
@@ -92,54 +77,14 @@ function buildDiscoveryDrivers(args: {
   ]
 }
 
-function prioritizeSections(
-  sections: CatalogSection[],
-  plan: StructuredQueryPlan,
-  retrievalContext: RetrievalContext
-) {
-  const matchedIds = new Set(retrievalContext.datasetMatches.map((match) => match.id))
-
-  const focusOrder = [
-    plan.discoveryFocus === "overview" ? "dataset-overview" : null,
-    plan.discoveryFocus === "metrics" ? "dataset-metrics" : null,
-    plan.discoveryFocus === "sources" ? "dataset-sources" : null,
-    plan.discoveryFocus === "dimensions" ? "dataset-dimensions" : null,
-    plan.discoveryFocus === "time_coverage" ? "dataset-time-coverage" : null,
-    plan.discoveryFocus === "questions" ? "dataset-supported-questions" : null,
-  ].filter(Boolean)
-
-  return [...sections].sort((left, right) => {
-    const leftFocusIndex = focusOrder.indexOf(left.id)
-    const rightFocusIndex = focusOrder.indexOf(right.id)
-
-    if (leftFocusIndex !== -1 || rightFocusIndex !== -1) {
-      if (leftFocusIndex === -1) return 1
-      if (rightFocusIndex === -1) return -1
-      return leftFocusIndex - rightFocusIndex
-    }
-
-    const leftMatched = matchedIds.has(left.id) ? 0 : 1
-    const rightMatched = matchedIds.has(right.id) ? 0 : 1
-
-    if (leftMatched !== rightMatched) {
-      return leftMatched - rightMatched
-    }
-
-    return left.title.localeCompare(right.title)
-  })
-}
-
 export async function executeDiscoveryPlan(
   args: DiscoveryExecutorArgs
 ): Promise<DiscoveryExecutionPayload> {
-  const dataset = getDatasetDefinition(args.plan.datasetId)
-  const sourceHealth = await args.dataAccess.getSourceHealth()
-  const coverageLabel = buildCoverageLabel(args.weeklyRows)
-  const catalogSections = prioritizeSections(
-    buildDiscoveryCatalogSections(),
-    args.plan,
-    args.retrievalContext
-  ).slice(0, 4)
+  const { dataset, sourceHealth, coverageLabel, catalogSections } =
+    await profileDatasetCapability({
+      context: args.context,
+      plan: args.plan,
+    })
 
   const evidence = [
     ...sourceHealth.map((source) => ({

@@ -8,16 +8,18 @@ import {
   buildCashflowHistoryChartSpec,
   filterRowsForScope,
 } from "@/lib/querylens/server/built-in-pipeline/common"
+import {
+  aggregateMetricCapability,
+  explainChangeCapability,
+  retrieveContextCapability,
+  type BuiltInCapabilityContext,
+  type CashflowComponentDelta,
+} from "@/lib/querylens/server/built-in-pipeline/capabilities"
 import type {
   BuiltInExecutionFailure,
   WhatChangedExecutionPayload,
 } from "@/lib/querylens/server/built-in-pipeline/types"
-import {
-  calculateConfidenceScore,
-  calculateWeightedDriverImpact,
-  roundTo,
-} from "@/lib/querylens/scoring"
-import { aggregateMetricWindowRows } from "@/lib/querylens/server/range-aggregation"
+import { calculateConfidenceScore, roundTo } from "@/lib/querylens/scoring"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   ContextEvent,
@@ -30,6 +32,7 @@ import type {
 } from "@/lib/querylens/types"
 
 interface WhatChangedExecutorArgs {
+  context: BuiltInCapabilityContext
   dataAccess: QueryLensDataAccess
   plan: StructuredQueryPlan
   weeklyRows: WeeklyMetricRow[]
@@ -107,46 +110,33 @@ function buildDeltaRanking(args: {
 function buildDrivers(
   current: WeeklyMetricRow,
   previous: WeeklyMetricRow,
-  regionSectorRows: WeeklyMetricRow[]
+  regionSectorRows: WeeklyMetricRow[],
+  componentDeltas: CashflowComponentDelta[],
 ): DriverItem[] {
+  const coverageDelta = componentDeltas.find((delta) => delta.id === "coverage")
+  const balanceDelta = componentDeltas.find((delta) => delta.id === "balance")
+  const stressDelta = componentDeltas.find((delta) => delta.id === "stress")
   const componentDrivers: DriverItem[] = [
     {
       id: "coverage",
       title: "Payment coverage weakened",
-      impactLabel: `${calculateWeightedDriverImpact(
-        previous.inflowOutflowScore,
-        current.inflowOutflowScore,
-        0.4
-      ).toFixed(1)} pts`,
-      direction:
-        current.inflowOutflowScore - previous.inflowOutflowScore < 0 ? "negative" : "positive",
-      description: `Inflow coverage moved from ${(previous.inboundPayments / previous.outboundPayments).toFixed(2)}x to ${(current.inboundPayments / current.outboundPayments).toFixed(2)}x, reducing the weighted score contribution from cash coverage.`,
+      impactLabel: `${(coverageDelta?.weightedDelta ?? 0).toFixed(1)} pts`,
+      direction: coverageDelta?.direction ?? "positive",
+      description: `Inflow coverage moved from ${(coverageDelta?.previousRatio ?? 0).toFixed(2)}x to ${(coverageDelta?.currentRatio ?? 0).toFixed(2)}x, reducing the weighted score contribution from cash coverage.`,
     },
     {
       id: "balance",
       title: "Closing balances ended the week softer",
-      impactLabel: `${calculateWeightedDriverImpact(
-        previous.balanceTrendScore,
-        current.balanceTrendScore,
-        0.25
-      ).toFixed(1)} pts`,
-      direction:
-        current.balanceTrendScore - previous.balanceTrendScore < 0 ? "negative" : "positive",
-      description: `The closing balance position shifted from ${previous.closingBalance.toLocaleString()} to ${current.closingBalance.toLocaleString()}, weakening the week-end balance trend.`,
+      impactLabel: `${(balanceDelta?.weightedDelta ?? 0).toFixed(1)} pts`,
+      direction: balanceDelta?.direction ?? "positive",
+      description: `The closing balance position shifted from ${(balanceDelta?.previousClosingBalance ?? 0).toLocaleString()} to ${(balanceDelta?.currentClosingBalance ?? 0).toLocaleString()}, weakening the week-end balance trend.`,
     },
     {
       id: "stress",
       title: "Stress indicators widened",
-      impactLabel: `${roundTo(
-        calculateWeightedDriverImpact(previous.lowBalanceScore, current.lowBalanceScore, 0.2) +
-          calculateWeightedDriverImpact(previous.overdueScore, current.overdueScore, 0.15)
-      ).toFixed(1)} pts`,
-      direction:
-        current.lowBalanceScore + current.overdueScore <
-        previous.lowBalanceScore + previous.overdueScore
-          ? "negative"
-          : "positive",
-      description: `Low-balance days rose from ${(previous.lowBalanceShare * 100).toFixed(1)}% to ${(current.lowBalanceShare * 100).toFixed(1)}%, while overdue exposure moved from ${(previous.overdueShare * 100).toFixed(1)}% to ${(current.overdueShare * 100).toFixed(1)}%.`,
+      impactLabel: `${(stressDelta?.weightedDelta ?? 0).toFixed(1)} pts`,
+      direction: stressDelta?.direction ?? "positive",
+      description: `Low-balance days rose from ${((stressDelta?.previousLowBalanceShare ?? 0) * 100).toFixed(1)}% to ${((stressDelta?.currentLowBalanceShare ?? 0) * 100).toFixed(1)}%, while overdue exposure moved from ${((stressDelta?.previousOverdueShare ?? 0) * 100).toFixed(1)}% to ${((stressDelta?.currentOverdueShare ?? 0) * 100).toFixed(1)}%.`,
     },
   ]
 
@@ -297,33 +287,23 @@ export async function executeWhatChangedPlan(
     args.plan.comparisonWindow.comparisonDateWindow ??
     buildPriorEqualDateWindow(targetWindow)
   const [targetDailyMetrics, comparisonDailyMetrics] = await Promise.all([
-    args.dataAccess.listDailyMetrics({
-      startDate: targetWindow.startDate,
-      endDate: targetWindow.endDate,
+    aggregateMetricCapability({
+      context: args.context,
+      window: targetWindow,
       scope: args.plan.scope,
     }),
     comparisonDateWindow
-      ? args.dataAccess.listDailyMetrics({
-          startDate: comparisonDateWindow.startDate,
-          endDate: comparisonDateWindow.endDate,
+      ? aggregateMetricCapability({
+          context: args.context,
+          window: comparisonDateWindow,
           scope: args.plan.scope,
         })
-      : Promise.resolve([]),
+      : Promise.resolve(undefined),
   ])
-  const targetRows = aggregateMetricWindowRows({
-    dailyMetrics: targetDailyMetrics,
-    startDate: targetWindow.startDate,
-    endDate: targetWindow.endDate,
-  })
-  const comparisonRows = comparisonDateWindow
-    ? aggregateMetricWindowRows({
-        dailyMetrics: comparisonDailyMetrics,
-        startDate: comparisonDateWindow.startDate,
-        endDate: comparisonDateWindow.endDate,
-      })
-    : []
-  const current = filterRowsForScope(targetRows, args.plan.scope)[0]
-  const previous = filterRowsForScope(comparisonRows, args.plan.scope)[0]
+  const targetRows = targetDailyMetrics.rows
+  const comparisonRows = comparisonDailyMetrics?.rows ?? []
+  const current = targetDailyMetrics.scopedRow
+  const previous = comparisonDailyMetrics?.scopedRow
 
   if (!current || !previous) {
     return {
@@ -354,16 +334,25 @@ export async function executeWhatChangedPlan(
     recordType: "region_sector",
     scope: args.plan.scope.region ? { region: args.plan.scope.region } : {},
   })
-  const contextEvents = await args.dataAccess.listContextEvents({
-    targetStart: targetWindow.startDate,
-    targetEnd: targetWindow.endDate,
-    scope: args.plan.scope,
+  const contextEvents = await retrieveContextCapability({
+    context: args.context,
+    requests: [
+      {
+        window: targetWindow,
+        scope: args.plan.scope,
+      },
+    ],
   })
   const timeframeLabel = formatContextualDateWindowLabel(targetWindow)
   const comparisonLabel = comparisonDateWindow
     ? formatPriorPeriodComparisonLabel(targetWindow, comparisonDateWindow)
     : "Compared with the immediately preceding validated period"
-  const drivers = buildDrivers(current, previous, regionSectorRows)
+  const componentDeltas = explainChangeCapability({
+    context: args.context,
+    current,
+    previous,
+  })
+  const drivers = buildDrivers(current, previous, regionSectorRows, componentDeltas)
   const evidence = buildEvidence({
     current,
     previous,
