@@ -4,6 +4,11 @@ This roadmap reflects the current product direction for QueryLens:
 
 **Bring data in -> understand it semantically -> let agents plan analysis -> execute safely -> show trust clearly.**
 
+## Platform Direction
+- Migrate model access from the direct Gemini API integration to OpenRouter.
+- Plan around `deepseek/deepseek-v4-pro` as the primary model for agentic planning and explanation.
+- Keep the model integration swappable so the execution and semantic layers do not become provider-bound.
+
 ## 1. Dataset Onboarding
 - Support CSV uploads as the first-class onboarding path.
 - Support structured JSON and connected Postgres sources next.
@@ -22,6 +27,7 @@ This roadmap reflects the current product direction for QueryLens:
 - Let the model interpret the user question and choose approved analysis capabilities.
 - Keep the planner agentic, but do not allow unrestricted freeform execution.
 - Add strong prompts, routing constraints, and validation rules around planning.
+- Route planning and explanation through OpenRouter using `deepseek/deepseek-v4-pro` as the initial primary model.
 - Make unsupported or ambiguous requests fail clearly and safely.
 - Treat the goal as governed agentic workflows, not open-ended agent behavior.
 
