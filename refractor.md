@@ -81,7 +81,7 @@ Create a clean pipeline where:
 - Easier debugging
 - Smaller mental load while building new features
 
-## 3. Create An Explicit Execution-Plan Contract
+## 3. Create An Explicit Execution-Plan Contract [Completed]
 
 ### Goal
 Introduce a typed execution-plan layer between planning and execution.
@@ -109,6 +109,12 @@ Introduce a typed execution-plan layer between planning and execution.
 - More predictable feature development
 - Fewer hidden assumptions
 - Cleaner bridge between planning and execution
+
+### Completion Notes
+- Completed by introducing a typed built-in execution plan between structured planning and deterministic execution.
+- The plan now carries semantic targets, selected capability labels, allowed sources and operations, validation outcomes, fallback policy, and execution trace metadata.
+- Built-in dispatch consumes the execution plan while existing intent executors continue to receive the original structured plan internally, keeping shipped flows stable.
+- Execution trace metadata now reaches successful and fallback responses through the presentation layer without changing existing response behavior.
 
 ## 4. Refactor Intent Executors Into Capability Executors
 
@@ -191,7 +197,7 @@ Replace trust as a loose mix of score + artifacts with a structured trust model.
 
 1. Introduce a first-class semantic manifest layer. [Completed]
 2. Separate planning, execution, and presentation.
-3. Create an explicit execution-plan contract.
+3. Create an explicit execution-plan contract. [Completed]
 4. Refactor intent executors into capability executors.
 5. Split ingestion and profiling from query-time data access.
 6. Create a first-class trust and confidence model.

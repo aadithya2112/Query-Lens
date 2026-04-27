@@ -404,7 +404,7 @@ export async function executeWhatChangedPlan(
     kind: "success",
     intent: "what_changed",
     plan: args.plan,
-    metric: args.plan.metricId,
+    metric: "cashflow_health_score",
     timeframe: timeframeLabel,
     comparisonBasis: comparisonLabel,
     confidence,

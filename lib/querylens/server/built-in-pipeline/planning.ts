@@ -1,9 +1,13 @@
 import { canUseGemini } from "@/lib/querylens/server/ai-config"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { getRelativeDateWindow } from "@/lib/querylens/date-windows"
+import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
-import type { BuiltInPlanningResult } from "@/lib/querylens/server/built-in-pipeline/types"
+import type {
+  BuiltInInterpretationSeed,
+  BuiltInPlanningResult,
+} from "@/lib/querylens/server/built-in-pipeline/types"
 import type {
   QueryRequestBody,
   RetrievalContext,
@@ -69,6 +73,10 @@ export async function planBuiltInAnalysis(args: {
   executionContext: QueryLensExecutionContext
   retrievalContext: RetrievalContext
   weeklyRows: WeeklyMetricRow[]
+  dateCoverage: {
+    startDate: string
+    endDate: string
+  }
 }): Promise<BuiltInPlanningResult> {
   const provider = getQueryEngineProvider({
     executionContext: args.executionContext,
@@ -83,11 +91,11 @@ export async function planBuiltInAnalysis(args: {
     canUseGemini(args.executionContext) &&
     parseResult.failureKind !== "model_unavailable"
 
-  let interpretation = {
-    mode: "direct" as const,
+  let interpretation: BuiltInInterpretationSeed = {
+    mode: "direct",
     explanation:
       "QueryLens matched your request directly to a supported analytics flow.",
-    resolvedQuestion: undefined as string | undefined,
+    resolvedQuestion: undefined,
   }
 
   const deterministicParseResult =
@@ -144,6 +152,11 @@ export async function planBuiltInAnalysis(args: {
   return {
     kind: "success",
     plan: resolvedParseResult.parsed,
+    executionPlan: buildBuiltInExecutionPlan({
+      plan: resolvedParseResult.parsed,
+      dateCoverage: args.dateCoverage,
+      allowAgenticFallback: false,
+    }),
     interpretation,
   }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 
@@ -25,7 +26,10 @@ describe("built-in execution stage", () => {
       expect(plan).toBeDefined()
 
       const result = await executeBuiltInPlan({
-        plan: plan!,
+        executionPlan: buildBuiltInExecutionPlan({
+          plan: plan!,
+          dateCoverage,
+        }),
         dataAccess,
         weeklyRows,
         retrievalContext: {
@@ -33,7 +37,6 @@ describe("built-in execution stage", () => {
           memoryMatches: [],
           recentMessages: [],
         },
-        dateCoverage,
       })
 
       expect(result.kind).toBe("success")
@@ -41,6 +44,7 @@ describe("built-in execution stage", () => {
         expect(result.plan.intent).toBe(result.intent)
         expect(result.metric).toBe(plan!.metricId)
         expect(result.evidence.length).toBeGreaterThanOrEqual(1)
+        expect(result.executionTrace?.entries.some((entry) => entry.stage === "dispatch")).toBe(true)
       }
     }
   })
@@ -82,7 +86,10 @@ describe("built-in execution stage", () => {
     }
 
     const result = await executeBuiltInPlan({
-      plan,
+      executionPlan: buildBuiltInExecutionPlan({
+        plan,
+        dateCoverage,
+      }),
       dataAccess,
       weeklyRows,
       retrievalContext: {
@@ -90,13 +97,13 @@ describe("built-in execution stage", () => {
         memoryMatches: [],
         recentMessages: [],
       },
-      dateCoverage,
     })
 
     expect(result.kind).toBe("failure")
     if (result.kind === "failure") {
       expect(result.fallbackReason).toContain("coverage window")
       expect(result.interpretation?.mode).toBe("fallback")
+      expect(result.executionTrace?.entries.some((entry) => entry.stage === "fallback")).toBe(true)
     }
   })
 
@@ -109,33 +116,36 @@ describe("built-in execution stage", () => {
     )
 
     const result = await executeBuiltInPlan({
-      plan: {
-        datasetId: "sme_portfolio",
-        rawQuestion: "Compare cashflow health this week vs last week",
-        intent: "compare",
-        metricId: "cashflow_health_score",
-        timeframe: "this_week",
-        dateWindow: {
-          startDate: "2026-04-06",
-          endDate: "2026-04-12",
-          dayCount: 7,
-          label: "Apr 6 - 12, 2026",
-          relativeTimeframe: "this_week",
-        },
-        scope: {},
-        scopeDimensions: ["portfolio"],
-        comparisonWindow: {
+      executionPlan: buildBuiltInExecutionPlan({
+        plan: {
+          datasetId: "sme_portfolio",
+          rawQuestion: "Compare cashflow health this week vs last week",
+          intent: "compare",
+          metricId: "cashflow_health_score",
           timeframe: "this_week",
-          comparisonBasis: "prior_period",
-          targetWindow: {
+          dateWindow: {
             startDate: "2026-04-06",
             endDate: "2026-04-12",
             dayCount: 7,
             label: "Apr 6 - 12, 2026",
             relativeTimeframe: "this_week",
           },
+          scope: {},
+          scopeDimensions: ["portfolio"],
+          comparisonWindow: {
+            timeframe: "this_week",
+            comparisonBasis: "prior_period",
+            targetWindow: {
+              startDate: "2026-04-06",
+              endDate: "2026-04-12",
+              dayCount: 7,
+              label: "Apr 6 - 12, 2026",
+              relativeTimeframe: "this_week",
+            },
+          },
         },
-      },
+        dateCoverage,
+      }),
       dataAccess,
       weeklyRows,
       retrievalContext: {
@@ -143,7 +153,6 @@ describe("built-in execution stage", () => {
         memoryMatches: [],
         recentMessages: [],
       },
-      dateCoverage,
     })
 
     expect(result.kind).toBe("failure")

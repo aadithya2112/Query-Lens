@@ -15,7 +15,7 @@ import type {
   DiscoveryExecutionPayload,
   WhatChangedExecutionPayload,
 } from "@/lib/querylens/server/built-in-pipeline/types"
-import type { RetrievalContext } from "@/lib/querylens/types"
+import type { ExecutionTrace, RetrievalContext } from "@/lib/querylens/types"
 
 function buildRetrievalTrace(retrievalContext: RetrievalContext) {
   return {
@@ -155,6 +155,7 @@ export async function presentBuiltInExecution(args: {
             weakestSectorLabel: args.execution.presentation.weakestSectorLabel,
             healthyPeerLabel: args.execution.presentation.healthyPeerLabel,
           }),
+          executionTrace: args.execution.executionTrace,
           sourceMode: args.execution.sourceMode,
         },
         retrievalContext: args.retrievalContext,
@@ -189,6 +190,7 @@ export async function presentBuiltInExecution(args: {
             compareDimension: args.execution.presentation.compareDimension,
           }),
           comparisonSummary: args.execution.comparisonSummary,
+          executionTrace: args.execution.executionTrace,
           sourceMode: args.execution.sourceMode,
         },
         retrievalContext: args.retrievalContext,
@@ -224,6 +226,7 @@ export async function presentBuiltInExecution(args: {
             topBucketRegionLabel: args.execution.presentation.topBucketRegionLabel,
             topBucketSectorLabel: args.execution.presentation.topBucketSectorLabel,
           }),
+          executionTrace: args.execution.executionTrace,
           sourceMode: args.execution.sourceMode,
         },
         retrievalContext: args.retrievalContext,
@@ -255,6 +258,7 @@ export async function presentBuiltInExecution(args: {
           ],
           discoverySummary: args.execution.discoverySummary,
           catalogSections: args.execution.catalogSections,
+          executionTrace: args.execution.executionTrace,
           sourceMode: args.execution.sourceMode,
         },
         retrievalContext: args.retrievalContext,
@@ -271,12 +275,14 @@ export function presentBuiltInFallback(args: {
   retrievalContext: RetrievalContext
   inputQuestion: string
   interpretation: BuiltInInterpretationSeed
+  executionTrace?: ExecutionTrace
 }) {
   return enrichPhase1Response({
     response: buildBuiltInFallbackResponse({
       fallbackReason: args.fallbackReason,
       sourceMode: args.sourceMode,
       rows: args.weeklyRows,
+      executionTrace: args.executionTrace,
     }),
     retrievalContext: args.retrievalContext,
     inputQuestion: args.inputQuestion,

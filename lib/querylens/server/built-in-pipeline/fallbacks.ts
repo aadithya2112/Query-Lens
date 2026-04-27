@@ -1,12 +1,13 @@
 import { DEFAULT_FLAGSHIP_QUESTION } from "@/lib/querylens/server/query-engine-provider"
 import { buildCashflowHistoryChartSpec, filterRowsForScope } from "@/lib/querylens/server/built-in-pipeline/common"
 import { calculateConfidenceScore } from "@/lib/querylens/scoring"
-import type { Phase1AnalysisResponse, WeeklyMetricRow } from "@/lib/querylens/types"
+import type { ExecutionTrace, Phase1AnalysisResponse, WeeklyMetricRow } from "@/lib/querylens/types"
 
 export function buildBuiltInFallbackResponse(args: {
   fallbackReason: string
   sourceMode: Phase1AnalysisResponse["sourceMode"]
   rows: WeeklyMetricRow[]
+  executionTrace?: ExecutionTrace
 }): Phase1AnalysisResponse {
   return {
     intent: "what_changed",
@@ -39,6 +40,7 @@ export function buildBuiltInFallbackResponse(args: {
       "Compare North West vs London & South East cashflow health last week",
     ],
     fallback: true,
+    executionTrace: args.executionTrace,
     sourceMode: args.sourceMode,
   }
 }

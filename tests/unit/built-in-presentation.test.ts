@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import { getQueryLensDataAccess } from "@/lib/querylens/server/repositories"
 
@@ -16,8 +17,11 @@ describe("built-in presentation stage", () => {
     )
 
     const execution = await executeBuiltInPlan({
-      plan: planDeterministicQuery("Why did SME cashflow health drop last week?")
-        .plan!,
+      executionPlan: buildBuiltInExecutionPlan({
+        plan: planDeterministicQuery("Why did SME cashflow health drop last week?")
+          .plan!,
+        dateCoverage,
+      }),
       dataAccess,
       weeklyRows,
       retrievalContext: {
@@ -25,7 +29,6 @@ describe("built-in presentation stage", () => {
         memoryMatches: [],
         recentMessages: [],
       },
-      dateCoverage,
     })
 
     expect(execution.kind).toBe("success")
@@ -53,6 +56,7 @@ describe("built-in presentation stage", () => {
     expect(response.followUpActions?.length).toBeGreaterThan(0)
     expect(response.trustArtifacts?.howProduced.length).toBeGreaterThan(0)
     expect(response.interpretation?.mode).toBe("direct")
+    expect(response.executionTrace?.entries.some((entry) => entry.stage === "dispatch")).toBe(true)
   })
 
   it("presents compare, breakdown, and discovery execution results without recomputing grounded artifacts", async () => {
@@ -74,7 +78,10 @@ describe("built-in presentation stage", () => {
 
     for (const question of questions) {
       const execution = await executeBuiltInPlan({
-        plan: planDeterministicQuery(question).plan!,
+        executionPlan: buildBuiltInExecutionPlan({
+          plan: planDeterministicQuery(question).plan!,
+          dateCoverage,
+        }),
         dataAccess,
         weeklyRows,
         retrievalContext: {
@@ -82,7 +89,6 @@ describe("built-in presentation stage", () => {
           memoryMatches: [],
           recentMessages: [],
         },
-        dateCoverage,
       })
 
       expect(execution.kind).toBe("success")
@@ -108,6 +114,7 @@ describe("built-in presentation stage", () => {
       expect(response.evidence.length).toBeGreaterThanOrEqual(1)
       expect(response.trustArtifacts?.sourcesUsed.length).toBeGreaterThanOrEqual(1)
       expect(response.followUpActions?.length).toBeGreaterThan(0)
+      expect(response.executionTrace?.entries.length).toBeGreaterThan(0)
     }
   })
 
@@ -133,11 +140,23 @@ describe("built-in presentation stage", () => {
         explanation:
           "QueryLens could not safely translate that request into one of the currently supported built-in analytics flows.",
       },
+      executionTrace: {
+        planId: "test-fallback",
+        entries: [
+          {
+            id: "fallback.test",
+            stage: "fallback",
+            status: "fallback",
+            message: "Unsupported question.",
+          },
+        ],
+      },
     })
 
     expect(response.fallback).toBe(true)
     expect(response.followUpActions?.length).toBeGreaterThan(0)
     expect(response.interpretation?.mode).toBe("fallback")
     expect(response.retrievalTrace?.recentMessagesCount).toBe(0)
+    expect(response.executionTrace?.entries[0]?.stage).toBe("fallback")
   })
 })

@@ -9,6 +9,7 @@ import type {
   DiscoverySummary,
   DriverItem,
   EvidenceItem,
+  ExecutionTrace,
   InterpretationMode,
   MetricId,
   Phase1AnalysisResponse,
@@ -21,6 +22,67 @@ import type {
 export type BuiltInIntent = "what_changed" | "breakdown" | "compare" | "discovery"
 export type BuiltInPresentationResult = Phase1AnalysisResponse
 
+export type BuiltInExecutionCapability =
+  | "profile_dataset"
+  | "aggregate_metric"
+  | "compare_slices"
+  | "explain_change"
+  | "retrieve_context"
+
+export type BuiltInAllowedSource = "postgres" | "mongodb" | "manifest"
+
+export type BuiltInAllowedOperation =
+  | "read_only_aggregate"
+  | "read_only_lookup"
+  | "catalog_profile_read"
+  | "contextual_retrieval"
+
+export type BuiltInValidationCheck =
+  | "dataset_support"
+  | "metric_support"
+  | "intent_support"
+  | "timeframe_support"
+  | "source_permission"
+  | "coverage"
+  | "intent_metadata"
+
+export interface BuiltInExecutionPlanValidationResult {
+  check: BuiltInValidationCheck
+  status: "passed" | "failed"
+  message: string
+}
+
+export interface BuiltInExecutionPlan {
+  planId: string
+  datasetId: StructuredQueryPlan["datasetId"]
+  intent: BuiltInIntent
+  rawQuestion: string
+  structuredPlan: StructuredQueryPlan
+  semanticTargets: {
+    metricId: MetricId
+    scope: ScopeFilter
+    scopeDimensions: StructuredQueryPlan["scopeDimensions"]
+    dateWindow: DateWindow
+    comparisonWindow: StructuredQueryPlan["comparisonWindow"]
+    breakdownDimension?: BreakdownDimension
+    compareSpec?: StructuredQueryPlan["compareSpec"]
+    discoveryFocus?: StructuredQueryPlan["discoveryFocus"]
+  }
+  selectedCapabilities: BuiltInExecutionCapability[]
+  allowedSources: BuiltInAllowedSource[]
+  allowedOperations: BuiltInAllowedOperation[]
+  validation: {
+    status: "approved" | "rejected"
+    results: BuiltInExecutionPlanValidationResult[]
+    fallbackReason?: string
+  }
+  fallbackPolicy: {
+    builtInFallback: boolean
+    allowAgenticFallback: boolean
+  }
+  trace: ExecutionTrace
+}
+
 export interface BuiltInInterpretationSeed {
   mode: InterpretationMode
   explanation: string
@@ -30,6 +92,7 @@ export interface BuiltInInterpretationSeed {
 export interface BuiltInPlanningSuccess {
   kind: "success"
   plan: StructuredQueryPlan
+  executionPlan: BuiltInExecutionPlan
   interpretation: BuiltInInterpretationSeed
 }
 
@@ -49,6 +112,7 @@ export interface BuiltInExecutionFailure {
   kind: "failure"
   fallbackReason: string
   interpretation?: BuiltInInterpretationSeed
+  executionTrace?: ExecutionTrace
 }
 
 interface BuiltInExecutionSuccessBase {
@@ -65,6 +129,7 @@ interface BuiltInExecutionSuccessBase {
   evidence: EvidenceItem[]
   assumptions: string[]
   sourceMode: Phase1AnalysisResponse["sourceMode"]
+  executionTrace?: ExecutionTrace
 }
 
 export interface WhatChangedExecutionPayload

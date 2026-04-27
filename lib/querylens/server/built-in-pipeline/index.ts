@@ -1,5 +1,6 @@
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { executeBuiltInPlan } from "@/lib/querylens/server/built-in-pipeline/execution"
+import { buildPlanningFallbackExecutionTrace } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
 import { planBuiltInAnalysis } from "@/lib/querylens/server/built-in-pipeline/planning"
 import {
   presentBuiltInExecution,
@@ -31,6 +32,7 @@ export async function runBuiltInAnalysisPipeline(args: {
     executionContext: args.executionContext,
     retrievalContext: args.retrievalContext,
     weeklyRows: args.weeklyRows,
+    dateCoverage: args.dateCoverage,
   })
 
   if (planning.kind === "failure") {
@@ -52,16 +54,21 @@ export async function runBuiltInAnalysisPipeline(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.input.question,
         interpretation: planning.interpretation,
+        executionTrace: buildPlanningFallbackExecutionTrace({
+          inputQuestion: args.input.question,
+          fallbackReason:
+            planning.fallbackReason ??
+            "The question could not be matched to the phase-1 vertical slice safely.",
+        }),
       }),
     }
   }
 
   const execution = await executeBuiltInPlan({
-    plan: planning.plan,
+    executionPlan: planning.executionPlan,
     dataAccess: args.dataAccess,
     weeklyRows: args.weeklyRows,
     retrievalContext: args.retrievalContext,
-    dateCoverage: args.dateCoverage,
   })
 
   if (execution.kind === "failure") {
@@ -74,6 +81,7 @@ export async function runBuiltInAnalysisPipeline(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.input.question,
         interpretation: execution.interpretation ?? planning.interpretation,
+        executionTrace: execution.executionTrace ?? planning.executionPlan.trace,
       }),
     }
   }

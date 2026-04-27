@@ -398,6 +398,32 @@ export interface RetrievalTrace {
   recentMessagesCount: number
 }
 
+export type ExecutionTraceStage =
+  | "planning"
+  | "validation"
+  | "dispatch"
+  | "source_read"
+  | "fallback"
+
+export type ExecutionTraceStatus =
+  | "approved"
+  | "completed"
+  | "blocked"
+  | "fallback"
+
+export interface ExecutionTraceEntry {
+  id: string
+  stage: ExecutionTraceStage
+  status: ExecutionTraceStatus
+  message: string
+  metadata?: Record<string, string | number | boolean | null>
+}
+
+export interface ExecutionTrace {
+  planId: string
+  entries: ExecutionTraceEntry[]
+}
+
 export interface Phase1AnalysisResponse {
   intent: QueryIntent
   headline: string
@@ -422,6 +448,7 @@ export interface Phase1AnalysisResponse {
   queryRuns?: QueryRun[]
   conversationContextUsed?: boolean
   retrievalTrace?: RetrievalTrace
+  executionTrace?: ExecutionTrace
   fallback?: boolean
   presentationMode?: ResponsePresentationMode
   sourceMode: "database" | "fixture"

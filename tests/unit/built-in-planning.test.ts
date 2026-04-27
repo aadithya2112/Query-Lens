@@ -10,6 +10,11 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
 }))
 
+const dateCoverage = {
+  startDate: "2026-01-18",
+  endDate: "2026-04-12",
+}
+
 describe("built-in planning stage", () => {
   beforeEach(() => {
     geminiGenerateMock.mockReset()
@@ -40,11 +45,14 @@ describe("built-in planning stage", () => {
         recentMessages: [],
       },
       weeklyRows: getSampleDataset().weeklyMetrics,
+      dateCoverage,
     })
 
     expect(result.kind).toBe("success")
     if (result.kind === "success") {
       expect(result.plan.intent).toBe("what_changed")
+      expect(result.executionPlan.intent).toBe("what_changed")
+      expect(result.executionPlan.validation.status).toBe("approved")
       expect(result.interpretation.mode).toBe("direct")
     }
   })
@@ -69,6 +77,7 @@ describe("built-in planning stage", () => {
         recentMessages: [],
       },
       weeklyRows: getSampleDataset().weeklyMetrics,
+      dateCoverage,
     })
 
     expect(result.kind).toBe("success")
@@ -94,6 +103,7 @@ describe("built-in planning stage", () => {
         recentMessages: [],
       },
       weeklyRows: getSampleDataset().weeklyMetrics,
+      dateCoverage,
     })
 
     expect(result.kind).toBe("success")
@@ -133,6 +143,7 @@ describe("built-in planning stage", () => {
         recentMessages: [],
       },
       weeklyRows: getSampleDataset().weeklyMetrics,
+      dateCoverage,
     })
 
     expect(result.kind).toBe("failure")

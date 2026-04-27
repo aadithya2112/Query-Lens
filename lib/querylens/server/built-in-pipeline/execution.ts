@@ -1,90 +1,78 @@
-import { formatDateCoverage, isDateWindowWithinCoverage } from "@/lib/querylens/date-windows"
+import { appendExecutionTrace } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
 import { executeComparePlan } from "@/lib/querylens/server/executors/compare"
 import { executeBreakdownPlan } from "@/lib/querylens/server/executors/breakdown"
 import { executeDiscoveryPlan } from "@/lib/querylens/server/executors/discovery"
 import { executeWhatChangedPlan } from "@/lib/querylens/server/executors/what-changed"
 import type {
+  BuiltInExecutionPlan,
   BuiltInExecutionResult,
 } from "@/lib/querylens/server/built-in-pipeline/types"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   RetrievalContext,
-  StructuredQueryPlan,
   WeeklyMetricRow,
 } from "@/lib/querylens/types"
 
-function getPlanDateWindows(plan: StructuredQueryPlan) {
-  const windows = [plan.dateWindow, plan.comparisonWindow.targetWindow]
-
-  if (plan.comparisonWindow.comparisonDateWindow) {
-    windows.push(plan.comparisonWindow.comparisonDateWindow)
-  }
-
-  if (plan.compareSpec?.leftWindow) {
-    windows.push(plan.compareSpec.leftWindow)
-  }
-
-  if (plan.compareSpec?.rightWindow) {
-    windows.push(plan.compareSpec.rightWindow)
-  }
-
-  if (plan.compareSpec?.selectedWindow) {
-    windows.push(plan.compareSpec.selectedWindow)
-  }
-
-  return windows
-}
-
 export async function executeBuiltInPlan(args: {
-  plan: StructuredQueryPlan
+  executionPlan: BuiltInExecutionPlan
   dataAccess: QueryLensDataAccess
   weeklyRows: WeeklyMetricRow[]
   retrievalContext: RetrievalContext
-  dateCoverage: {
-    startDate: string
-    endDate: string
-  }
 }): Promise<BuiltInExecutionResult> {
-  const outOfCoverageWindow = getPlanDateWindows(args.plan).find(
-    (window) => !isDateWindowWithinCoverage(window, args.dateCoverage),
-  )
+  const plan = args.executionPlan.structuredPlan
 
-  if (outOfCoverageWindow) {
+  if (args.executionPlan.validation.status === "rejected") {
     return {
       kind: "failure",
-      fallbackReason: `That request falls outside the dataset coverage window of ${formatDateCoverage(args.dateCoverage)}.`,
+      fallbackReason:
+        args.executionPlan.validation.fallbackReason ??
+        "QueryLens could not approve that execution plan safely.",
       interpretation: {
         mode: "fallback",
         explanation:
-          "QueryLens kept the request inside the validated dataset coverage window and declined to answer outside that range.",
+          "QueryLens validated the execution plan before dispatch and declined to run an unapproved deterministic path.",
       },
+      executionTrace: appendExecutionTrace(args.executionPlan.trace, {
+        id: "fallback.execution_validation",
+        stage: "fallback",
+        status: "fallback",
+        message:
+          args.executionPlan.validation.fallbackReason ??
+          "Execution plan validation rejected deterministic dispatch.",
+      }),
     }
   }
 
-  switch (args.plan.intent) {
+  let result: BuiltInExecutionResult
+
+  switch (args.executionPlan.intent) {
     case "what_changed":
-      return executeWhatChangedPlan({
+      result = await executeWhatChangedPlan({
         dataAccess: args.dataAccess,
-        plan: args.plan,
+        plan,
         weeklyRows: args.weeklyRows,
       })
+      break
     case "compare":
-      return executeComparePlan({
+      result = await executeComparePlan({
         dataAccess: args.dataAccess,
-        plan: args.plan,
+        plan,
       })
+      break
     case "breakdown":
-      return executeBreakdownPlan({
+      result = await executeBreakdownPlan({
         dataAccess: args.dataAccess,
-        plan: args.plan,
+        plan,
       })
+      break
     case "discovery":
-      return executeDiscoveryPlan({
-        plan: args.plan,
+      result = await executeDiscoveryPlan({
+        plan,
         weeklyRows: args.weeklyRows,
         dataAccess: args.dataAccess,
         retrievalContext: args.retrievalContext,
       })
+      break
     default:
       return {
         kind: "failure",
@@ -95,6 +83,35 @@ export async function executeBuiltInPlan(args: {
           explanation:
             "QueryLens recognized the request shape but the dataset does not currently ship that built-in flow.",
         },
+        executionTrace: appendExecutionTrace(args.executionPlan.trace, {
+          id: "fallback.unregistered_intent",
+          stage: "fallback",
+          status: "fallback",
+          message:
+            "That query intent is not registered yet for the current dataset.",
+        }),
       }
+  }
+
+  const executionTrace = appendExecutionTrace(args.executionPlan.trace, {
+    id: `dispatch.${args.executionPlan.intent}`,
+    stage: "dispatch",
+    status: result.kind === "success" ? "completed" : "fallback",
+    message:
+      result.kind === "success"
+        ? `${args.executionPlan.intent} dispatched through the approved deterministic executor.`
+        : result.fallbackReason,
+  })
+
+  if (result.kind === "failure") {
+    return {
+      ...result,
+      executionTrace,
+    }
+  }
+
+  return {
+    ...result,
+    executionTrace,
   }
 }
