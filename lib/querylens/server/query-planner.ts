@@ -3,11 +3,13 @@ import {
   getRelativeDateWindow,
   resolveQuestionDateWindows,
 } from "@/lib/querylens/date-windows"
-import { getSampleDataset } from "@/lib/querylens/seed-data"
 import {
   getDatasetDefinition,
   getDefaultDatasetId,
 } from "@/lib/querylens/datasets"
+import {
+  getSemanticEntityLabel,
+} from "@/lib/querylens/semantic-manifest"
 import {
   normalizePhase1Text,
   resolvePhase1Scope,
@@ -210,11 +212,10 @@ function parseCompareSubjects(question: string) {
   }
 
   const [, rawLeft, rawRight] = subjectMatch
-  const dataset = getSampleDataset()
-  const leftRegion = resolvePhase1ScopeValue(rawLeft, dataset.regions)
-  const rightRegion = resolvePhase1ScopeValue(rawRight, dataset.regions)
-  const leftSector = resolvePhase1ScopeValue(rawLeft, dataset.sectors)
-  const rightSector = resolvePhase1ScopeValue(rawRight, dataset.sectors)
+  const leftRegion = resolvePhase1ScopeValue(rawLeft, "region")
+  const rightRegion = resolvePhase1ScopeValue(rawRight, "region")
+  const leftSector = resolvePhase1ScopeValue(rawLeft, "sector")
+  const rightSector = resolvePhase1ScopeValue(rawRight, "sector")
 
   if ((leftRegion && leftSector) || (rightRegion && rightSector)) {
     return {
@@ -231,12 +232,8 @@ function parseCompareSubjects(question: string) {
   }
 
   if (leftRegion && rightRegion) {
-    const leftLabel =
-      dataset.regions.find((region) => region.id === leftRegion)?.name ??
-      rawLeft
-    const rightLabel =
-      dataset.regions.find((region) => region.id === rightRegion)?.name ??
-      rawRight
+    const leftLabel = getSemanticEntityLabel("region", leftRegion) ?? rawLeft
+    const rightLabel = getSemanticEntityLabel("region", rightRegion) ?? rawRight
 
     return {
       dimension: "region" as const,
@@ -248,12 +245,8 @@ function parseCompareSubjects(question: string) {
   }
 
   if (leftSector && rightSector) {
-    const leftLabel =
-      dataset.sectors.find((sector) => sector.id === leftSector)?.name ??
-      rawLeft
-    const rightLabel =
-      dataset.sectors.find((sector) => sector.id === rightSector)?.name ??
-      rawRight
+    const leftLabel = getSemanticEntityLabel("sector", leftSector) ?? rawLeft
+    const rightLabel = getSemanticEntityLabel("sector", rightSector) ?? rawRight
 
     return {
       dimension: "sector" as const,
@@ -286,14 +279,13 @@ function buildTimeframeCompareSpec(
     }
   }
 
-  const dataset = getSampleDataset()
   const leftLabel = getWindowDisplayLabel(leftWindow)
   const rightLabel = getWindowDisplayLabel(rightWindow)
 
   const scopeLabel = scope.region
-    ? dataset.regions.find((region) => region.id === scope.region)?.name
+    ? getSemanticEntityLabel("region", scope.region)
     : scope.sector
-      ? dataset.sectors.find((sector) => sector.id === scope.sector)?.name
+      ? getSemanticEntityLabel("sector", scope.sector)
       : undefined
 
   return {

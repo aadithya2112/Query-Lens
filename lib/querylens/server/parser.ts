@@ -1,4 +1,7 @@
-import { getSampleDataset } from "@/lib/querylens/seed-data"
+import {
+  findSemanticEntityByText,
+  normalizeSemanticText,
+} from "@/lib/querylens/semantic-manifest"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import type {
   QueryPlanResult,
@@ -8,27 +11,19 @@ import type {
 export type ParseResult = QueryPlanResult
 
 export function normalizePhase1Text(value: string): string {
-  return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim()
+  return normalizeSemanticText(value)
 }
 
 export function resolvePhase1ScopeValue(
   rawValue: string | undefined,
-  catalog: Array<{ id: string; name: string }>
+  scopeType: "region" | "sector",
 ) {
-  if (!rawValue) return undefined
-
-  const candidate = normalizePhase1Text(rawValue)
-  return catalog.find((item) => {
-    const idCandidate = normalizePhase1Text(item.id.replace(/_/g, " "))
-    const nameCandidate = normalizePhase1Text(item.name)
-    return candidate === idCandidate || candidate === nameCandidate || candidate.includes(nameCandidate)
-  })?.id
+  return findSemanticEntityByText(scopeType, rawValue)?.id
 }
 
 export function resolvePhase1Scope(scope: ScopeFilter) {
-  const dataset = getSampleDataset()
-  const region = resolvePhase1ScopeValue(scope.region, dataset.regions)
-  const sector = resolvePhase1ScopeValue(scope.sector, dataset.sectors)
+  const region = resolvePhase1ScopeValue(scope.region, "region")
+  const sector = resolvePhase1ScopeValue(scope.sector, "sector")
 
   return {
     scope: {

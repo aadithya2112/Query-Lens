@@ -129,6 +129,23 @@ describe("query planner", () => {
     })
   })
 
+  it("uses manifest-backed aliases for peer compare entity resolution", () => {
+    const result = planDeterministicQuery(
+      "Compare northwest vs Midlands cashflow health last week."
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "compare",
+      metricId: "cashflow_health_score",
+      compareSpec: {
+        mode: "peer",
+        dimension: "region",
+        leftLabel: "North West",
+        rightLabel: "Midlands",
+      },
+    })
+  })
+
   it("creates a sector peer compare plan", () => {
     const result = planDeterministicQuery(
       "Compare hospitality vs retail cashflow health this week."

@@ -25,6 +25,12 @@ describe("retrieval scaffolding", () => {
         "questions",
       ])
     )
+    expect(chunks.find((chunk) => chunk.id === "dataset-sources")?.content).toContain(
+      "Semantic manifest",
+    )
+    expect(
+      chunks.find((chunk) => chunk.id === "dataset-supported-questions")?.content
+    ).toContain("What data is currently stored?")
   })
 
   it("creates deterministic embeddings when Gemini is not configured", async () => {

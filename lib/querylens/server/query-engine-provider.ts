@@ -1,9 +1,12 @@
 import { FunctionCallingConfigMode, type FunctionDeclaration } from "@google/genai"
 import { z } from "zod"
 
-import { getSupportedEntityLabels } from "@/lib/querylens/dataset-semantics"
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
 import { DEFAULT_WHAT_CHANGED_FOLLOW_UPS } from "@/lib/querylens/follow-ups"
+import {
+  getSemanticManifest,
+  getSupportedEntityLabels,
+} from "@/lib/querylens/semantic-manifest"
 import {
   canUseGemini,
   type QueryLensExecutionContext,
@@ -304,8 +307,22 @@ function formatRetrievedContext(retrievalContext?: RetrievalContext) {
   return `Dataset context:\n${datasetContext}\n\nConversation memory:\n${memoryContext}\n\nRecent conversation:\n${recentMessages}`
 }
 
-function buildPlannerPrompt(question: string, retrievalContext?: RetrievalContext) {
+export function buildPlannerPrompt(
+  question: string,
+  retrievalContext?: RetrievalContext,
+) {
+  const manifest = getSemanticManifest()
   const supportedEntities = getSupportedEntityLabels()
+  const supportedMetricLines = manifest.metrics
+    .map(
+      (metric) =>
+        `- ${metric.id}: ${metric.label}. Supported intents: ${metric.supportedIntents.join(", ")}. Supported dimensions: ${metric.supportedDimensions.join(", ")}.`,
+    )
+    .join("\n")
+  const supportedDimensionLabels = manifest.dimensions
+    .map((dimension) => `${dimension.id} (${dimension.label})`)
+    .join(", ")
+  const exampleQuestionCoverage = manifest.supportedQuestions.join(" | ")
 
   return `
 You are planning a QueryLens analytics query.
@@ -313,6 +330,10 @@ You are planning a QueryLens analytics query.
 You must choose exactly one function call.
 
 Supported product boundaries:
+- dataset: ${manifest.dataset.label}
+- supported dimensions: ${supportedDimensionLabels}
+- supported metrics:
+${supportedMetricLines}
 - intent: what changed
   - metric: cashflow_health_score
   - supported date inputs are resolved deterministically from the question: this week, last week, exact dates, date ranges, or week-of phrasing
@@ -331,6 +352,7 @@ Supported product boundaries:
 - deterministic parsing resolves exact dates, date ranges, week-of phrases, region, sector, and peer entities after you choose the intent and mode
 - supported regions: ${supportedEntities.regions.join(", ")}
 - supported sectors: ${supportedEntities.sectors.join(", ")}
+- example question coverage: ${exampleQuestionCoverage}
 
 Use retrieved context to resolve references like "that", "there", "those metrics", or "that region".
 

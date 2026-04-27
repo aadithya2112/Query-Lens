@@ -211,4 +211,17 @@ describe("query engine provider", () => {
     expect(result.summary).toContain("Portfolio moved down")
     expect(result.summary).toContain("immediately preceding grounded period")
   }, TEST_TIMEOUT)
+
+  it("builds the planner prompt from manifest-backed metrics, entities, and examples", async () => {
+    const { buildPlannerPrompt } = await import(
+      "@/lib/querylens/server/query-engine-provider"
+    )
+
+    const prompt = buildPlannerPrompt("What data is currently stored?")
+
+    expect(prompt).toContain("SME portfolio")
+    expect(prompt).toContain("Professional Services")
+    expect(prompt).toContain("cashflow_health_score")
+    expect(prompt).toContain("What data is currently stored?")
+  })
 })

@@ -15,6 +15,17 @@ describe("parsePhase1Question", () => {
     expect(result.parsed?.scope.sector).toBe("hospitality")
   })
 
+  it("resolves manifest-backed region and sector aliases from the question text", () => {
+    const result = parsePhase1Question(
+      "Why did prof services cashflow health drop last week in the northwest?"
+    )
+
+    expect(result.parsed?.scope).toEqual({
+      region: "north_west",
+      sector: "professional_services",
+    })
+  })
+
   it("parses explicit region scope overrides", () => {
     const result = parsePhase1Question("Why did cashflow health drop this week?", {
       region: "North West",

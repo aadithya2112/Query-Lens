@@ -1,7 +1,12 @@
 import { Pool } from "pg"
 
-import { getDatasetSemantics } from "@/lib/querylens/dataset-semantics"
 import { getDatasetDefinition, getDatasetMetricManifest } from "@/lib/querylens/datasets"
+import {
+  getSemanticManifest,
+  getSemanticSourceMappings,
+  getSemanticSupportedQuestions,
+  getSupportedEntityLabels,
+} from "@/lib/querylens/semantic-manifest"
 import {
   cosineSimilarity,
   embedTexts,
@@ -89,16 +94,17 @@ function buildTimeCoverageLabel() {
 export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
   const dataset = getDatasetDefinition()
   const manifest = getDatasetMetricManifest()
-  const sample = getSampleDataset()
-  const semantics = getDatasetSemantics()
-  const supportedQuestions = manifest.metrics.flatMap((metric) => metric.exampleQuestions)
+  const semanticManifest = getSemanticManifest()
+  const supportedEntities = getSupportedEntityLabels()
+  const supportedQuestions = getSemanticSupportedQuestions()
+  const sourceMappings = getSemanticSourceMappings()
 
   return [
     {
       id: "dataset-overview",
       kind: "overview",
       title: "Dataset overview",
-      content: `${dataset.label} is the active built-in sample dataset. ${dataset.description} Current story anchors: stress pocket ${semantics.story.stressPocket}, healthy control ${semantics.story.healthyControl}, softer secondary pocket ${semantics.story.softeningPocket}, and recovery pocket ${semantics.story.recoveryPocket}.`,
+      content: `${dataset.label} is the active built-in sample dataset. ${dataset.description} Current story anchors: stress pocket ${semanticManifest.storyAnchors.stressPocket}, healthy control ${semanticManifest.storyAnchors.healthyControl}, softer secondary pocket ${semanticManifest.storyAnchors.softeningPocket}, and recovery pocket ${semanticManifest.storyAnchors.recoveryPocket}.`,
     },
     {
       id: "dataset-metrics",
@@ -115,14 +121,15 @@ export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
       id: "dataset-dimensions",
       kind: "dimensions",
       title: "Available dimensions",
-      content: `QueryLens currently supports the portfolio, regions, and sectors as analysis dimensions. Regions: ${sample.regions.map((region) => region.name).join(", ")}. Sectors: ${sample.sectors.map((sector) => sector.name).join(", ")}.`,
+      content: `QueryLens currently supports ${semanticManifest.dimensions.map((dimension) => dimension.label.toLowerCase()).join(", ")} as analysis dimensions. Regions: ${supportedEntities.regions.join(", ")}. Sectors: ${supportedEntities.sectors.join(", ")}.`,
     },
     {
       id: "dataset-sources",
       kind: "sources",
       title: "Connected sources",
-      content:
-        "QueryLens uses Postgres for structured facts, MongoDB for contextual corroboration, and a metric manifest for semantic definitions.",
+      content: sourceMappings
+        .map((source) => `${source.label}: ${source.description}.`)
+        .join(" "),
     },
     {
       id: "dataset-time-coverage",
@@ -134,7 +141,7 @@ export function buildDatasetCatalogChunks(): DatasetCatalogChunk[] {
       id: "dataset-supported-questions",
       kind: "questions",
       title: "Supported questions",
-      content: `You can ask about what changed, breakdowns, compares, and dataset discovery. Example questions: ${supportedQuestions.join(" | ")} | What data is currently stored? | What metrics are available?`,
+      content: `You can ask about what changed, breakdowns, compares, and dataset discovery. Example questions: ${supportedQuestions.join(" | ")}`,
     },
   ]
 }

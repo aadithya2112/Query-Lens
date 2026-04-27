@@ -1,4 +1,8 @@
-import { getSampleDataset } from "@/lib/querylens/seed-data"
+import {
+  getScopeLabel as getManifestScopeLabel,
+  getSemanticManifest,
+  getSupportedEntityLabels as getManifestSupportedEntityLabels,
+} from "@/lib/querylens/semantic-manifest"
 import type { DatasetId, ScopeFilter } from "@/lib/querylens/types"
 
 export interface DatasetSemantics {
@@ -19,52 +23,27 @@ const DEFAULT_DATASET_ID: DatasetId = "sme_portfolio"
 export function getDatasetSemantics(
   datasetId: DatasetId = DEFAULT_DATASET_ID,
 ): DatasetSemantics {
-  const dataset = getSampleDataset()
+  const manifest = getSemanticManifest(datasetId)
+  const supportedEntities = getManifestSupportedEntityLabels(datasetId)
 
   return {
     datasetId,
-    portfolioLabel: "Portfolio",
-    supportedRegionLabels: dataset.regions.map((region) => region.name),
-    supportedSectorLabels: dataset.sectors.map((sector) => sector.name),
+    portfolioLabel: manifest.dataset.portfolioLabel,
+    supportedRegionLabels: supportedEntities.regions,
+    supportedSectorLabels: supportedEntities.sectors,
     story: {
-      stressPocket: "North West hospitality",
-      healthyControl: "London & South East professional services",
-      softeningPocket: "Midlands retail",
-      recoveryPocket: "North West hospitality this week",
+      stressPocket: manifest.storyAnchors.stressPocket,
+      healthyControl: manifest.storyAnchors.healthyControl,
+      softeningPocket: manifest.storyAnchors.softeningPocket,
+      recoveryPocket: manifest.storyAnchors.recoveryPocket,
     },
   }
 }
 
 export function getSupportedEntityLabels() {
-  const semantics = getDatasetSemantics()
-
-  return {
-    regions: semantics.supportedRegionLabels,
-    sectors: semantics.supportedSectorLabels,
-  }
+  return getManifestSupportedEntityLabels()
 }
 
 export function getScopeLabel(scope: ScopeFilter) {
-  const dataset = getSampleDataset()
-  const regionName = scope.region
-    ? dataset.regions.find((region) => region.id === scope.region)?.name
-    : undefined
-  const sectorName = scope.sector
-    ? dataset.sectors.find((sector) => sector.id === scope.sector)?.name
-    : undefined
-
-  if (regionName && sectorName) {
-    return `${regionName} / ${sectorName}`
-  }
-
-  if (regionName) {
-    return regionName
-  }
-
-  if (sectorName) {
-    return sectorName
-  }
-
-  return getDatasetSemantics().portfolioLabel
+  return getManifestScopeLabel(scope)
 }
-

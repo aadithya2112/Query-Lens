@@ -53,9 +53,9 @@ export interface MetricDefinition {
     inflowOutflowRatio: number
     balanceTrend: number
     lowBalanceExposure: number
-    overdueExposure: number
+      overdueExposure: number
   }
-  supportedDimensions: string[]
+  supportedDimensions: ScopeType[]
   supportedTimeframes: PlannedTimeframe[]
   synonyms: string[]
   exampleQuestions: string[]
@@ -63,6 +63,53 @@ export interface MetricDefinition {
 
 export interface MetricManifest {
   metrics: MetricDefinition[]
+}
+
+export interface SemanticEntityDefinition {
+  id: string
+  label: string
+  aliases?: string[]
+}
+
+export interface SemanticDimensionDefinition {
+  id: ScopeType
+  label: string
+  description: string
+}
+
+export interface SemanticSourceDefinition {
+  id: string
+  label: string
+  type: "postgres" | "mongodb" | "manifest"
+  description: string
+}
+
+export interface SemanticStoryAnchors {
+  stressPocket: string
+  healthyControl: string
+  softeningPocket: string
+  recoveryPocket: string
+}
+
+export interface SemanticManifest {
+  dataset: {
+    id: DatasetId
+    label: string
+    description: string
+    portfolioLabel: string
+    supportedIntentIds: QueryIntent[]
+    supportedTimeframes: PlannedTimeframe[]
+  }
+  dimensions: SemanticDimensionDefinition[]
+  entities: {
+    regions: SemanticEntityDefinition[]
+    sectors: SemanticEntityDefinition[]
+  }
+  metrics: MetricDefinition[]
+  sources: SemanticSourceDefinition[]
+  supportedQuestions: string[]
+  storyAnchors: SemanticStoryAnchors
+  uncertaintyNotes: string[]
 }
 
 export interface DatasetDefinition {

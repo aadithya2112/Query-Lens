@@ -1,12 +1,10 @@
-import manifest from "@/data/metric-manifest.json"
+import { getPrimarySemanticMetricDefinition, getSemanticMetricManifest } from "@/lib/querylens/semantic-manifest"
 import type { MetricDefinition, MetricManifest } from "@/lib/querylens/types"
 
-const metricManifest = manifest as MetricManifest
-
 export function getMetricManifest(): MetricManifest {
-  return metricManifest
+  return getSemanticMetricManifest()
 }
 
 export function getPrimaryMetricDefinition(): MetricDefinition {
-  return metricManifest.metrics[0]
+  return getPrimarySemanticMetricDefinition()
 }
