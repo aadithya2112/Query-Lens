@@ -1,9 +1,5 @@
-export type DatasetId = "sme_portfolio"
-export type MetricId =
-  | "cashflow_health_score"
-  | "at_risk_account_count"
-  | "dataset_catalog"
-  | "custom_query_result"
+export type DatasetId = string
+export type MetricId = string
 export type SupportedTimeframe = "this_week" | "last_week"
 export type PlannedTimeframe = SupportedTimeframe | "custom"
 export type QueryIntent =
@@ -11,6 +7,8 @@ export type QueryIntent =
   | "breakdown"
   | "compare"
   | "discovery"
+  | "aggregate"
+  | "trend"
   | "agentic_query"
 export type ScopeDimension = "portfolio" | "region" | "sector"
 export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
@@ -49,11 +47,11 @@ export interface MetricDefinition {
   description: string
   scale: string
   supportedIntents: QueryIntent[]
-  weights: {
+  weights?: {
     inflowOutflowRatio: number
     balanceTrend: number
     lowBalanceExposure: number
-      overdueExposure: number
+    overdueExposure: number
   }
   supportedDimensions: ScopeType[]
   supportedTimeframes: PlannedTimeframe[]
@@ -384,7 +382,7 @@ export interface TrustScore {
 }
 
 export interface TrustArtifactSource {
-  sourceType: EvidenceItem["sourceType"] | "manifest"
+  sourceType: EvidenceItem["sourceType"] | "manifest" | "csv"
   sourceName: string
   scope: string
   timeRange: string
@@ -503,6 +501,7 @@ export interface FollowUpContext {
 export interface QueryRequestBody {
   question: string
   chatId?: string
+  datasetId?: DatasetId
   action?: QueryAction
   followUpContext?: FollowUpContext
   scope?: ScopeFilter
@@ -511,8 +510,8 @@ export interface QueryRequestBody {
 export interface SourceHealth {
   id: string
   name: string
-  type: "postgres" | "mongodb" | "manifest"
-  status: "connected" | "sample-fixture" | "configured"
+  type: "postgres" | "mongodb" | "manifest" | "csv"
+  status: "connected" | "sample-fixture" | "configured" | "draft"
   detail: string
   recordCount?: number
 }
@@ -528,6 +527,8 @@ export interface DatasetSourceCount {
 export interface DatasetProfileSnapshot {
   datasetId: DatasetId
   sourceMode: QueryLensSourceMode
+  datasetLabel?: string
+  datasetDescription?: string
   dateCoverage: {
     startDate: string
     endDate: string
@@ -544,13 +545,20 @@ export interface DatasetSemanticDraft {
   sourceMode: QueryLensSourceMode
   timeCoverage: string
   dimensions: Array<{
-    id: ScopeType
+    id: string
     label: string
+    columnId?: string
+    synonyms?: string[]
   }>
   metrics: Array<{
     id: MetricId
     label: string
+    description?: string
     supportedIntents: QueryIntent[]
+    aggregation?: "sum" | "avg" | "min" | "max" | "count"
+    columnId?: string
+    synonyms?: string[]
+    exampleQuestions?: string[]
   }>
   sources: Array<{
     id: string
@@ -583,6 +591,8 @@ export interface DatasetCatalogProfile {
 }
 
 export interface BootstrapPayload {
+  datasetId: DatasetId
+  datasets: DatasetListItem[]
   initialQuestion: string
   metrics: MetricDefinition[]
   sourceHealth: SourceHealth[]
@@ -613,4 +623,68 @@ export interface RetrievalContext {
   datasetMatches: RetrievalMatch[]
   memoryMatches: RetrievalMatch[]
   recentMessages: StoredConversationMessage[]
+}
+
+export type OnboardedDatasetStatus = "draft" | "active"
+export type OnboardedColumnType =
+  | "string"
+  | "integer"
+  | "number"
+  | "boolean"
+  | "date"
+  | "datetime"
+
+export interface DatasetListItem {
+  id: DatasetId
+  label: string
+  description: string
+  status: "built_in" | OnboardedDatasetStatus
+  sourceKind: "built_in" | "csv"
+  sourceMode: QueryLensSourceMode
+}
+
+export interface CsvColumnProfile {
+  name: string
+  normalizedName: string
+  label: string
+  type: OnboardedColumnType
+  nullRatio: number
+  distinctCount: number
+  sampleValues: Array<string | number | boolean | null>
+  isIdentifier: boolean
+  isDimension: boolean
+  isMeasure: boolean
+  isTimeField: boolean
+}
+
+export interface OnboardedDatasetRecord {
+  id: DatasetId
+  label: string
+  description: string
+  status: OnboardedDatasetStatus
+  sourceKind: "csv"
+  sourceMode: "database"
+  tableName: string
+  rowCount: number
+  primaryTimeField?: string
+  grain: string
+  manifestVersion: number
+  createdAt: string
+  updatedAt: string
+  semanticDraft: DatasetSemanticDraft
+  columns: CsvColumnProfile[]
+  previewRows: ResultTable
+}
+
+export type DatasetImportErrorCode =
+  | "openrouter_rate_limited"
+  | "openrouter_auth_failed"
+  | "openrouter_upstream_error"
+  | "csv_import_failed"
+
+export interface DatasetImportErrorPayload {
+  error: string
+  code: DatasetImportErrorCode
+  retryable: boolean
+  provider?: "openrouter"
 }
