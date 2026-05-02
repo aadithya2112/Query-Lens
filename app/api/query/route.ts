@@ -6,6 +6,7 @@ import type { QueryRequestBody } from "@/lib/querylens/types"
 const queryRequestSchema = z.object({
   question: z.string().min(1, "Question is required."),
   chatId: z.string().min(1).optional(),
+  datasetId: z.string().min(1).optional(),
   action: z
     .enum(["run_follow_up_question", "leadership_summary"])
     .optional(),

@@ -171,7 +171,7 @@ export default function Sidebar({
               </p>
             </div>
           </div>
-        ) : metric ? (
+        ) : metric?.weights ? (
           <div className="mt-4 space-y-3">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -205,6 +205,13 @@ export default function Sidebar({
                 {Math.round(metric.weights.overdueExposure * 100)}%
               </p>
             </div>
+          </div>
+        ) : metric ? (
+          <div className="mt-4 space-y-3">
+            <p className="text-sm leading-6 text-foreground">
+              This onboarded metric uses the semantic draft rather than the built-in
+              cashflow weighting model.
+            </p>
           </div>
         ) : null}
       </section>

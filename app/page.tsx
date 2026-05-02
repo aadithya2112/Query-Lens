@@ -11,6 +11,7 @@ export default function Home() {
         <div className="flex items-center gap-8 px-8 py-3 rounded-full bg-[#1c1c1e]/60 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
           <Link href="/" className="font-semibold text-sm tracking-wide text-white/90 hover:text-white transition-colors">QueryLens</Link>
           <Link href="/demo" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Workspace</Link>
+          <Link href="/onboarding" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Onboarding</Link>
           <Link href="/explorer" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Context</Link>
         </div>
       </nav>
@@ -38,6 +39,13 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mt-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
           <Button asChild size="lg" className="h-14 px-8 text-base bg-white text-black hover:bg-white/90 rounded-full font-semibold transition-all hover:scale-105 active:scale-95 shadow-[0_4px_24px_rgba(255,255,255,0.25)]">
             <Link href="/demo">Launch Workspace</Link>
+          </Button>
+          <Button
+            asChild
+            size="lg"
+            className="h-14 px-8 text-base rounded-full bg-[#D6C5B3] text-black hover:bg-[#cbb9a7] font-semibold transition-all hover:scale-105 active:scale-95"
+          >
+            <Link href="/onboarding">Import CSV</Link>
           </Button>
           <Button
             asChild

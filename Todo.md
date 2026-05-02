@@ -8,13 +8,26 @@ This roadmap reflects the current product direction for QueryLens:
 - Migrate model access from the direct Gemini API integration to OpenRouter.
 - Plan around `deepseek/deepseek-v4-pro` as the primary model for agentic planning and explanation.
 - Keep the model integration swappable so the execution and semantic layers do not become provider-bound.
+- Do not treat the OpenRouter migration as a standalone phase before onboarding; fold it into the onboarding implementation behind a provider-agnostic model interface.
 
 ## 1. Dataset Onboarding
 - Support CSV uploads as the first-class onboarding path.
 - Support structured JSON and connected Postgres sources next.
 - Support Mongo-backed tabular views where the data can be flattened into an analytic shape.
+- The first implementation order should be:
+  1. CSV onboarding end to end
+  2. provider-agnostic model interface extraction
+  3. OpenRouter integration through that interface
+  4. Postgres onboarding via connection URL
+  5. MongoDB onboarding via connection URL
+- For Postgres and MongoDB, the first user input should be a connection URL, not a manual schema definition.
+- Treat the connection URL as the start of onboarding, not the end of it: QueryLens should inspect, profile, and prepare the source before queries run against it.
 - Add an onboarding flow that inspects schema before the user starts querying.
 - Detect time fields, candidate dimensions, measures, identifiers, and dataset grain.
+- For Postgres, inspect schemas, tables, views, columns, and likely analytic keys and time fields.
+- For MongoDB, inspect collections, sample documents, infer common fields, and derive flattenable tabular views where possible.
+- The first implementation can remain inside the single Next.js app; a separate worker is not required until onboarding jobs become slow or operationally heavy.
+- Onboarded data should be stored or registered in a queryable form before normal question answering begins.
 
 ## 2. Semantic Layer Generation
 - Generate a semantic manifest for each onboarded dataset.
@@ -22,6 +35,7 @@ This roadmap reflects the current product direction for QueryLens:
 - Capture source mappings and supported analysis capabilities in metadata.
 - Surface uncertainty when the system is not fully confident about inferred semantics.
 - Make the semantic layer the contract between changing data and trustworthy analytics.
+- The first onboarding slice should end with a semantic draft that is good enough to support a small set of safe questions.
 
 ## 3. Agentic Planning With Guardrails
 - Let the model interpret the user question and choose approved analysis capabilities.

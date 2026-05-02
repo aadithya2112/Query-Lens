@@ -1,8 +1,10 @@
 import { canUseGemini } from "@/lib/querylens/server/ai-config"
+import { isBuiltInDatasetId } from "@/lib/querylens/datasets"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
 import { runBuiltInAnalysisPipeline } from "@/lib/querylens/server/built-in-pipeline"
 import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
+import { analyzeOnboardedDatasetQuery } from "@/lib/querylens/server/onboarded-analysis"
 import { presentBuiltInFallback, enrichPhase1Response } from "@/lib/querylens/server/built-in-pipeline/presentation"
 import { buildLeadershipSummaryResponse } from "@/lib/querylens/server/response-enrichment"
 import { getQueryLensRetrievalStore } from "@/lib/querylens/server/retrieval"
@@ -38,6 +40,17 @@ export async function analyzeQuery(
   options: { executionContext?: QueryLensExecutionContext } = {},
 ): Promise<Phase1AnalysisResponse> {
   const executionContext = options.executionContext ?? "interactive"
+  if (!isBuiltInDatasetId(input.datasetId)) {
+    const onboardedResponse = await analyzeOnboardedDatasetQuery({
+      input,
+      executionContext,
+    })
+
+    if (onboardedResponse) {
+      return onboardedResponse
+    }
+  }
+
   const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
   const profileSnapshot = await profileStore.getProfileSnapshot()
   const weeklyRows = await dataAccess.listWeeklyMetrics()

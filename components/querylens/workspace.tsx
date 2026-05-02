@@ -17,13 +17,14 @@ import {
 } from "@/components/ui/resizable"
 import type {
   BootstrapPayload,
+  DatasetListItem,
   Phase1AnalysisResponse,
   QueryAction,
 } from "@/lib/querylens/types"
 
-const CHAT_ID_STORAGE_KEY = "querylens.chatId"
-const CHAT_MESSAGES_STORAGE_KEY = "querylens.messages"
-const ACTIVE_ANALYSIS_STORAGE_KEY = "querylens.activeAnalysis"
+function buildStorageKey(datasetId: string, suffix: string) {
+  return `querylens.${datasetId}.${suffix}`
+}
 
 function buildInitialMessages(
   initialQuestion: string,
@@ -97,6 +98,8 @@ function buildSuggestedPrompts(
 }
 
 export default function Workspace({
+  datasetId,
+  datasets,
   initialQuestion,
   metrics,
   sourceHealth,
@@ -124,20 +127,23 @@ export default function Workspace({
   )
 
   useEffect(() => {
-    const storedChatId = window.localStorage.getItem(CHAT_ID_STORAGE_KEY)
+    const chatIdKey = buildStorageKey(datasetId, "chatId")
+    const messagesKey = buildStorageKey(datasetId, "messages")
+    const analysisKey = buildStorageKey(datasetId, "activeAnalysis")
+    const storedChatId = window.localStorage.getItem(chatIdKey)
     const nextChatId = storedChatId || generateChatId()
 
     if (!storedChatId) {
-      window.localStorage.setItem(CHAT_ID_STORAGE_KEY, nextChatId)
+      window.localStorage.setItem(chatIdKey, nextChatId)
     }
 
     setChatId(nextChatId)
 
     const storedMessages = readStoredState<ConversationMessage[]>(
-      CHAT_MESSAGES_STORAGE_KEY,
+      messagesKey,
     )
     const storedAnalysis = readStoredState<Phase1AnalysisResponse>(
-      ACTIVE_ANALYSIS_STORAGE_KEY,
+      analysisKey,
     )
 
     if (storedMessages?.length) {
@@ -149,22 +155,24 @@ export default function Workspace({
     }
 
     setIsRestored(true)
-  }, [])
+  }, [datasetId])
 
   useEffect(() => {
     if (!isRestored || typeof window === "undefined") {
       return
     }
 
+    const messagesKey = buildStorageKey(datasetId, "messages")
+    const analysisKey = buildStorageKey(datasetId, "activeAnalysis")
     window.localStorage.setItem(
-      CHAT_MESSAGES_STORAGE_KEY,
+      messagesKey,
       JSON.stringify(messages),
     )
     window.localStorage.setItem(
-      ACTIVE_ANALYSIS_STORAGE_KEY,
+      analysisKey,
       JSON.stringify(activeAnalysis),
     )
-  }, [activeAnalysis, isRestored, messages])
+  }, [activeAnalysis, datasetId, isRestored, messages])
 
   const handleSend = async (
     question: string,
@@ -198,6 +206,7 @@ export default function Workspace({
         body: JSON.stringify({
           question: trimmed,
           chatId: chatId || undefined,
+          datasetId,
           action: options?.action,
           followUpContext: options?.sourceAnalysis
             ? {
@@ -251,6 +260,24 @@ export default function Workspace({
         </div>
 
         <div className="flex items-center gap-1">
+          <label className="hidden md:flex items-center gap-2 mr-2 text-sm text-muted-foreground">
+            <span>Dataset</span>
+            <select
+              className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+              value={datasetId}
+              onChange={(event) => {
+                window.location.assign(
+                  `/demo?datasetId=${encodeURIComponent(event.target.value)}`
+                )
+              }}
+            >
+              {datasets.map((dataset: DatasetListItem) => (
+                <option key={dataset.id} value={dataset.id}>
+                  {dataset.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="hidden text-sm text-muted-foreground md:inline-block mr-2">
             Metric Focus:{" "}
             <span className="font-medium text-foreground">

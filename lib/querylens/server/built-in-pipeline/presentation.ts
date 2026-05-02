@@ -34,12 +34,12 @@ function buildRetrievalTrace(retrievalContext: RetrievalContext) {
   }
 }
 
-export function enrichPhase1Response(args: {
-  response: BuiltInPresentationResult
+export function enrichPhase1Response<T extends Phase1AnalysisResponse>(args: {
+  response: T
   retrievalContext: RetrievalContext
   inputQuestion: string
   interpretation: BuiltInInterpretationSeed
-}) {
+}): T {
   return {
     ...args.response,
     followUpActions:
@@ -61,7 +61,7 @@ export function enrichPhase1Response(args: {
       args.retrievalContext.memoryMatches.length > 0 ||
       args.retrievalContext.recentMessages.length > 0,
     retrievalTrace: buildRetrievalTrace(args.retrievalContext),
-  }
+  } as T
 }
 
 type BuiltInResponseSeed = Omit<

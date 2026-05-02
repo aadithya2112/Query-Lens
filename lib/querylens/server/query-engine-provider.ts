@@ -1,4 +1,3 @@
-import { FunctionCallingConfigMode, type FunctionDeclaration } from "@google/genai"
 import { z } from "zod"
 
 import { formatContextualDateWindowLabel } from "@/lib/querylens/date-windows"
@@ -8,11 +7,11 @@ import {
   getSupportedEntityLabels,
 } from "@/lib/querylens/semantic-manifest"
 import {
-  canUseGemini,
+  canUseReasoningProvider,
   type QueryLensExecutionContext,
   requiresGeminiPlanning,
 } from "@/lib/querylens/server/ai-config"
-import { generateGeminiResponse } from "@/lib/querylens/server/gemini-client"
+import { generateStructuredData } from "@/lib/querylens/server/reasoning-provider"
 import {
   planDeterministicQuery,
 } from "@/lib/querylens/server/query-planner"
@@ -221,67 +220,38 @@ function buildGuidedPlanningFailure(
 }
 
 async function buildGeminiNarrative(input: NarrativeInput) {
-  const result = await generateGeminiResponse({
-    prompt: buildNarrativePrompt(input),
-    responseJsonSchema: narrativeJsonSchema,
-  })
+  const result = await generateStructuredData(
+    {
+      prompt: buildNarrativePrompt(input),
+      responseJsonSchema: narrativeJsonSchema,
+      schemaName: "querylens_narrative",
+    },
+    narrativeResponseSchema
+  )
 
-  return narrativeResponseSchema.parse(result.json)
+  if (!result.data) {
+    throw new Error("QueryLens could not validate the narrative response.")
+  }
+
+  return result.data
 }
 
-const plannerTools: FunctionDeclaration[] = [
-  {
-    name: "submit_analytics_query_plan",
-    description:
-      "Submit a supported QueryLens query plan for the current what-changed analytics flow.",
-    parametersJsonSchema: {
-      type: "object",
-      additionalProperties: false,
-      required: ["intent", "metric"],
-      properties: {
-        intent: {
-          type: "string",
-          enum: ["what_changed", "breakdown", "compare", "discovery"],
-        },
-        metric: {
-          type: "string",
-          enum: ["cashflow_health_score", "at_risk_account_count", "dataset_catalog"],
-        },
-        breakdownDimension: {
-          type: "string",
-          enum: ["region", "sector", "region_sector"],
-        },
-        compareMode: {
-          type: "string",
-          enum: ["timeframe", "peer"],
-        },
-        compareDimension: {
-          type: "string",
-          enum: ["region", "sector"],
-        },
-        discoveryFocus: {
-          type: "string",
-          enum: ["overview", "metrics", "sources", "dimensions", "time_coverage", "questions"],
-        },
-      },
-    },
-  },
-  {
-    name: "reject_analytics_query_plan",
-    description:
-      "Reject requests that are outside the supported QueryLens scope or too ambiguous to parse safely.",
-    parametersJsonSchema: {
-      type: "object",
-      additionalProperties: false,
-      required: ["reason"],
-      properties: {
-        reason: {
-          type: "string",
-        },
-      },
-    },
-  },
-]
+const plannerDecisionSchema = z.object({
+  decision: z.enum(["submit", "reject"]),
+  intent: z
+    .enum(["what_changed", "breakdown", "compare", "discovery"])
+    .optional(),
+  metric: z
+    .enum(["cashflow_health_score", "at_risk_account_count", "dataset_catalog"])
+    .optional(),
+  breakdownDimension: z.enum(["region", "sector", "region_sector"]).optional(),
+  compareMode: z.enum(["timeframe", "peer"]).optional(),
+  compareDimension: z.enum(["region", "sector"]).optional(),
+  discoveryFocus: z
+    .enum(["overview", "metrics", "sources", "dimensions", "time_coverage", "questions"])
+    .optional(),
+  reason: z.string().optional(),
+})
 
 function formatRetrievedContext(retrievalContext?: RetrievalContext) {
   if (!retrievalContext) {
@@ -327,7 +297,7 @@ export function buildPlannerPrompt(
   return `
 You are planning a QueryLens analytics query.
 
-You must choose exactly one function call.
+Return JSON only.
 
 Supported product boundaries:
 - dataset: ${manifest.dataset.label}
@@ -357,6 +327,12 @@ ${supportedMetricLines}
 Use retrieved context to resolve references like "that", "there", "those metrics", or "that region".
 
 Reject requests about unsupported metrics, unsupported time windows, uploads, or anything outside the current discovery, what-changed, breakdown, and compare flows.
+
+Return an object with:
+- decision: "submit" or "reject"
+- if decision is "submit", include intent and metric
+- include breakdownDimension, compareMode, compareDimension, or discoveryFocus only when needed
+- if decision is "reject", include a concise reason
 
 Retrieved context:
 ${formatRetrievedContext(retrievalContext)}
@@ -418,36 +394,63 @@ function plansAlign(args: {
   return deterministicResult
 }
 
-async function planQueryWithGemini(
+async function planQueryWithReasoningProvider(
   question: string,
   scopeOverride?: ScopeFilter,
   retrievalContext?: RetrievalContext
 ) {
-  const result = await generateGeminiResponse({
-    prompt: buildPlannerPrompt(question, retrievalContext),
-    tools: [{ functionDeclarations: plannerTools }],
-    toolConfig: {
-      functionCallingConfig: {
-        mode: FunctionCallingConfigMode.ANY,
-        allowedFunctionNames: [
-          "submit_analytics_query_plan",
-          "reject_analytics_query_plan",
-        ],
+  const result = await generateStructuredData(
+    {
+      prompt: buildPlannerPrompt(question, retrievalContext),
+      responseJsonSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["decision"],
+        properties: {
+          decision: {
+            type: "string",
+            enum: ["submit", "reject"],
+          },
+          intent: {
+            type: "string",
+            enum: ["what_changed", "breakdown", "compare", "discovery"],
+          },
+          metric: {
+            type: "string",
+            enum: ["cashflow_health_score", "at_risk_account_count", "dataset_catalog"],
+          },
+          breakdownDimension: {
+            type: "string",
+            enum: ["region", "sector", "region_sector"],
+          },
+          compareMode: {
+            type: "string",
+            enum: ["timeframe", "peer"],
+          },
+          compareDimension: {
+            type: "string",
+            enum: ["region", "sector"],
+          },
+          discoveryFocus: {
+            type: "string",
+            enum: ["overview", "metrics", "sources", "dimensions", "time_coverage", "questions"],
+          },
+          reason: {
+            type: "string",
+          },
+        },
       },
+      schemaName: "querylens_built_in_plan",
     },
-  })
+    plannerDecisionSchema
+  )
 
-  const call = result.functionCalls?.[0]
-
-  if (!call?.name) {
+  if (!result.data) {
     return undefined
   }
 
-  if (call.name === "reject_analytics_query_plan") {
-    const reason =
-      typeof call.args?.reason === "string" && call.args.reason.trim()
-        ? call.args.reason
-        : undefined
+  if (result.data.decision === "reject") {
+    const reason = result.data.reason?.trim() || undefined
 
     return {
       fallbackReason: reason,
@@ -455,11 +458,7 @@ async function planQueryWithGemini(
     }
   }
 
-  if (call.name !== "submit_analytics_query_plan") {
-    return undefined
-  }
-
-  const parsedArgs = submitQueryPlanSchema.safeParse(call.args)
+  const parsedArgs = submitQueryPlanSchema.safeParse(result.data)
 
   if (!parsedArgs.success) {
     return undefined
@@ -482,7 +481,7 @@ export function getQueryEngineProvider(args: {
   executionContext: QueryLensExecutionContext
 }): QueryEngineProvider {
   const geminiPlanningRequired = requiresGeminiPlanning(args.executionContext)
-  const geminiAvailable = canUseGemini(args.executionContext)
+  const reasoningProviderAvailable = canUseReasoningProvider(args.executionContext)
 
   if (!geminiPlanningRequired) {
     return deterministicQueryEngineProvider
@@ -490,24 +489,24 @@ export function getQueryEngineProvider(args: {
 
   return {
     planQuery: async (question, scopeOverride, retrievalContext) => {
-      if (!geminiAvailable) {
+      if (!reasoningProviderAvailable) {
         return buildGeminiRequiredFallback()
       }
 
       try {
-        const geminiResult = await Promise.race([
-          planQueryWithGemini(question, scopeOverride, retrievalContext),
+        const providerResult = await Promise.race([
+          planQueryWithReasoningProvider(question, scopeOverride, retrievalContext),
           new Promise<undefined>((resolve) => {
             setTimeout(() => resolve(undefined), 6_000)
           }),
         ])
 
-        if (geminiResult?.parsed) {
-          return geminiResult
+        if (providerResult?.parsed) {
+          return providerResult
         }
 
-        if (geminiResult?.fallbackReason) {
-          return geminiResult
+        if (providerResult?.fallbackReason) {
+          return providerResult
         }
 
         return buildGuidedPlanningFailure(
@@ -520,7 +519,7 @@ export function getQueryEngineProvider(args: {
       }
     },
     composeNarrative: async (input) => {
-      if (!geminiAvailable) {
+      if (!reasoningProviderAvailable) {
         return buildDeterministicNarrative(input)
       }
 

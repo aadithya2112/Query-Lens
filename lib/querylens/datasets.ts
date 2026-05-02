@@ -12,7 +12,11 @@ import type {
   ScopeDimension,
 } from "@/lib/querylens/types"
 
-const BUILT_IN_DATASET_ID: DatasetId = "sme_portfolio"
+export const BUILT_IN_DATASET_ID: DatasetId = "sme_portfolio"
+
+export function isBuiltInDatasetId(datasetId: DatasetId | undefined): datasetId is "sme_portfolio" {
+  return !datasetId || datasetId === BUILT_IN_DATASET_ID
+}
 
 export function getDefaultDatasetId(): DatasetId {
   return BUILT_IN_DATASET_ID

@@ -110,7 +110,7 @@ function ComparisonCards({ analysis }: EvidencePanelProps) {
 function TrustBar({ analysis }: EvidencePanelProps) {
   const visibleConfidence = resolveConfidenceScore(analysis)
   const width = `${visibleConfidence}%`
-  const trustComponents = analysis.trust?.components
+  const trustComponents: Array<[string, NonNullable<typeof analysis.trust>["components"]["interpretation"]]> = analysis.trust?.components
     ? [
         ["Interpretation", analysis.trust.components.interpretation],
         ["Coverage", analysis.trust.components.dataCoverage],
