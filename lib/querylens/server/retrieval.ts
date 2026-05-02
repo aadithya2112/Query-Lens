@@ -1,6 +1,5 @@
 import { getDatasetMetricManifest } from "@/lib/querylens/datasets"
 import {
-  cosineSimilarity,
   embedTexts,
   EMBEDDING_DIMENSIONS,
   formatVectorLiteral,
@@ -15,7 +14,6 @@ import type {
   QueryIntent,
   RetrievalContext,
   RetrievalMatch,
-  StoredConversationMessage,
 } from "@/lib/querylens/types"
 
 const CATALOG_TOP_K = 5
@@ -44,15 +42,6 @@ export interface QueryLensRetrievalStore {
 }
 
 declare global {
-  var __querylensFixtureCatalogChunks:
-    | Array<DatasetCatalogChunk & { embedding: number[] }>
-    | undefined
-  var __querylensFixtureConversationMessages:
-    | Map<string, StoredConversationMessage[]>
-    | undefined
-  var __querylensFixtureMemoryChunks:
-    | Map<string, Array<RetrievalMatch & { embedding: number[] }>>
-    | undefined
   var __querylensPgRetrievalReady: boolean | undefined
 }
 
@@ -66,7 +55,7 @@ export function buildDatasetCatalogChunks(
       id: "dataset-overview",
       kind: "overview",
       title: "Dataset overview",
-      content: `${profile.datasetLabel} is the active ${profile.sourceMode === "database" ? "database-backed" : "built-in sample"} dataset. ${profile.datasetDescription} Current story anchors: stress pocket ${profile.storyAnchors.stressPocket}, healthy control ${profile.storyAnchors.healthyControl}, softer secondary pocket ${profile.storyAnchors.softeningPocket}, and recovery pocket ${profile.storyAnchors.recoveryPocket}.`,
+      content: `${profile.datasetLabel} is the active database-backed dataset. ${profile.datasetDescription} Current story anchors: stress pocket ${profile.storyAnchors.stressPocket}, healthy control ${profile.storyAnchors.healthyControl}, softer secondary pocket ${profile.storyAnchors.softeningPocket}, and recovery pocket ${profile.storyAnchors.recoveryPocket}.`,
     },
     {
       id: "dataset-metrics",
@@ -176,129 +165,6 @@ function mapRetrievedMatch(args: {
     content: args.content,
     kind: args.kind,
     score: Number(args.score.toFixed(4)),
-  }
-}
-
-class FixtureRetrievalStore implements QueryLensRetrievalStore {
-  private async ensureCatalogIndex() {
-    if (globalThis.__querylensFixtureCatalogChunks) {
-      return globalThis.__querylensFixtureCatalogChunks
-    }
-
-    const chunks = await loadCatalogChunks()
-    const embeddings = await embedTexts({
-      texts: chunks.map((chunk) => chunk.content),
-      task: "document",
-    })
-
-    globalThis.__querylensFixtureCatalogChunks = chunks.map((chunk, index) => ({
-      ...chunk,
-      embedding: embeddings[index],
-    }))
-
-    return globalThis.__querylensFixtureCatalogChunks
-  }
-
-  private getMessageStore() {
-    if (!globalThis.__querylensFixtureConversationMessages) {
-      globalThis.__querylensFixtureConversationMessages = new Map()
-    }
-
-    return globalThis.__querylensFixtureConversationMessages
-  }
-
-  private getMemoryStore() {
-    if (!globalThis.__querylensFixtureMemoryChunks) {
-      globalThis.__querylensFixtureMemoryChunks = new Map()
-    }
-
-    return globalThis.__querylensFixtureMemoryChunks
-  }
-
-  async retrieveContext(args: {
-    chatId: string
-    question: string
-  }): Promise<RetrievalContext> {
-    const questionEmbedding = (
-      await embedTexts({ texts: [args.question], task: "query" })
-    )[0]
-    const catalog = await this.ensureCatalogIndex()
-    const datasetMatches = [...catalog]
-      .map((chunk) =>
-        mapRetrievedMatch({
-          id: chunk.id,
-          title: chunk.title,
-          content: chunk.content,
-          kind: chunk.kind,
-          score: cosineSimilarity(questionEmbedding, chunk.embedding),
-        })
-      )
-      .sort((left, right) => right.score - left.score)
-      .slice(0, CATALOG_TOP_K)
-
-    const memoryChunks = this.getMemoryStore().get(args.chatId) ?? []
-    const memoryMatches = [...memoryChunks]
-      .map((chunk) =>
-        mapRetrievedMatch({
-          id: chunk.id,
-          title: chunk.title,
-          content: chunk.content,
-          kind: chunk.kind,
-          score: cosineSimilarity(questionEmbedding, chunk.embedding),
-        })
-      )
-      .sort((left, right) => right.score - left.score)
-      .slice(0, MEMORY_TOP_K)
-
-    const recentMessages = [...(this.getMessageStore().get(args.chatId) ?? [])].slice(
-      -RECENT_MESSAGE_LIMIT
-    )
-
-    return {
-      datasetMatches,
-      memoryMatches,
-      recentMessages,
-    }
-  }
-
-  async persistConversation(args: PersistConversationArgs): Promise<void> {
-    const messages = this.getMessageStore()
-    const currentMessages = messages.get(args.chatId) ?? []
-    const timestamp = new Date().toISOString()
-
-    const userMessage: StoredConversationMessage = {
-      id: `user-${Date.now()}`,
-      chatId: args.chatId,
-      role: "user",
-      text: args.question,
-      createdAt: timestamp,
-    }
-    const assistantMessage: StoredConversationMessage = {
-      id: `assistant-${Date.now() + 1}`,
-      chatId: args.chatId,
-      role: "assistant",
-      text: args.response.summary,
-      createdAt: timestamp,
-    }
-
-    messages.set(args.chatId, [...currentMessages, userMessage, assistantMessage])
-
-    const memoryText = buildConversationMemoryText(args)
-    const [embedding] = await embedTexts({ texts: [memoryText], task: "document" })
-    const memoryStore = this.getMemoryStore()
-    const currentChunks = memoryStore.get(args.chatId) ?? []
-
-    memoryStore.set(args.chatId, [
-      ...currentChunks,
-      {
-        id: `memory-${Date.now()}`,
-        title: buildMemoryChunkTitle(args.response),
-        content: memoryText,
-        kind: "conversation_memory",
-        score: 1,
-        embedding,
-      },
-    ])
   }
 }
 
@@ -578,16 +444,5 @@ class DatabaseRetrievalStore implements QueryLensRetrievalStore {
 }
 
 export async function getQueryLensRetrievalStore(): Promise<QueryLensRetrievalStore> {
-  try {
-    if (
-      process.env.QUERYLENS_DATA_MODE === "fixture" ||
-      !process.env.POSTGRES_URL
-    ) {
-      return new FixtureRetrievalStore()
-    }
-
-    return new DatabaseRetrievalStore()
-  } catch {
-    return new FixtureRetrievalStore()
-  }
+  return new DatabaseRetrievalStore()
 }

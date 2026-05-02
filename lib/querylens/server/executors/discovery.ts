@@ -16,7 +16,7 @@ interface DiscoveryExecutorArgs {
   plan: StructuredQueryPlan
   weeklyRows: WeeklyMetricRow[]
   dataAccess: {
-    sourceMode: "database" | "fixture"
+    sourceMode: "database"
   }
   retrievalContext: RetrievalContext
 }
@@ -54,7 +54,7 @@ function buildDiscoveryDrivers(args: {
       impactLabel: `${args.metricCount} metrics`,
       direction: "positive",
       description:
-        "The current sample dataset supports cashflow health analysis, at-risk account breakdowns, and metadata discovery.",
+        "The current database-backed dataset supports cashflow health analysis, at-risk account breakdowns, and metadata discovery.",
     },
     {
       id: "dataset-sources",

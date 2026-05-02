@@ -157,7 +157,7 @@ function buildBreakdownHeadlineAndSummary(execution: BreakdownExecutionPayload) 
 }
 
 function buildDiscoverySummary(execution: DiscoveryExecutionPayload) {
-  return `QueryLens currently has ${execution.presentation.metricCount} analytical metrics across ${execution.presentation.supportedIntentCount} intent families for the ${execution.presentation.datasetLabel} dataset. The active source stack includes ${execution.presentation.sourceHealth.map((source) => source.name).join(", ")}, with weekly coverage from ${execution.presentation.coverageLabel}. That means discovery answers can stay grounded in explicit source coverage, retrieved catalog metadata, and the current sample-dataset boundaries before analytical planning begins.`
+  return `QueryLens currently has ${execution.presentation.metricCount} analytical metrics across ${execution.presentation.supportedIntentCount} intent families for the ${execution.presentation.datasetLabel} dataset. The active source stack includes ${execution.presentation.sourceHealth.map((source) => source.name).join(", ")}, with weekly coverage from ${execution.presentation.coverageLabel}. That means discovery answers can stay grounded in explicit source coverage, retrieved catalog metadata, and the current database-backed dataset boundaries before analytical planning begins.`
 }
 
 export async function presentBuiltInExecution(args: {

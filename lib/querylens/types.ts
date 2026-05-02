@@ -491,7 +491,7 @@ export interface Phase1AnalysisResponse {
   executionTrace?: ExecutionTrace
   fallback?: boolean
   presentationMode?: ResponsePresentationMode
-  sourceMode: "database" | "fixture"
+  sourceMode: "database"
 }
 
 export interface FollowUpContext {
@@ -511,12 +511,12 @@ export interface SourceHealth {
   id: string
   name: string
   type: "postgres" | "mongodb" | "manifest" | "csv"
-  status: "connected" | "sample-fixture" | "configured" | "draft"
+  status: "connected" | "configured" | "draft"
   detail: string
   recordCount?: number
 }
 
-export type QueryLensSourceMode = "database" | "fixture"
+export type QueryLensSourceMode = "database"
 
 export interface DatasetSourceCount {
   sourceId: SourceHealth["id"]

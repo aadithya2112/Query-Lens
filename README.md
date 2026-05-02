@@ -9,7 +9,7 @@
 > ### **[https://query-lens-one.vercel.app/](https://query-lens-one.vercel.app/)**
 >
 > **No setup required. Click the link and start asking questions immediately.**
-> The live deployment runs in fixture mode — the full SME portfolio dataset and all four use cases are available out of the box.
+> The live deployment runs against the database-backed SME portfolio dataset, with all four use cases available out of the box.
 
 ---
 
@@ -40,7 +40,6 @@ The product is built around the three pillars of the hackathon brief:
   - [4. Load the sample dataset](#4-load-the-sample-dataset)
   - [5. Start the app](#5-start-the-app)
   - [6. Run the flagship questions](#6-run-the-flagship-questions)
-- [Fixture Mode](#fixture-mode)
 - [API Usage Examples](#api-usage-examples)
 - [Validation Commands](#validation-commands)
 - [Architecture Notes](#architecture-notes)
@@ -182,18 +181,6 @@ Compare cashflow health this week vs last week
 
 ---
 
-## Fixture Mode
-
-If you want to run the UI without Docker, you can force fixture mode:
-
-```bash
-QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 npm run dev
-```
-
-This uses the same sample dataset story, but reads from in-repo fixtures instead of the live local databases.
-
----
-
 ## API Usage Examples
 
 ### `GET /api/metrics`
@@ -252,7 +239,7 @@ QueryLens is a single `Next.js` application with an integrated server layer.
 - The server routes requests through a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and conversation memory, and a generic analysis orchestrator before executing the current `discovery`, `what changed`, `breakdown`, or `compare` intent.
 - `GET /api/metrics` exposes the current metric manifest for all shipped slices.
 - Interactive query parsing requires Gemini planning for supported questions, while data retrieval, evidence assembly, charting, confidence, and retrieval persistence remain deterministic and grounded.
-- Fixture mode remains available as a safe fallback when live databases are not running.
+- Postgres and MongoDB are required for the workspace runtime; the sample-data loader seeds those databases for local demos.
 
 For the fuller details and request lifecycle, see [Architecture.md](./Architecture.md) and [Flow.md](./Flow.md).
 ![architecture](app/images/architecture_flowchart.svg )

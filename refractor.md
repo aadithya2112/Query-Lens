@@ -9,7 +9,7 @@ These refactors are chosen for one reason: they should make future implementatio
 ## Refactor Guardrails
 
 - Do not break the current shipped flows: `discovery`, `what changed`, `compare`, and `breakdown`.
-- Preserve both fixture mode and Docker-backed database mode.
+- Preserve the shipped Docker-backed database flows.
 - Prefer incremental refactors over a rewrite.
 - Optimize for future feature velocity, clarity, and debuggability.
 - Keep current external behavior stable unless a change is truly necessary.
@@ -180,8 +180,8 @@ Separate the system that learns what a dataset is from the system that answers q
 ### Completion Notes
 - Completed by splitting dataset runtime responsibilities into a query-time data-access layer and a separate dataset profile store.
 - Query answering now stays focused on validated analytic reads, while source inspection, schema snapshots, source health, catalog profiling, and semantic draft generation live in dedicated profiling modules.
-- Discovery, bootstrap, source-context, retrieval, and seeding paths now consume the profile/runtime seam without changing shipped `discovery`, `what_changed`, `compare`, `breakdown`, fixture-mode, or database-mode behavior.
-- Tests now cover the runtime resolver, fixture profile snapshots, semantic draft generation, and the rewired consumers that depend on profiling instead of query-time repositories.
+- Discovery, bootstrap, source-context, retrieval, and seeding paths now consume the profile/runtime seam without changing shipped `discovery`, `what_changed`, `compare`, `breakdown`, or database-backed behavior.
+- Tests now cover the runtime resolver, database profile snapshots, semantic draft generation, and the rewired consumers that depend on profiling instead of query-time repositories.
 
 ## 6. Create A First-Class Trust And Confidence Model [Completed]
 

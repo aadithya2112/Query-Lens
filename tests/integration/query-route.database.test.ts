@@ -9,7 +9,6 @@ describe("/api/query database mode", () => {
   runIfDatabase(
     "returns a grounded database-backed analysis for the flagship question",
     async () => {
-      delete process.env.QUERYLENS_DATA_MODE
       process.env.QUERYLENS_REFERENCE_DATE = "2026-04-11"
 
       const request = new Request("http://localhost/api/query", {
@@ -19,6 +18,7 @@ describe("/api/query database mode", () => {
         },
         body: JSON.stringify({
           question: "Why did SME cashflow health drop last week?",
+          chatId: "database-route-flagship",
         }),
       })
 
@@ -43,5 +43,4 @@ afterAll(async () => {
   await mongoClient?.close()
   globalThis.__querylensMongoClientPromise = undefined
 
-  process.env.QUERYLENS_DATA_MODE = "fixture"
 })

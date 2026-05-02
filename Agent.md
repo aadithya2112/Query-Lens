@@ -3,7 +3,7 @@
 - QueryLens is a trust-first analytics workspace that should evolve from a seeded demo into a governed, adaptable analytics system.
 - The long-term product direction is: **bring data in -> understand it semantically -> let agents plan analysis -> execute safely -> show trust clearly.**
 - Shipped today: `discovery`, `what changed`, and `compare` for `cashflow_health_score`, plus `breakdown` for `at_risk_account_count`, over the current SME portfolio dataset.
-- The app supports both fixture mode and Docker-backed database mode, with `pgvector` retrieval and conversational memory already in place.
+- The app uses Docker-backed databases, with `pgvector` retrieval and conversational memory already in place.
 - Gemini is required for the main interactive planning flow; deterministic interactive parsing is scaffolding, not the intended product experience.
 - The target architecture is:
   - agentic for understanding

@@ -1,8 +1,6 @@
 import { MongoClient } from "mongodb"
 import { Pool } from "pg"
 
-import { getSampleDataset } from "@/lib/querylens/seed-data"
-import type { AgenticSchemaSnapshot } from "@/lib/querylens/server/agentic-types"
 import type { ContextCollection, ContextEvent } from "@/lib/querylens/types"
 
 declare global {
@@ -175,30 +173,6 @@ export function normalizeDateValue(value: string | Date) {
   return `${year}-${month}-${day}`
 }
 
-export function buildFixtureAgenticSchemaSnapshot(): AgenticSchemaSnapshot {
-  const dataset = getSampleDataset()
-
-  return {
-    postgres: AGENTIC_POSTGRES_TABLES.map((table) => ({
-      ...table,
-      rowCount:
-        table.name === "regions"
-          ? dataset.regions.length
-          : table.name === "sectors"
-            ? dataset.sectors.length
-            : table.name === "accounts"
-              ? dataset.accounts.length
-              : table.name === "daily_account_metrics"
-                ? dataset.dailyMetrics.length
-                : dataset.weeklyMetrics.length,
-    })),
-    mongodb: AGENTIC_MONGO_COLLECTIONS.map((collection) => ({
-      ...collection,
-      rowCount: dataset.contextEvents[collection.name as ContextCollection].length,
-    })),
-  }
-}
-
 export function getPgPool() {
   if (!process.env.POSTGRES_URL) {
     throw new Error("POSTGRES_URL is not configured.")
@@ -225,25 +199,4 @@ export function getMongoClientPromise() {
   }
 
   return globalThis.__querylensMongoClientPromise
-}
-
-export async function canUseDatabaseAdapter() {
-  if (
-    process.env.QUERYLENS_DATA_MODE === "fixture" ||
-    !process.env.POSTGRES_URL ||
-    !process.env.MONGODB_URL
-  ) {
-    return false
-  }
-
-  try {
-    const pool = getPgPool()
-    const mongo = await getMongoClientPromise()
-
-    await Promise.all([pool.query("SELECT 1"), mongo.db().command({ ping: 1 })])
-    return true
-  } catch (error) {
-    console.warn("QueryLens database adapters unavailable, falling back to the sample dataset.", error)
-    return false
-  }
 }

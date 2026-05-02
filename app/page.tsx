@@ -13,6 +13,7 @@ export default function Home() {
           <Link href="/demo" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Workspace</Link>
           <Link href="/onboarding" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Onboarding</Link>
           <Link href="/explorer" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Context</Link>
+          <Link href="/sign-in" className="text-sm font-medium text-white/60 hover:text-white transition-colors">Sign in</Link>
         </div>
       </nav>
 

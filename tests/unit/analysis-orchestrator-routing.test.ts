@@ -109,7 +109,7 @@ describe("analysis orchestrator routing", () => {
           evidence: [],
           assumptions: [],
           supportedFollowUps: [],
-          sourceMode: "fixture",
+          sourceMode: "database",
         },
       },
     })

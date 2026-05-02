@@ -1,6 +1,87 @@
+import { vi } from "vitest"
+
 import { analyzeQuery } from "@/lib/querylens/server/analysis-orchestrator"
 
+const { persistedMessagesByChat, retrieveContextMock, persistConversationMock } =
+  vi.hoisted(() => ({
+    persistedMessagesByChat: new Map<
+      string,
+      Array<{
+        id: string
+        chatId: string
+        role: "user" | "assistant"
+        text: string
+        createdAt: string
+      }>
+    >(),
+    retrieveContextMock: vi.fn(
+      async (args: { chatId: string; question: string }) => ({
+        datasetMatches: [],
+        memoryMatches: [],
+        recentMessages: persistedMessagesByChat.get(args.chatId) ?? [],
+      }),
+    ),
+    persistConversationMock: vi.fn(
+      async (args: {
+        chatId: string
+        question: string
+        response: { summary: string }
+      }) => {
+        const current = persistedMessagesByChat.get(args.chatId) ?? []
+        const createdAt = new Date().toISOString()
+        persistedMessagesByChat.set(args.chatId, [
+          ...current,
+          {
+            id: `user-${current.length + 1}`,
+            chatId: args.chatId,
+            role: "user",
+            text: args.question,
+            createdAt,
+          },
+          {
+            id: `assistant-${current.length + 2}`,
+            chatId: args.chatId,
+            role: "assistant",
+            text: args.response.summary,
+            createdAt,
+          },
+        ])
+      },
+    ),
+  }))
+
+vi.mock("@/lib/querylens/server/dataset-runtime", async () => {
+  const { createMockQueryLensDatasetRuntime } = await import(
+    "../helpers/querylens-runtime"
+  )
+
+  return {
+    getQueryLensDatasetRuntime: vi.fn(async () =>
+      createMockQueryLensDatasetRuntime(),
+    ),
+  }
+})
+
+vi.mock("@/lib/querylens/server/retrieval", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("@/lib/querylens/server/retrieval")>()
+
+  return {
+    ...original,
+    getQueryLensRetrievalStore: vi.fn(async () => ({
+      retrieveContext: retrieveContextMock,
+      persistConversation: persistConversationMock,
+    })),
+  }
+})
+
 describe("analysis orchestrator", () => {
+  beforeEach(() => {
+    persistedMessagesByChat.clear()
+    retrieveContextMock.mockClear()
+    persistConversationMock.mockClear()
+  })
+
   it("dispatches the flagship query through the what-changed executor", async () => {
     const payload = await analyzeQuery({
       question: "Why did SME cashflow health drop last week?",
@@ -81,7 +162,7 @@ describe("analysis orchestrator", () => {
     expect(payload.intent).toBe("discovery")
     expect(payload.metric).toBe("dataset_catalog")
     expect(payload.discoverySummary?.datasetLabel).toBe("SME portfolio")
-    expect(payload.summary).toContain("sample-dataset boundaries")
+    expect(payload.summary).toContain("database-backed dataset boundaries")
     expect(payload.catalogSections?.length).toBeGreaterThan(0)
     expect(payload.evidence.length).toBeGreaterThan(0)
   })

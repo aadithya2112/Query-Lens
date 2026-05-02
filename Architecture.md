@@ -2,7 +2,7 @@
 
 ## Current Architecture Summary
 
-`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus four product slices: a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and memory, a generic analysis orchestrator, and registered `discovery`, `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over the built-in sample dataset, `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini is required for interactive query planning and remains constrained to planning, embeddings, and final wording.
+`QueryLens` is a single `Next.js` application with an integrated server layer. The current phase now includes the Stage 1 engine foundation plus four product slices: a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and memory, a generic analysis orchestrator, and registered `discovery`, `what changed`, `breakdown`, and `compare` executors. Retrieval remains deterministic over `Postgres` facts, account-level stress rollups, `MongoDB` context, and a repo-managed metric manifest, while Gemini is required for interactive query planning and remains constrained to planning, embeddings, and final wording.
 
 ## Target Architecture Direction
 
@@ -50,8 +50,7 @@ flowchart LR
       VECTOR["Postgres + pgvector\ncatalog chunks, memory chunks"]
       MG["MongoDB\ncomplaints, incidents, alerts, RM notes"]
       MANIFEST["Metric Manifest JSON"]
-      SAMPLE["Built-in Sample Dataset"]
-      GEMINI["Gemini API\nstructured parse + embeddings + narrative output"]
+    GEMINI["Gemini API\nstructured parse + embeddings + narrative output"]
     end
 
     EXEC --> PG
@@ -59,7 +58,6 @@ flowchart LR
     EXEC --> MG
     MEMORY --> VECTOR
     VALIDATE --> MANIFEST
-    EXEC --> SAMPLE
     PLAN --> GEMINI
     RETRIEVE --> GEMINI
     NARRATE --> GEMINI
@@ -93,7 +91,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 3. The server produces a structured query plan for the built-in dataset, with Gemini required for interactive planning and local validation enforcing the manifest boundaries.
 4. The plan is validated against the dataset definition, supported metric, allowed timeframe rules, and discovery/compare boundaries.
 5. The analysis orchestrator dispatches the plan to the registered `discovery`, `what changed`, `breakdown`, or `compare` executor.
-6. The executor reads weekly movement or account-level stress from `Postgres` and corroborating context from `MongoDB`, or reads the built-in sample dataset when local databases are unavailable.
+6. The executor reads weekly movement or account-level stress from `Postgres` and corroborating context from `MongoDB`.
 7. Drivers, evidence, confidence, assumptions, discovery catalog sections, and chart data are assembled deterministically into a grounded response payload.
 8. For interactive requests only, the planner requires Gemini and the narrative provider can ask Gemini for a structured headline and summary, while deterministic execution remains the source of truth for facts and evidence.
 9. The server persists the user turn, assistant turn, and a compact memory chunk back into `pgvector` for the next request.
@@ -105,7 +103,7 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 - Canonical structured facts
 - Weekly comparison rows used to explain score movement
-- Daily account metrics used to support believable sample-dataset behavior
+- Daily account metrics used to support the portfolio analysis behavior
 - `pgvector` storage for dataset catalog chunks and conversational memory chunks
 
 ### MongoDB
@@ -117,11 +115,6 @@ Deferred endpoints such as briefing or trace APIs are not part of the current sh
 
 - Metric definitions for `cashflow_health_score` and `at_risk_account_count`
 - Supported synonyms, dimensions, intents, and allowed time windows
-
-### Built-in Sample Dataset
-
-- Safe built-in dataset for the local demo when database services are not configured or unavailable
-- Must behave the same as the intended `database` answer shape
 
 ## Current Constraints
 

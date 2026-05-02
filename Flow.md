@@ -108,7 +108,6 @@ Depending on the intent, QueryLens reads from:
 
 - `Postgres` for structured facts and `pgvector` retrieval tables
 - `MongoDB` for complaints, incidents, alerts, and RM notes
-- the built-in sample dataset when Docker-backed databases are unavailable
 
 ### 8. The answer is assembled deterministically
 

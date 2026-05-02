@@ -109,9 +109,7 @@ export default function Sidebar({
           Source mode
         </p>
         <p className="mt-1 text-sm text-foreground">
-          {analysis.sourceMode === "database"
-            ? "Docker-backed databases"
-            : "Built-in sample dataset"}
+          Docker-backed databases
         </p>
       </section>
 
@@ -124,7 +122,7 @@ export default function Sidebar({
         </div>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {isDiscovery
-            ? "Discovery answers come from retrieved dataset metadata, source health, and sample-dataset coverage summaries before analytical execution begins."
+            ? "Discovery answers come from retrieved dataset metadata, source health, and database coverage summaries before analytical execution begins."
             : isAgentic
             ? "Custom live queries are grounded in the approved database schema and executed with read-only guards before QueryLens renders the answer."
             : metric?.description}

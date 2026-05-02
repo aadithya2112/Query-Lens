@@ -5,12 +5,10 @@ import {
   getSemanticSourceMappings,
   getSemanticSupportedQuestions,
 } from "@/lib/querylens/semantic-manifest"
-import { getSampleDataset } from "@/lib/querylens/seed-data"
 import type { AgenticSchemaSnapshot } from "@/lib/querylens/server/agentic-types"
 import {
   AGENTIC_MONGO_COLLECTIONS,
   AGENTIC_POSTGRES_TABLES,
-  buildFixtureAgenticSchemaSnapshot,
   getMongoClientPromise,
   getPgPool,
   normalizeDateValue,
@@ -115,67 +113,6 @@ export function buildDatasetCatalogProfile(
     regionLabels: supportedEntities.regions,
     sectorLabels: supportedEntities.sectors,
     supportedQuestions,
-  }
-}
-
-class FixtureDatasetProfileStore implements QueryLensDatasetProfileStore {
-  sourceMode = "fixture" as const
-
-  async getProfileSnapshot(): Promise<DatasetProfileSnapshot> {
-    const dataset = getSampleDataset()
-    const dailyDates = dataset.dailyMetrics.map((metric) => metric.date).sort()
-    const metricManifest = getDatasetMetricManifest()
-
-    const sourceHealth: SourceHealth[] = [
-      {
-        id: "postgres",
-        name: "Postgres facts",
-        type: "postgres",
-        status: "sample-fixture",
-        detail: `${dataset.accounts.length} accounts · ${dataset.dailyMetrics.length} daily rows · ${dataset.weeklyMetrics.length} weekly rows`,
-        recordCount: dataset.weeklyMetrics.length,
-      },
-      {
-        id: "mongodb",
-        name: "Mongo context",
-        type: "mongodb",
-        status: "sample-fixture",
-        detail: `${AGENTIC_MONGO_COLLECTIONS.reduce(
-          (total, collection) => total + dataset.contextEvents[collection.name].length,
-          0
-        )} contextual documents across 4 collections`,
-        recordCount: AGENTIC_MONGO_COLLECTIONS.reduce(
-          (total, collection) => total + dataset.contextEvents[collection.name].length,
-          0
-        ),
-      },
-      {
-        id: "manifest",
-        name: "Metric manifest",
-        type: "manifest",
-        status: "configured",
-        detail: "1 supported metric with fixed weekly definitions",
-        recordCount: metricManifest.metrics.length,
-      },
-    ]
-
-    return {
-      datasetId: "sme_portfolio",
-      sourceMode: this.sourceMode,
-      dateCoverage: {
-        startDate: dailyDates[0],
-        endDate: dailyDates.at(-1) ?? dailyDates[0],
-      },
-      sourceHealth,
-      schemaSnapshot: buildFixtureAgenticSchemaSnapshot(),
-      sourceCounts: buildSourceCounts(sourceHealth),
-    }
-  }
-
-  async getSemanticDraft(): Promise<DatasetSemanticDraft> {
-    return buildSemanticDraft({
-      snapshot: await this.getProfileSnapshot(),
-    })
   }
 }
 
@@ -297,10 +234,6 @@ class DatabaseDatasetProfileStore implements QueryLensDatasetProfileStore {
       snapshot: await this.getProfileSnapshot(),
     })
   }
-}
-
-export function createFixtureDatasetProfileStore(): QueryLensDatasetProfileStore {
-  return new FixtureDatasetProfileStore()
 }
 
 export function createDatabaseDatasetProfileStore(): QueryLensDatasetProfileStore {

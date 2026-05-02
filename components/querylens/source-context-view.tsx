@@ -164,9 +164,7 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           <div className="flex flex-wrap items-center gap-4">
             <h2 className="text-xl font-semibold tracking-tight text-white/90">Data Summary</h2>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-400/90 shadow-inner">
-              {payload.sourceMode === "database"
-                ? "Live database mode"
-                : "Fixture mode"}
+              Live database mode
             </span>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">

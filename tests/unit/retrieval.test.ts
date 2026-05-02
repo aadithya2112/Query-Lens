@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
+import { buildMockDatabaseProfileSnapshot } from "../helpers/querylens-runtime"
 import { buildDatasetCatalogProfile } from "@/lib/querylens/server/profile-store"
 import {
   cosineSimilarity,
@@ -10,15 +10,12 @@ import {
 import {
   buildConversationMemoryText,
   buildDatasetCatalogChunks,
-  getQueryLensRetrievalStore,
 } from "@/lib/querylens/server/retrieval"
 
 describe("retrieval scaffolding", () => {
   it("builds high-signal catalog chunks from the runtime profile snapshot", async () => {
-    const { profileStore } = await getQueryLensDatasetRuntime()
-    const profileSnapshot = await profileStore.getProfileSnapshot()
     const chunks = buildDatasetCatalogChunks(
-      buildDatasetCatalogProfile(profileSnapshot)
+      buildDatasetCatalogProfile(buildMockDatabaseProfileSnapshot())
     )
 
     expect(chunks.map((chunk) => chunk.kind)).toEqual(
@@ -50,47 +47,6 @@ describe("retrieval scaffolding", () => {
     expect(cosineSimilarity(first, second)).toBeGreaterThan(0.99)
   })
 
-  it("stores and retrieves conversational memory in fixture mode", async () => {
-    const store = await getQueryLensRetrievalStore()
-    const chatId = "test-chat-retrieval"
-
-    await store.persistConversation({
-      chatId,
-      question: "Why did SME cashflow health drop last week?",
-      response: {
-        intent: "what_changed",
-        headline: "Portfolio cashflow health fell 1.7 points",
-        summary: "Portfolio moved down from 100 to 98.3 week over week.",
-        metric: "cashflow_health_score",
-        timeframe: "Last week",
-        comparisonBasis: "Compared with the prior week",
-        confidence: 92,
-        activeScope: "Portfolio",
-        drivers: [],
-        chartSpec: {
-          type: "line",
-          title: "Weekly trend",
-          xKey: "label",
-          yKey: "score",
-          data: [],
-          explanation: "Trend",
-        },
-        evidence: [],
-        assumptions: [],
-        supportedFollowUps: [],
-        sourceMode: "fixture",
-      },
-    })
-
-    const context = await store.retrieveContext({
-      chatId,
-      question: "What about hospitality there?",
-    })
-
-    expect(context.memoryMatches.length).toBeGreaterThan(0)
-    expect(context.recentMessages.length).toBeGreaterThanOrEqual(2)
-  })
-
   it("builds conversation memory text with analytical context", () => {
     const text = buildConversationMemoryText({
       chatId: "demo-chat",
@@ -116,7 +72,7 @@ describe("retrieval scaffolding", () => {
         evidence: [],
         assumptions: [],
         supportedFollowUps: [],
-        sourceMode: "fixture",
+        sourceMode: "database",
       },
     })
 

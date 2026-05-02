@@ -272,7 +272,7 @@ describe("built-in trust model", () => {
             id: "weekly_metrics",
             name: "Weekly portfolio metrics",
             type: "postgres",
-            status: "sample-fixture",
+            status: "connected",
             detail: "Weekly facts are available.",
           },
         ],

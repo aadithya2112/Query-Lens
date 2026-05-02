@@ -12,7 +12,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      `PORT=${port} QUERYLENS_DATA_MODE=fixture QUERYLENS_REFERENCE_DATE=2026-04-11 QUERYLENS_AI_MODE=deterministic npm run dev`,
+      `PORT=${port} QUERYLENS_REFERENCE_DATE=2026-04-11 QUERYLENS_AI_MODE=deterministic npm run dev`,
     port,
     reuseExistingServer: false,
     timeout: 120_000,

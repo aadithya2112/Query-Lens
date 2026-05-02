@@ -6,6 +6,35 @@ const { geminiChatSendMock, geminiGenerateMock } = vi.hoisted(() => ({
 }))
 import { POST } from "@/app/api/query/route"
 
+vi.mock("@/lib/querylens/server/dataset-runtime", async () => {
+  const { createMockQueryLensDatasetRuntime } = await import(
+    "../helpers/querylens-runtime"
+  )
+
+  return {
+    getQueryLensDatasetRuntime: vi.fn(async () =>
+      createMockQueryLensDatasetRuntime(),
+    ),
+  }
+})
+
+vi.mock("@/lib/querylens/server/retrieval", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("@/lib/querylens/server/retrieval")>()
+
+  return {
+    ...original,
+    getQueryLensRetrievalStore: vi.fn(async () => ({
+      retrieveContext: async () => ({
+        datasetMatches: [],
+        memoryMatches: [],
+        recentMessages: [],
+      }),
+      persistConversation: async () => undefined,
+    })),
+  }
+})
+
 vi.mock("@/lib/querylens/server/gemini-client", () => ({
   createGeminiChatSession: () => ({
     sendMessage: geminiChatSendMock,
@@ -19,7 +48,6 @@ describe("/api/query Gemini parser mode", () => {
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
     process.env.QUERYLENS_REFERENCE_DATE = "2026-04-11"
-    process.env.QUERYLENS_DATA_MODE = "fixture"
   })
 
   afterEach(() => {
@@ -63,6 +91,7 @@ describe("/api/query Gemini parser mode", () => {
       body: JSON.stringify({
         question:
           "Help me understand why North West hospitality cashflow got worse last week",
+        chatId: "gemini-parser-route",
       }),
     })
 

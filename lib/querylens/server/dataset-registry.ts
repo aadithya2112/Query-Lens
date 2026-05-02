@@ -58,10 +58,10 @@ function buildBuiltInDatasetListItem(): DatasetListItem {
   return {
     id: "sme_portfolio",
     label: "SME portfolio",
-    description: "Built-in trust-first sample dataset for the flagship QueryLens flows.",
+    description: "Database-backed SME portfolio dataset for the flagship QueryLens flows.",
     status: "built_in",
     sourceKind: "built_in",
-    sourceMode: "fixture",
+    sourceMode: "database",
   }
 }
 
@@ -189,10 +189,6 @@ function mapDatasetRow(row: DatasetRow, columns: CsvColumnProfile[]): OnboardedD
 }
 
 export async function listRegisteredDatasets(): Promise<DatasetListItem[]> {
-  if (!process.env.POSTGRES_URL) {
-    return [buildBuiltInDatasetListItem()]
-  }
-
   await ensureDatasetRegistryTables()
   const pool = getPgPool()
   const result = await pool.query<Pick<DatasetRow, "id" | "label" | "description" | "status">>(`
@@ -217,10 +213,6 @@ export async function listRegisteredDatasets(): Promise<DatasetListItem[]> {
 export async function getOnboardedDatasetRecord(
   datasetId: DatasetId
 ): Promise<OnboardedDatasetRecord | undefined> {
-  if (!process.env.POSTGRES_URL) {
-    return undefined
-  }
-
   await ensureDatasetRegistryTables()
   const pool = getPgPool()
   const [datasetResult, columnResult] = await Promise.all([

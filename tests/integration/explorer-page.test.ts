@@ -1,4 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server"
+import { describe, expect, it, vi } from "vitest"
+
+vi.mock("@/lib/querylens/server/dataset-runtime", async () => {
+  const { createMockQueryLensDatasetRuntime } = await import(
+    "../helpers/querylens-runtime"
+  )
+
+  return {
+    getQueryLensDatasetRuntime: async () => createMockQueryLensDatasetRuntime(),
+  }
+})
 
 import ExplorerPage from "@/app/explorer/page"
 

@@ -20,7 +20,7 @@ function createAnalysis(overrides: Partial<Phase1AnalysisResponse> = {}): Phase1
     evidence: [],
     assumptions: [],
     supportedFollowUps: ["Break this down by region"],
-    sourceMode: "fixture",
+    sourceMode: "database",
     ...overrides,
   }
 }

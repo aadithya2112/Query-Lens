@@ -123,22 +123,6 @@ export async function analyzeQuery(
     executionContext === "interactive" &&
     canUseGemini(executionContext)
   ) {
-    if (dataAccess.sourceMode !== "database") {
-      return presentBuiltInFallback({
-        fallbackReason:
-          "This custom live-query fallback needs QueryLens connected to live Postgres and MongoDB sources. In fixture mode, QueryLens can still answer the built-in discovery, what-changed, breakdown, and compare questions.",
-        sourceMode: dataAccess.sourceMode,
-        weeklyRows,
-        retrievalContext,
-        inputQuestion: input.question,
-        interpretation: {
-          mode: "fallback",
-          explanation:
-            "QueryLens could not safely map that request into a built-in flow and did not have live databases available for the guarded custom-query path.",
-        },
-      })
-    }
-
     const agenticResponse = await executeAgenticFallback({
       question: input.question,
       dataAccess,

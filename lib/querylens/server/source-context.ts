@@ -13,7 +13,7 @@ interface SourceSummary {
 }
 
 export interface SourceContextPayload {
-  sourceMode: "database" | "fixture"
+  sourceMode: "database"
   sourceHealth: SourceHealth[]
   summaries: SourceSummary[]
   postgresSchema: AgenticSchemaObject[]
@@ -112,9 +112,7 @@ export async function getSourceContextPayload(): Promise<SourceContextPayload> {
       {
         title: "Execution mode",
         description:
-          dataAccess.sourceMode === "database"
-            ? "This workspace is reading from live docker-backed databases in read-only mode."
-            : "This workspace is running against the built-in fixture dataset with the same schema shape.",
+          "This workspace is reading from live docker-backed databases in read-only mode.",
       },
     ],
     postgresSchema: profileSnapshot.schemaSnapshot.postgres,

@@ -8,7 +8,7 @@ const {
   retrieveContextMock,
 } = vi.hoisted(() => {
   const dataAccess = {
-    sourceMode: "database" as "database" | "fixture",
+    sourceMode: "database" as const,
     listWeeklyMetrics: vi.fn(async () => []),
     listDailyMetrics: vi.fn(async () => []),
     getDateCoverage: vi.fn(async () => ({
@@ -216,41 +216,16 @@ describe("/api/query agentic fallback", () => {
     expect(payload.queryRuns).toHaveLength(1)
     expect(payload.resultTable?.rows).toHaveLength(2)
     expect(mockDataAccess.executeReadOnlySql).toHaveBeenCalledOnce()
+    expect(retrieveContextMock).toHaveBeenCalledWith({
+      chatId: "test-clerk-user:agentic-route",
+      question: "How has cashflow health trended over time?",
+    })
+    expect(persistConversationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chatId: "test-clerk-user:agentic-route",
+      }),
+    )
     expect(persistConversationMock).toHaveBeenCalledOnce()
   })
 
-  it("returns an honest fixture-mode fallback instead of pretending live queries ran", async () => {
-    mockDataAccess.sourceMode = "fixture"
-    geminiGenerateMock.mockResolvedValueOnce({
-      functionCalls: [
-        {
-          name: "reject_analytics_query_plan",
-          args: {
-            reason:
-              "This needs a custom live query rather than a built-in intent.",
-          },
-        },
-      ],
-    })
-
-    const request = new Request("http://localhost/api/query", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question: "How has cashflow health trended over time?",
-      }),
-    })
-
-    const response = await POST(request)
-    const payload = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(payload.fallback).toBe(true)
-    expect(payload.summary).toContain(
-      "needs QueryLens connected to live Postgres and MongoDB",
-    )
-    expect(geminiChatSendMock).not.toHaveBeenCalled()
-  })
 })

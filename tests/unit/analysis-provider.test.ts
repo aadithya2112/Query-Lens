@@ -13,6 +13,43 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
   generateGeminiResponse: geminiGenerateMock,
 }))
 
+vi.mock("@/lib/querylens/server/dataset-runtime", async () => {
+  const { createMockQueryLensDatasetRuntime } = await import(
+    "../helpers/querylens-runtime"
+  )
+
+  return {
+    getQueryLensDatasetRuntime: async () => createMockQueryLensDatasetRuntime(),
+  }
+})
+
+vi.mock("@/lib/querylens/server/dataset-registry", () => ({
+  listRegisteredDatasets: async () => [
+    {
+      id: "sme_portfolio",
+      label: "SME portfolio",
+      description:
+        "Database-backed portfolio analytics for weekly SME cashflow health.",
+      status: "built_in",
+      sourceKind: "built_in",
+      sourceMode: "database",
+    },
+  ],
+  getOnboardedDatasetRecord: async () => undefined,
+}))
+
+vi.mock("@/lib/querylens/server/retrieval", () => ({
+  getQueryLensRetrievalStore: async () => ({
+    retrieveContext: async () => ({
+      datasetMatches: [],
+      memoryMatches: [],
+      recentMessages: [],
+    }),
+    persistConversation: async () => undefined,
+    refreshDatasetCatalog: async () => undefined,
+  }),
+}))
+
 function buildWhatChangedPlan(args: {
   rawQuestion: string
   timeframe: "this_week" | "last_week"

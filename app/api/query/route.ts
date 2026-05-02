@@ -1,11 +1,12 @@
 import { z } from "zod"
+import { auth } from "@clerk/nextjs/server"
 
 import { analyzeQuery } from "@/lib/querylens/server/analysis-orchestrator"
 import type { QueryRequestBody } from "@/lib/querylens/types"
 
 const queryRequestSchema = z.object({
   question: z.string().min(1, "Question is required."),
-  chatId: z.string().min(1).optional(),
+  chatId: z.string().min(1, "Chat is required."),
   datasetId: z.string().min(1).optional(),
   action: z
     .enum(["run_follow_up_question", "leadership_summary"])
@@ -25,8 +26,24 @@ const queryRequestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const payload = queryRequestSchema.parse(await request.json()) as QueryRequestBody
-    const response = await analyzeQuery(payload)
+    const { userId: clerkUserId } = await auth()
+
+    if (!clerkUserId) {
+      return Response.json(
+        {
+          error: "Not authenticated.",
+        },
+        { status: 401 },
+      )
+    }
+
+    const payload = queryRequestSchema.parse(
+      await request.json(),
+    ) as QueryRequestBody & { chatId: string }
+    const response = await analyzeQuery({
+      ...payload,
+      chatId: `${clerkUserId}:${payload.chatId}`,
+    })
     return Response.json(response)
   } catch (error) {
     if (error instanceof z.ZodError) {

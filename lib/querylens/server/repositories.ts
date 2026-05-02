@@ -1,4 +1,3 @@
-import { getSampleDataset } from "@/lib/querylens/seed-data"
 import type { AgenticQueryExecutionResult } from "@/lib/querylens/server/agentic-types"
 import {
   CONTEXT_COLLECTIONS,
@@ -151,120 +150,6 @@ function normalizeQueryRows(
     ),
     totalRows: rows.length,
     truncated: rows.length > maxRows,
-  }
-}
-
-class FixtureDataAccess implements QueryLensDataAccess {
-  sourceMode: "fixture" = "fixture"
-
-  async listWeeklyMetrics(): Promise<WeeklyMetricRow[]> {
-    return getSampleDataset().weeklyMetrics
-  }
-
-  async listDailyMetrics(args: {
-    startDate: string
-    endDate: string
-    scope: ScopeFilter
-  }): Promise<DailyAccountMetric[]> {
-    const dataset = getSampleDataset()
-
-    return dataset.dailyMetrics.filter((metric) => {
-      if (metric.date < args.startDate || metric.date > args.endDate) return false
-      if (args.scope.region && metric.regionId !== args.scope.region) return false
-      if (args.scope.sector && metric.sectorId !== args.scope.sector) return false
-      return true
-    })
-  }
-
-  async listWeeklyAccountStress(args: {
-    targetStart: string
-    scope: ScopeFilter
-  }): Promise<WeeklyAccountStressRow[]> {
-    const dataset = getSampleDataset()
-    const grouped = new Map<string, WeeklyAccountStressRow>()
-
-    dataset.dailyMetrics
-      .filter((metric) => {
-        if (metric.weekStart !== args.targetStart) return false
-        if (args.scope.region && metric.regionId !== args.scope.region) return false
-        if (args.scope.sector && metric.sectorId !== args.scope.sector) return false
-        return true
-      })
-      .forEach((metric) => {
-        const account = dataset.accounts.find(
-          (candidate) => candidate.id === metric.accountId
-        )
-        const region = dataset.regions.find(
-          (candidate) => candidate.id === metric.regionId
-        )
-        const sector = dataset.sectors.find(
-          (candidate) => candidate.id === metric.sectorId
-        )
-
-        if (!account || !region || !sector) {
-          return
-        }
-
-        const existing = grouped.get(metric.accountId)
-
-        if (existing) {
-          existing.lowBalanceDays += metric.lowBalanceFlag ? 1 : 0
-          existing.hasOverdue = existing.hasOverdue || metric.overdueFlag
-          return
-        }
-
-        grouped.set(metric.accountId, {
-          weekStart: metric.weekStart,
-          accountId: account.id,
-          regionId: region.id,
-          sectorId: sector.id,
-          regionName: region.name,
-          sectorName: sector.name,
-          lowBalanceDays: metric.lowBalanceFlag ? 1 : 0,
-          hasOverdue: metric.overdueFlag,
-        })
-      })
-
-    return Array.from(grouped.values()).sort((left, right) =>
-      left.accountId.localeCompare(right.accountId)
-    )
-  }
-
-  async listContextEvents(args: {
-    targetStart: string
-    targetEnd: string
-    scope: ScopeFilter
-  }): Promise<ContextEvent[]> {
-    const dataset = getSampleDataset()
-    return CONTEXT_COLLECTIONS.flatMap((collection) => dataset.contextEvents[collection])
-      .filter((event) => {
-        if (event.occurredAt < `${args.targetStart}T00:00:00Z`) return false
-        if (event.occurredAt > `${args.targetEnd}T23:59:59Z`) return false
-        if (args.scope.region && event.regionId && event.regionId !== args.scope.region)
-          return false
-        if (args.scope.sector && event.sectorId && event.sectorId !== args.scope.sector)
-          return false
-        if (args.scope.region && !event.regionId && !event.sectorId) return false
-        return true
-      })
-      .sort(sortContextEvents)
-  }
-
-  async getDateCoverage() {
-    const dates = getSampleDataset().dailyMetrics.map((metric) => metric.date).sort()
-
-    return {
-      startDate: dates[0],
-      endDate: dates.at(-1) ?? dates[0],
-    }
-  }
-
-  async executeReadOnlySql(): Promise<AgenticQueryExecutionResult> {
-    throw new Error("Agentic SQL execution is only available in database mode.")
-  }
-
-  async executeReadOnlyMongoPipeline(): Promise<AgenticQueryExecutionResult> {
-    throw new Error("Agentic Mongo execution is only available in database mode.")
   }
 }
 
@@ -528,10 +413,6 @@ class DatabaseDataAccess implements QueryLensDataAccess {
         : `Returned ${rowset.totalRows} document${rowset.totalRows === 1 ? "" : "s"}.`,
     }
   }
-}
-
-export function createFixtureDataAccess(): QueryLensDataAccess {
-  return new FixtureDataAccess()
 }
 
 export function createDatabaseDataAccess(): QueryLensDataAccess {

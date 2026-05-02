@@ -773,7 +773,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
                       ? "The breakdown slice uses validated planning, account-level weekly stress rollups, and contextual Mongo evidence."
                       : isCompare
                         ? "The compare slice uses validated planning, side-by-side weekly metric rows, and contextual Mongo evidence."
-                        : "The what-changed slice uses validated planning, sample-dataset weekly metrics, and contextual Mongo evidence."}
+                        : "The what-changed slice uses validated planning, database weekly metrics, and contextual Mongo evidence."}
               </p>
               {analysis.retrievalTrace && (
                 <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">

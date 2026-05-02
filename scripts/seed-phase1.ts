@@ -3,9 +3,12 @@ import { Pool } from "pg"
 
 import { getSampleDataset } from "@/lib/querylens/seed-data"
 import {
-  createFixtureDatasetProfileStore,
   buildDatasetCatalogProfile,
 } from "@/lib/querylens/server/profile-store"
+import {
+  AGENTIC_MONGO_COLLECTIONS,
+  AGENTIC_POSTGRES_TABLES,
+} from "@/lib/querylens/server/runtime-shared"
 import {
   buildDatasetCatalogChunks,
 } from "@/lib/querylens/server/retrieval"
@@ -14,10 +17,83 @@ import {
   EMBEDDING_DIMENSIONS,
   formatVectorLiteral,
 } from "@/lib/querylens/server/embedding-service"
+import { getDatasetMetricManifest } from "@/lib/querylens/datasets"
+import type { ContextCollection, DatasetProfileSnapshot, SourceHealth } from "@/lib/querylens/types"
+
+function buildSeedProfileSnapshot(): DatasetProfileSnapshot {
+  const dataset = getSampleDataset()
+  const dailyDates = dataset.dailyMetrics.map((metric) => metric.date).sort()
+  const metricManifest = getDatasetMetricManifest()
+  const mongoTotal = AGENTIC_MONGO_COLLECTIONS.reduce(
+    (total, collection) =>
+      total + dataset.contextEvents[collection.name as ContextCollection].length,
+    0,
+  )
+  const sourceHealth: SourceHealth[] = [
+    {
+      id: "postgres",
+      name: "Postgres facts",
+      type: "postgres",
+      status: "connected",
+      detail: `${dataset.accounts.length} accounts · ${dataset.dailyMetrics.length} daily rows · ${dataset.weeklyMetrics.length} weekly rows`,
+      recordCount: dataset.weeklyMetrics.length,
+    },
+    {
+      id: "mongodb",
+      name: "Mongo context",
+      type: "mongodb",
+      status: "connected",
+      detail: `${mongoTotal} contextual documents across 4 collections`,
+      recordCount: mongoTotal,
+    },
+    {
+      id: "manifest",
+      name: "Metric manifest",
+      type: "manifest",
+      status: "configured",
+      detail: "1 supported metric with fixed weekly definitions",
+      recordCount: metricManifest.metrics.length,
+    },
+  ]
+
+  return {
+    datasetId: "sme_portfolio",
+    sourceMode: "database",
+    dateCoverage: {
+      startDate: dailyDates[0],
+      endDate: dailyDates.at(-1) ?? dailyDates[0],
+    },
+    sourceHealth,
+    schemaSnapshot: {
+      postgres: AGENTIC_POSTGRES_TABLES.map((table) => ({
+        ...table,
+        rowCount:
+          table.name === "regions"
+            ? dataset.regions.length
+            : table.name === "sectors"
+              ? dataset.sectors.length
+              : table.name === "accounts"
+                ? dataset.accounts.length
+                : table.name === "daily_account_metrics"
+                  ? dataset.dailyMetrics.length
+                  : dataset.weeklyMetrics.length,
+      })),
+      mongodb: AGENTIC_MONGO_COLLECTIONS.map((collection) => ({
+        ...collection,
+        rowCount: dataset.contextEvents[collection.name as ContextCollection].length,
+      })),
+    },
+    sourceCounts: sourceHealth.map((source) => ({
+      sourceId: source.id,
+      sourceLabel: source.name,
+      recordCount: source.recordCount ?? 0,
+    })),
+  }
+}
 
 async function seedPostgres(pool: Pool) {
   const dataset = getSampleDataset()
-  const profileStore = createFixtureDatasetProfileStore()
+  const profileSnapshot = buildSeedProfileSnapshot()
 
   await pool.query("BEGIN")
 
@@ -277,7 +353,7 @@ async function seedPostgres(pool: Pool) {
     }
 
     const catalogChunks = buildDatasetCatalogChunks(
-      buildDatasetCatalogProfile(await profileStore.getProfileSnapshot())
+      buildDatasetCatalogProfile(profileSnapshot)
     )
     const catalogEmbeddings = await embedTexts({
       texts: catalogChunks.map((chunk) => chunk.content),

@@ -10,7 +10,16 @@ This roadmap reflects the current product direction for QueryLens:
 - Keep the model integration swappable so the execution and semantic layers do not become provider-bound.
 - Do not treat the OpenRouter migration as a standalone phase before onboarding; fold it into the onboarding implementation behind a provider-agnostic model interface.
 
-## 1. Dataset Onboarding
+## 1. Auth, Sessions, And Saved Sources
+- Use Clerk for authentication so each user has a clean, persistent workspace.
+- Use Convex for app-state persistence: users, chats, messages, source metadata, onboarding runs, active dataset state, and semantic manifests.
+- Store chat history as `user -> chat -> messages`, with each chat linked to the currently active dataset or source when relevant.
+- Persist the context loaded by the user, including uploaded datasets, connected sources, inferred schema summaries, and semantic drafts.
+- For the demo, it is acceptable to store Postgres and MongoDB connection URLs directly so sources can be reused across sessions.
+- Even in the demo, keep the code shaped so connection storage can later be swapped for proper secret handling without rewriting onboarding logic.
+- Treat this as the persistence backbone for the onboarding and querying experience, not just as chat history storage.
+
+## 2. Dataset Onboarding
 - Support CSV uploads as the first-class onboarding path.
 - Support structured JSON and connected Postgres sources next.
 - Support Mongo-backed tabular views where the data can be flattened into an analytic shape.
@@ -28,8 +37,9 @@ This roadmap reflects the current product direction for QueryLens:
 - For MongoDB, inspect collections, sample documents, infer common fields, and derive flattenable tabular views where possible.
 - The first implementation can remain inside the single Next.js app; a separate worker is not required until onboarding jobs become slow or operationally heavy.
 - Onboarded data should be stored or registered in a queryable form before normal question answering begins.
+- The first shipped slice should support `discovery + simple metrics` against newly onboarded datasets, not full parity with the seeded SME demo flows.
 
-## 2. Semantic Layer Generation
+## 3. Semantic Layer Generation
 - Generate a semantic manifest for each onboarded dataset.
 - Define dimensions, measures, derived metrics, synonyms, valid filters, and allowed groupings.
 - Capture source mappings and supported analysis capabilities in metadata.
@@ -37,7 +47,7 @@ This roadmap reflects the current product direction for QueryLens:
 - Make the semantic layer the contract between changing data and trustworthy analytics.
 - The first onboarding slice should end with a semantic draft that is good enough to support a small set of safe questions.
 
-## 3. Agentic Planning With Guardrails
+## 4. Agentic Planning With Guardrails
 - Let the model interpret the user question and choose approved analysis capabilities.
 - Keep the planner agentic, but do not allow unrestricted freeform execution.
 - Add strong prompts, routing constraints, and validation rules around planning.
@@ -45,27 +55,27 @@ This roadmap reflects the current product direction for QueryLens:
 - Make unsupported or ambiguous requests fail clearly and safely.
 - Treat the goal as governed agentic workflows, not open-ended agent behavior.
 
-## 4. Unified Execution Plan
+## 5. Unified Execution Plan
 - Introduce an explicit execution-plan model between planning and execution.
 - Show the interpreted intent, selected metric, timeframe, scope, and sources used.
 - Keep execution deterministic and inspectable once the plan is approved.
 - Make the same execution backbone work for both structured and more agentic flows.
 - Use this as the bridge between flexibility and trust.
 
-## 5. Better Trust And Confidence System
+## 6. Better Trust And Confidence System
 - Replace the single opaque confidence score with clearer trust components.
 - Break confidence into interpretation confidence, data coverage confidence, source corroboration confidence, and execution confidence.
 - Show why the system trusts its own answer.
 - Make trust trace and source trace visible in the product experience.
 - Keep trust as a core capability, not just a visual theme.
 
-## 6. Weekly Briefing
+## 7. Weekly Briefing
 - Add a proactive weekly briefing workflow over onboarded datasets.
 - Generate top changes, biggest movers, strongest drivers, and cross-source context.
 - Make this a hero product experience rather than only relying on user prompts.
 - Use it to demonstrate both intelligence and grounded analysis in demos.
 
-## 7. Text As Contextual Evidence
+## 8. Text As Contextual Evidence
 - Support text files, notes, and documents as contextual evidence.
 - Use text for retrieval, explanation, and corroboration rather than primary metric computation.
 - Keep structured data as the source of analytic truth.

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
-import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
+import { createMockQueryLensDatasetRuntime } from "../helpers/querylens-runtime"
 
 describe("built-in execution stage", () => {
   it("returns typed execution payloads for each shipped built-in intent", async () => {
-    const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
+    const { dataAccess, profileStore } = createMockQueryLensDatasetRuntime()
     const weeklyRows = await dataAccess.listWeeklyMetrics()
     const dateCoverage = await dataAccess.getDateCoverage()
     const profileSnapshot = await profileStore.getProfileSnapshot()
@@ -52,7 +52,7 @@ describe("built-in execution stage", () => {
   })
 
   it("fails at execution when the plan falls outside grounded coverage", async () => {
-    const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
+    const { dataAccess, profileStore } = createMockQueryLensDatasetRuntime()
     const weeklyRows = await dataAccess.listWeeklyMetrics()
     const dateCoverage = await dataAccess.getDateCoverage()
     const profileSnapshot = await profileStore.getProfileSnapshot()
@@ -112,7 +112,7 @@ describe("built-in execution stage", () => {
   })
 
   it("returns a shared execution failure for compare plans missing compare metadata", async () => {
-    const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
+    const { dataAccess, profileStore } = createMockQueryLensDatasetRuntime()
     const weeklyRows = await dataAccess.listWeeklyMetrics()
     const dateCoverage = await dataAccess.getDateCoverage()
     const profileSnapshot = await profileStore.getProfileSnapshot()
