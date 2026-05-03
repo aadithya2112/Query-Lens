@@ -86,12 +86,40 @@ describe("EvidencePanel", () => {
 
     const html = renderToStaticMarkup(<EvidencePanel analysis={analysis} />)
 
-    expect(html).toContain("Source audit")
+    expect(html).toContain("Trust snapshot")
+    expect(html).toContain("What was inspected vs used")
     expect(html).toContain("Available sources")
     expect(html).toContain("Inspected sources")
     expect(html).toContain("Used in answer")
+    expect(html).toContain("What queries ran")
     expect(html).toContain("Execution trace (agentic:test)")
     expect(html).toContain("Entered bounded multi-source agent.")
     expect(html).toContain("source_read")
+  })
+
+  it("renders conversational guidance without dense trust sections", () => {
+    const analysis: Phase1AnalysisResponse = {
+      intent: "what_changed",
+      headline: "Hi - I can help with your portfolio data",
+      summary:
+        "I can answer grounded questions about cashflow health, regions, sectors, and sources.",
+      metric: "cashflow_health_score",
+      timeframe: "Conversation",
+      comparisonBasis: "Conversational guidance (no analytical query was run)",
+      confidence: 24,
+      activeScope: "Conversation",
+      drivers: [],
+      evidence: [],
+      assumptions: [],
+      supportedFollowUps: ["What data is currently stored?"],
+      fallback: true,
+      sourceMode: "database",
+    }
+
+    const html = renderToStaticMarkup(<EvidencePanel analysis={analysis} />)
+
+    expect(html).toContain("Conversation guidance")
+    expect(html).toContain("Suggested prompts")
+    expect(html).not.toContain("Trust snapshot")
   })
 })

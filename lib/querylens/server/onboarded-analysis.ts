@@ -3,6 +3,7 @@ import { z } from "zod"
 import { getDefaultDatasetId, isBuiltInDatasetId } from "@/lib/querylens/datasets"
 import { getOnboardedDatasetRecord } from "@/lib/querylens/server/dataset-registry"
 import { canUseReasoningProvider, type QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
+import { classifyBroadQuestion } from "@/lib/querylens/server/question-capabilities"
 import { generateStructuredData } from "@/lib/querylens/server/reasoning-provider"
 import { getPgPool } from "@/lib/querylens/server/runtime-shared"
 import type {
@@ -427,6 +428,131 @@ function buildDiscoveryResponse(record: OnboardedDatasetRecord): Phase1AnalysisR
   }
 }
 
+export function buildCsvPreviewResponse(record: OnboardedDatasetRecord): Phase1AnalysisResponse {
+  return {
+    intent: "discovery",
+    headline: `${record.label} CSV preview`,
+    summary: `${record.label} has ${record.rowCount.toLocaleString()} uploaded CSV rows across ${record.columns.length} columns. The table below shows the saved bounded preview so you can inspect the raw shape before asking for aggregates or trends.`,
+    metric: "dataset_catalog",
+    timeframe: record.semanticDraft.timeCoverage,
+    comparisonBasis: "Uploaded CSV preview rows",
+    confidence: 82,
+    activeScope: record.label,
+    drivers: [
+      {
+        id: "csv-preview-rows",
+        title: `${record.previewRows.totalRows.toLocaleString()} preview rows are available`,
+        impactLabel: `${record.previewRows.totalRows} rows`,
+        direction: "positive",
+        description:
+          "QueryLens uses the stored preview to show the CSV shape without spending the bounded custom-query budget.",
+      },
+    ],
+    evidence: buildSourceEvidence(
+      `${record.label} preview includes ${record.previewRows.columns.length} columns and ${record.previewRows.totalRows} saved rows.`,
+    ),
+    assumptions: record.semanticDraft.notes,
+    supportedFollowUps: [
+      "Help me understand each column in this CSV.",
+      ...record.semanticDraft.metrics.flatMap((metric) => metric.exampleQuestions ?? []).slice(0, 3),
+    ],
+    resultTable: record.previewRows,
+    sourceMode: "database",
+  }
+}
+
+export function buildOnboardedSourceCatalogResponse(
+  record: OnboardedDatasetRecord,
+): Phase1AnalysisResponse {
+  const metricLabels = record.semanticDraft.metrics.map((metric) => metric.label)
+  const dimensionLabels = record.semanticDraft.dimensions.map((dimension) => dimension.label)
+  const columnRows = record.columns.map((column) => ({
+    column: column.normalizedName,
+    label: column.label,
+    type: column.type,
+    role: column.isMeasure
+      ? "measure"
+      : column.isTimeField
+        ? "time"
+        : column.isDimension
+          ? "dimension"
+          : column.isIdentifier
+            ? "identifier"
+            : "attribute",
+    distinctCount: column.distinctCount,
+    nullRatio: column.nullRatio,
+  }))
+
+  return {
+    intent: "discovery",
+    headline: `${record.label} source and column breakdown`,
+    summary: `${record.label} is stored as the ${record.tableName} uploaded CSV table with ${record.rowCount.toLocaleString()} rows. QueryLens inferred ${metricLabels.length} measures and ${dimensionLabels.length} dimensions from ${record.columns.length} columns.`,
+    metric: "dataset_catalog",
+    timeframe: record.semanticDraft.timeCoverage,
+    comparisonBasis: "Uploaded CSV schema and semantic draft",
+    confidence: 82,
+    activeScope: record.label,
+    drivers: [
+      {
+        id: "csv-column-count",
+        title: `${record.columns.length} columns are profiled`,
+        impactLabel: `${record.columns.length} columns`,
+        direction: "positive",
+        description:
+          "Each column has a detected type and role so QueryLens can decide whether to preview, group, aggregate, or trend it.",
+      },
+    ],
+    evidence: buildSourceEvidence(
+      `${record.label} is stored in ${record.tableName} with ${record.rowCount} imported rows.`,
+    ),
+    assumptions: record.semanticDraft.notes,
+    supportedFollowUps: [
+      "Show me the data in csv",
+      ...record.semanticDraft.metrics.flatMap((metric) => metric.exampleQuestions ?? []).slice(0, 3),
+    ],
+    discoverySummary: {
+      datasetLabel: record.label,
+      sourceLabels: ["Onboarded CSV facts", "Semantic draft"],
+      metricCount: metricLabels.length,
+      timeCoverage: record.semanticDraft.timeCoverage,
+      dimensionLabels,
+    },
+    catalogSections: [
+      {
+        id: "csv-source",
+        title: "Uploaded CSV source",
+        summary: `${record.tableName} stores ${record.rowCount.toLocaleString()} imported rows.`,
+        items: [
+          `${record.rowCount.toLocaleString()} rows`,
+          `${record.columns.length} columns`,
+          record.primaryTimeField
+            ? `Primary time field: ${record.primaryTimeField}`
+            : "No primary time field detected",
+        ],
+      },
+      {
+        id: "csv-measures",
+        title: "Inferred measures",
+        summary: metricLabels.join(", ") || "No numeric measures inferred.",
+        items: metricLabels,
+      },
+      {
+        id: "csv-dimensions",
+        title: "Inferred dimensions",
+        summary: dimensionLabels.join(", ") || "No categorical dimensions inferred.",
+        items: dimensionLabels,
+      },
+    ],
+    resultTable: {
+      columns: ["column", "label", "type", "role", "distinctCount", "nullRatio"],
+      rows: columnRows,
+      totalRows: columnRows.length,
+      truncated: false,
+    },
+    sourceMode: "database",
+  }
+}
+
 function buildChartFromRows(args: {
   type: "bar" | "line"
   title: string
@@ -464,6 +590,144 @@ function buildChartFromRows(args: {
     yKey: args.yKey,
     data,
   }
+}
+
+export async function buildOnboardedVisualOverviewResponse(
+  record: OnboardedDatasetRecord,
+): Promise<Phase1AnalysisResponse> {
+  const firstMetric = record.semanticDraft.metrics[0]
+  const metricColumn = firstMetric ? findMetricColumn(record, firstMetric.id) : undefined
+  const firstDimension = record.semanticDraft.dimensions[0]
+  const dimensionColumn = firstDimension
+    ? findDimensionColumn(record, firstDimension.id)
+    : undefined
+
+  if (!metricColumn) {
+    return buildCsvPreviewResponse(record)
+  }
+
+  if (dimensionColumn) {
+    const statement = `
+      SELECT
+        ${quoteIdentifier(dimensionColumn.normalizedName)} AS label,
+        SUM(${quoteIdentifier(metricColumn.normalizedName)})::double precision AS value
+      FROM ${quoteIdentifier(record.tableName)}
+      GROUP BY 1
+      ORDER BY 2 DESC NULLS LAST
+      LIMIT 12
+    `.trim()
+    const result = await runSql(statement)
+    const topLabel = String(result.rows[0]?.label ?? "the top group")
+    const summary = `${metricColumn.label} is highest for ${topLabel} when grouped by ${dimensionColumn.label.toLowerCase()}. The chart highlights the most important breakdown QueryLens can infer from the uploaded CSV metadata.`
+
+    return {
+      intent: "aggregate",
+      headline: `${record.label} key visual overview`,
+      summary,
+      metric: metricColumn.normalizedName,
+      timeframe: record.semanticDraft.timeCoverage,
+      comparisonBasis: "Deterministic visual overview over imported CSV rows",
+      confidence: 83,
+      activeScope: record.label,
+      drivers: [
+        {
+          id: "csv-top-group",
+          title: `${topLabel} leads the visible grouped view`,
+          impactLabel: "Top group",
+          direction: "positive",
+          description: summary,
+        },
+      ],
+      chartSpec: buildChartFromRows({
+        type: "bar",
+        title: `${metricColumn.label} by ${dimensionColumn.label}`,
+        explanation:
+          "QueryLens selected the first inferred measure and dimension to provide a bounded visual overview.",
+        xKey: "label",
+        yKey: "value",
+        rows: result.table.rows,
+      }),
+      evidence: buildSourceEvidence(summary),
+      assumptions: record.semanticDraft.notes,
+      supportedFollowUps: [
+        "Show me the data in csv",
+        `What is the total ${metricColumn.label.toLowerCase()}?`,
+        record.primaryTimeField
+          ? `Show the trend of ${metricColumn.label.toLowerCase()} over time.`
+          : "Help me understand each column in this CSV.",
+      ],
+      resultTable: result.table,
+      queryRuns: [
+        buildQueryRun({
+          id: "onboarded-visual-overview",
+          title: `${metricColumn.label} by ${dimensionColumn.label}`,
+          sourceId: record.id,
+          sourceLabel: record.label,
+          statement,
+          rowCount: result.table.totalRows,
+          summary,
+        }),
+      ],
+      sourceMode: "database",
+    }
+  }
+
+  if (record.primaryTimeField) {
+    const statement = `
+      SELECT
+        ${quoteIdentifier(record.primaryTimeField)} AS period,
+        SUM(${quoteIdentifier(metricColumn.normalizedName)})::double precision AS value
+      FROM ${quoteIdentifier(record.tableName)}
+      WHERE ${quoteIdentifier(record.primaryTimeField)} IS NOT NULL
+      GROUP BY 1
+      ORDER BY 1 ASC
+      LIMIT 60
+    `.trim()
+    const result = await runSql(statement)
+    const summary = `${metricColumn.label} is visualized over ${record.primaryTimeField}, the primary time field detected during CSV onboarding.`
+
+    return {
+      intent: "trend",
+      headline: `${record.label} key trend overview`,
+      summary,
+      metric: metricColumn.normalizedName,
+      timeframe: record.semanticDraft.timeCoverage,
+      comparisonBasis: `Deterministic trend over ${record.primaryTimeField}`,
+      confidence: 82,
+      activeScope: record.label,
+      drivers: [],
+      chartSpec: buildChartFromRows({
+        type: "line",
+        title: `${metricColumn.label} over time`,
+        explanation:
+          "QueryLens selected the first inferred measure and primary time field to provide a bounded visual overview.",
+        xKey: "period",
+        yKey: "value",
+        rows: result.table.rows,
+      }),
+      evidence: buildSourceEvidence(summary),
+      assumptions: record.semanticDraft.notes,
+      supportedFollowUps: [
+        "Show me the data in csv",
+        `What is the total ${metricColumn.label.toLowerCase()}?`,
+      ],
+      resultTable: result.table,
+      queryRuns: [
+        buildQueryRun({
+          id: "onboarded-visual-trend",
+          title: `${metricColumn.label} over time`,
+          sourceId: record.id,
+          sourceLabel: record.label,
+          statement,
+          rowCount: result.table.totalRows,
+          summary,
+        }),
+      ],
+      sourceMode: "database",
+    }
+  }
+
+  return buildCsvPreviewResponse(record)
 }
 
 export async function analyzeOnboardedDatasetQuery(args: {
@@ -512,6 +776,19 @@ export async function analyzeOnboardedDatasetQuery(args: {
       },
       reason: "QueryLens could not find that onboarded dataset.",
     })
+  }
+
+  const broadCapability = classifyBroadQuestion(args.input.question)
+  if (broadCapability === "csv_preview") {
+    return buildCsvPreviewResponse(record)
+  }
+
+  if (broadCapability === "source_catalog") {
+    return buildOnboardedSourceCatalogResponse(record)
+  }
+
+  if (broadCapability === "visual_overview") {
+    return buildOnboardedVisualOverviewResponse(record)
   }
 
   const planned = await planOnboardedQuery(

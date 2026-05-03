@@ -214,4 +214,56 @@ describe("analysis orchestrator routing", () => {
     expect(executeAgenticFallbackMock).toHaveBeenCalledOnce()
     expect(response.intent).toBe("agentic_query")
   })
+
+  it("does not invoke agentic fallback when built-in pipeline returns conversational guidance", async () => {
+    runBuiltInAnalysisPipelineMock.mockResolvedValue({
+      kind: "response",
+      response: {
+        intent: "what_changed",
+        headline: "Hi - I can help with your portfolio data",
+        summary: "Ask a portfolio question and I will ground it in the dataset.",
+        metric: "cashflow_health_score",
+        timeframe: "Conversation",
+        comparisonBasis: "Conversational guidance (no analytical query was run)",
+        confidence: 24,
+        activeScope: "Conversation",
+        drivers: [],
+        evidence: [],
+        assumptions: [],
+        supportedFollowUps: ["What data is currently stored?"],
+        fallback: true,
+        sourceMode: "database",
+      },
+    })
+
+    const { analyzeQuery } = await import(
+      "@/lib/querylens/server/analysis-orchestrator"
+    )
+
+    const response = await analyzeQuery({
+      question: "Hi",
+      chatId: "conversational-route",
+    })
+
+    expect(executeAgenticFallbackMock).not.toHaveBeenCalled()
+    expect(response.timeframe).toBe("Conversation")
+    expect(persistConversationMock).toHaveBeenCalledOnce()
+  })
+
+  it("short-circuits greetings before built-in planning and agentic fallback", async () => {
+    const { analyzeQuery } = await import(
+      "@/lib/querylens/server/analysis-orchestrator"
+    )
+
+    const response = await analyzeQuery({
+      question: "Hello",
+      chatId: "hello-route",
+    })
+
+    expect(runBuiltInAnalysisPipelineMock).not.toHaveBeenCalled()
+    expect(executeAgenticFallbackMock).not.toHaveBeenCalled()
+    expect(response.timeframe).toBe("Conversation")
+    expect(response.summary).toContain("grounded questions")
+    expect(persistConversationMock).toHaveBeenCalledOnce()
+  })
 })

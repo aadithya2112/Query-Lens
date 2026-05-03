@@ -180,6 +180,19 @@ describe("query planner", () => {
     })
   })
 
+  it("creates a discovery plan for current data and context wording", () => {
+    const result = planDeterministicQuery(
+      "Explain me about the current data that's stored and the context that you have.",
+    )
+
+    expect(result.plan).toMatchObject({
+      intent: "discovery",
+      metricId: "dataset_catalog",
+      discoveryFocus: "sources",
+      scopeDimensions: ["portfolio"],
+    })
+  })
+
   it("rejects mixed-dimension peer compare", () => {
     const result = planDeterministicQuery(
       "Compare North West vs retail cashflow health last week."

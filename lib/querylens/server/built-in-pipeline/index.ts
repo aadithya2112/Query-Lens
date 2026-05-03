@@ -56,6 +56,7 @@ export async function runBuiltInAnalysisPipeline(args: {
         retrievalContext: args.retrievalContext,
         inputQuestion: args.input.question,
         interpretation: planning.interpretation,
+        isConversational: planning.isConversationalFallback,
         executionTrace: buildPlanningFallbackExecutionTrace({
           inputQuestion: args.input.question,
           fallbackReason:

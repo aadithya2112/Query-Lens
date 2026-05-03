@@ -54,6 +54,41 @@ export function shouldShowFollowUpActions(args: {
   )
 }
 
+export function isConversationalReply(analysis: Phase1AnalysisResponse) {
+  return analysis.fallback === true && analysis.timeframe === "Conversation"
+}
+
+function resolveVisibleTrustLabel(analysis: Phase1AnalysisResponse) {
+  if (analysis.trust?.overall.label) {
+    return analysis.trust.overall.label
+  }
+
+  const score = getVisibleConfidenceScore(analysis)
+  if (score >= 75) {
+    return "high"
+  }
+  if (score >= 50) {
+    return "medium"
+  }
+  return "low"
+}
+
+export function getTrustCueSummary(analysis: Phase1AnalysisResponse) {
+  const usedSources =
+    analysis.trust?.sources.length ??
+    analysis.trustArtifacts?.sourcesUsed.length ??
+    analysis.sourceAudit?.used.length ??
+    analysis.evidence.length
+  const queries = analysis.queryRuns?.length ?? 0
+
+  return {
+    trustLabel: resolveVisibleTrustLabel(analysis),
+    confidenceScore: getVisibleConfidenceScore(analysis),
+    usedSources,
+    queries,
+  }
+}
+
 function resolveVisibleActions(
   analysis: Phase1AnalysisResponse,
 ): FollowUpAction[] {
@@ -149,11 +184,11 @@ function QueryRunsDisclosure({ analysis }: { analysis: Phase1AnalysisResponse })
   }
 
   return (
-    <div className="mt-4 rounded-[22px] border border-border bg-background/30 px-4 py-4">
-      <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-4">
-        Queries used
-      </div>
-      <div className="space-y-4">
+    <details className="mt-4 rounded-[22px] border border-border bg-background/30 px-4 py-4">
+      <summary className="cursor-pointer list-none font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors">
+        What queries ran ({analysis.queryRuns.length})
+      </summary>
+      <div className="mt-4 space-y-4">
         {analysis.queryRuns.map((queryRun) => (
           <div
             key={queryRun.id}
@@ -175,11 +210,42 @@ function QueryRunsDisclosure({ analysis }: { analysis: Phase1AnalysisResponse })
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {queryRun.summary}
             </p>
-            <pre className="mt-3 overflow-x-auto rounded-2xl border border-border bg-black/30 p-3 text-xs leading-6 text-foreground">
-              <code>{queryRun.statement}</code>
-            </pre>
+            <details className="mt-3 rounded-2xl border border-border bg-background/30 px-3 py-3">
+              <summary className="cursor-pointer list-none font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors">
+                Show statement
+              </summary>
+              <pre className="mt-3 overflow-x-auto rounded-2xl border border-border bg-black/30 p-3 text-xs leading-6 text-foreground">
+                <code>{queryRun.statement}</code>
+              </pre>
+            </details>
           </div>
         ))}
+      </div>
+    </details>
+  )
+}
+
+function TrustCueStrip({ analysis }: { analysis: Phase1AnalysisResponse }) {
+  const cue = getTrustCueSummary(analysis)
+
+  return (
+    <div className="mt-4 rounded-2xl border border-border bg-background/35 px-3 py-3">
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        Trust cue
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded-full border border-border px-2 py-1 capitalize text-foreground">
+          {cue.trustLabel} trust
+        </span>
+        <span className="rounded-full border border-border px-2 py-1 text-muted-foreground">
+          {cue.confidenceScore}% confidence
+        </span>
+        <span className="rounded-full border border-border px-2 py-1 text-muted-foreground">
+          {cue.usedSources} source{cue.usedSources === 1 ? "" : "s"} used
+        </span>
+        <span className="rounded-full border border-border px-2 py-1 text-muted-foreground">
+          {cue.queries} quer{cue.queries === 1 ? "y" : "ies"} ran
+        </span>
       </div>
     </div>
   )
@@ -200,6 +266,7 @@ function AssistantMessage({
 }) {
   const analysis = message.analysis
   const followUpActions = analysis ? resolveVisibleActions(analysis) : []
+  const hideTrustUi = analysis ? isConversationalReply(analysis) : false
 
   return (
     <div className="ql-enter rounded-3xl border border-border bg-card/50 px-4 py-4">
@@ -248,7 +315,7 @@ function AssistantMessage({
       )}
 
       {analysis && <InlineResultTable analysis={analysis} />}
-      {analysis && <QueryRunsDisclosure analysis={analysis} />}
+      {analysis && !hideTrustUi && <QueryRunsDisclosure analysis={analysis} />}
 
       {analysis && (
         <div className="mt-4 border-t border-border pt-4">
@@ -256,10 +323,13 @@ function AssistantMessage({
             <span className="text-xs text-muted-foreground">
               {analysis.timeframe}
             </span>
-            <span className="font-mono text-xs text-muted-foreground">
-              confidence {getVisibleConfidenceScore(analysis)}%
-            </span>
+            {!hideTrustUi && (
+              <span className="font-mono text-xs text-muted-foreground">
+                confidence {getVisibleConfidenceScore(analysis)}%
+              </span>
+            )}
           </div>
+          {!hideTrustUi && <TrustCueStrip analysis={analysis} />}
           {analysis.conversationContextUsed && (
             <p className="mt-3 text-xs text-muted-foreground">
               Conversation context was used to interpret this reply.
@@ -270,25 +340,30 @@ function AssistantMessage({
             messageText: message.text,
             followUpCount: followUpActions.length,
           }) && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {followUpActions.map((followUp) => (
-                <button
-                  key={followUp.id}
-                  className="rounded-full border border-border px-3 py-1.5 text-left text-xs bg-muted/20 text-muted-foreground transition hover:border-muted-foreground hover:text-foreground"
-                  onClick={() =>
-                    onSend(followUp.question, {
-                      action: followUp.actionType,
-                      sourceAnalysis:
-                        followUp.actionType === "leadership_summary"
-                          ? analysis
-                          : undefined,
-                    })
-                  }
-                  type="button"
-                >
-                  {followUp.label}
-                </button>
-              ))}
+            <div className="mt-4">
+              <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
+                Grounded next steps
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {followUpActions.map((followUp) => (
+                  <button
+                    key={followUp.id}
+                    className="rounded-full border border-border px-3 py-1.5 text-left text-xs bg-muted/20 text-muted-foreground transition hover:border-muted-foreground hover:text-foreground"
+                    onClick={() =>
+                      onSend(followUp.question, {
+                        action: followUp.actionType,
+                        sourceAnalysis:
+                          followUp.actionType === "leadership_summary"
+                            ? analysis
+                            : undefined,
+                      })
+                    }
+                    type="button"
+                  >
+                    {followUp.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

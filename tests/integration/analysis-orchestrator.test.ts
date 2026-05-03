@@ -2,7 +2,12 @@ import { vi } from "vitest"
 
 import { analyzeQuery } from "@/lib/querylens/server/analysis-orchestrator"
 
-const { persistedMessagesByChat, retrieveContextMock, persistConversationMock } =
+const {
+  persistedMessagesByChat,
+  retrieveContextMock,
+  persistConversationMock,
+  activeCsvDataset,
+} =
   vi.hoisted(() => ({
     persistedMessagesByChat: new Map<
       string,
@@ -48,6 +53,97 @@ const { persistedMessagesByChat, retrieveContextMock, persistConversationMock } 
         ])
       },
     ),
+    activeCsvDataset: {
+      id: "csv_sample",
+      label: "Sample",
+      description: "Uploaded sample sales CSV",
+      status: "active",
+      sourceKind: "csv",
+      sourceMode: "database",
+      tableName: "querylens_dataset_rows_csv_sample",
+      rowCount: 30,
+      primaryTimeField: "date",
+      grain: "daily",
+      manifestVersion: 1,
+      createdAt: "2026-05-03T00:00:00.000Z",
+      updatedAt: "2026-05-03T00:00:00.000Z",
+      semanticDraft: {
+        datasetId: "csv_sample",
+        datasetLabel: "Sample",
+        description: "Uploaded sample sales CSV",
+        sourceMode: "database",
+        timeCoverage: "2026-04-01 to 2026-04-03",
+        dimensions: [
+          {
+            id: "region",
+            label: "Region",
+            columnId: "region",
+          },
+        ],
+        metrics: [
+          {
+            id: "revenue",
+            label: "Revenue",
+            supportedIntents: ["aggregate", "trend", "discovery"],
+            columnId: "revenue",
+            exampleQuestions: ["Show revenue by region."],
+          },
+        ],
+        sources: [],
+        notes: ["CSV semantics are inferred from uploaded columns."],
+      },
+      profileSnapshot: undefined,
+      columns: [
+        {
+          name: "date",
+          normalizedName: "date",
+          label: "Date",
+          type: "date",
+          nullRatio: 0,
+          distinctCount: 3,
+          sampleValues: ["2026-04-01"],
+          isIdentifier: false,
+          isDimension: true,
+          isMeasure: false,
+          isTimeField: true,
+        },
+        {
+          name: "region",
+          normalizedName: "region",
+          label: "Region",
+          type: "string",
+          nullRatio: 0,
+          distinctCount: 3,
+          sampleValues: ["North"],
+          isIdentifier: false,
+          isDimension: true,
+          isMeasure: false,
+          isTimeField: false,
+        },
+        {
+          name: "revenue",
+          normalizedName: "revenue",
+          label: "Revenue",
+          type: "number",
+          nullRatio: 0,
+          distinctCount: 3,
+          sampleValues: [120],
+          isIdentifier: false,
+          isDimension: false,
+          isMeasure: true,
+          isTimeField: false,
+        },
+      ],
+      previewRows: {
+        columns: ["date", "region", "revenue"],
+        rows: [
+          { date: "2026-04-01", region: "North", revenue: 120 },
+          { date: "2026-04-02", region: "South", revenue: 180 },
+        ],
+        totalRows: 2,
+        truncated: false,
+      },
+    },
   }))
 
 vi.mock("@/lib/querylens/server/dataset-runtime", async () => {
@@ -74,6 +170,12 @@ vi.mock("@/lib/querylens/server/retrieval", async (importOriginal) => {
     })),
   }
 })
+
+vi.mock("@/lib/querylens/server/dataset-registry", () => ({
+  getOnboardedDatasetRecord: async (datasetId: string) =>
+    datasetId === activeCsvDataset.id ? activeCsvDataset : undefined,
+  listOnboardedDatasetRecords: async () => [activeCsvDataset],
+}))
 
 describe("analysis orchestrator", () => {
   beforeEach(() => {
@@ -165,6 +267,62 @@ describe("analysis orchestrator", () => {
     expect(payload.summary).toContain("database-backed dataset boundaries")
     expect(payload.catalogSections?.length).toBeGreaterThan(0)
     expect(payload.evidence.length).toBeGreaterThan(0)
+  })
+
+  it("dispatches current data and context wording through the discovery executor", async () => {
+    const payload = await analyzeQuery({
+      question:
+        "Explain me about the current data that's stored and the context that you have.",
+      chatId: "discovery-context-test",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.intent).toBe("discovery")
+    expect(payload.metric).toBe("dataset_catalog")
+    expect(payload.discoverySummary?.sourceLabels.length).toBeGreaterThan(0)
+    expect(payload.trust?.overall.level).not.toBe("low")
+  })
+
+  it("answers uploaded CSV preview requests without agentic fallback", async () => {
+    const payload = await analyzeQuery({
+      question: "Show me the data in csv",
+      chatId: "csv-preview-test",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.intent).toBe("discovery")
+    expect(payload.headline).toContain("CSV preview")
+    expect(payload.resultTable?.columns).toEqual(["date", "region", "revenue"])
+    expect(payload.executionTrace?.entries.some((entry) => entry.stage === "fallback")).not.toBe(
+      true,
+    )
+  })
+
+  it("answers source and table breakdown requests deterministically", async () => {
+    const payload = await analyzeQuery({
+      question:
+        "Help me understand the data that's currently in the context, break it down by each table and source and what kind of data is stored.",
+      chatId: "source-catalog-test",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.intent).toBe("discovery")
+    expect(payload.catalogSections?.some((section) => section.title.includes("Postgres"))).toBe(
+      true,
+    )
+    expect(payload.resultTable?.rows.some((row) => row.object === "Sample")).toBe(true)
+  })
+
+  it("answers visual overview requests with a chart before agentic fallback", async () => {
+    const payload = await analyzeQuery({
+      question: "Visualize the data and show me the most important information",
+      chatId: "visual-overview-test",
+    })
+
+    expect(payload.fallback).not.toBe(true)
+    expect(payload.chartSpec).toBeDefined()
+    expect(payload.metric).toBe("cashflow_health_score")
+    expect(payload.drivers.length).toBeGreaterThan(0)
   })
 
   it("dispatches custom-range breakdown questions through the breakdown executor", async () => {

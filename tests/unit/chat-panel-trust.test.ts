@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  getTrustCueSummary,
   getVisibleConfidenceScore,
+  isConversationalReply,
   shouldShowFollowUpActions,
 } from "@/components/querylens/chat-panel"
 import type { Phase1AnalysisResponse } from "@/lib/querylens/types"
@@ -166,6 +168,93 @@ describe("chat-panel trust helpers", () => {
         messageText: "QueryLens could not complete that custom analysis safely",
         followUpCount: 1,
       }),
+    ).toBe(false)
+  })
+
+  it("builds a trust cue summary from first-class trust metadata", () => {
+    const analysis = createAnalysis({
+      queryRuns: [
+        {
+          id: "run-1",
+          title: "Weekly trend",
+          sourceId: "built_in_postgres",
+          sourceLabel: "Built-in Postgres facts",
+          sourceType: "postgres",
+          language: "sql",
+          statement: "select 1",
+          status: "completed",
+          rowCount: 2,
+          summary: "Returned 2 rows.",
+        },
+      ],
+      trust: {
+        overall: {
+          score: 88,
+          label: "high",
+        },
+        components: {
+          interpretation: {
+            score: 92,
+            label: "high",
+            reason: "Direct match.",
+          },
+          dataCoverage: {
+            score: 92,
+            label: "high",
+            reason: "Coverage approved.",
+          },
+          sourceCorroboration: {
+            score: 68,
+            label: "medium",
+            reason: "Single-source evidence.",
+          },
+          execution: {
+            score: 92,
+            label: "high",
+            reason: "Dispatch completed.",
+          },
+        },
+        trace: [],
+        howProduced: [],
+        uncertaintyNotes: [],
+        limitationNotes: [],
+        sources: [
+          {
+            sourceType: "postgres",
+            sourceName: "Built-in Postgres facts",
+            scope: "Portfolio",
+            timeRange: "Last week",
+            note: "Used in answer synthesis.",
+          },
+        ],
+        observedFacts: [],
+        inferredFindings: [],
+        assumptions: [],
+      },
+    })
+
+    expect(getTrustCueSummary(analysis)).toEqual({
+      trustLabel: "high",
+      confidenceScore: 88,
+      usedSources: 1,
+      queries: 1,
+    })
+  })
+
+  it("detects conversational fallback replies", () => {
+    const analysis = createAnalysis({
+      fallback: true,
+      timeframe: "Conversation",
+    })
+
+    expect(isConversationalReply(analysis)).toBe(true)
+    expect(
+      isConversationalReply(
+        createAnalysis({
+          fallback: true,
+          timeframe: "Last week",
+        }),
+      ),
     ).toBe(false)
   })
 })

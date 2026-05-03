@@ -93,7 +93,7 @@ function isCompareIntent(normalizedQuestion: string) {
 }
 
 function isDiscoveryIntent(normalizedQuestion: string) {
-  return /(what data|type of data|data types?|what is stored|currently stored|currently used|what can i ask|what metrics|which metrics|which sources|what sources|what regions|what sectors|time range|time coverage|what data do we have|what is available|available data)/.test(
+  return /(what data|current data|type of data|data types?|what is stored|currently stored|data (?:that )?(?:is |s )?stored|stored data|currently used|context (?:(?:that )?you have|available)|available context|what can i ask|what metrics|which metrics|which sources|what sources|what regions|what sectors|time range|time coverage|what data do we have|what is available|available data)/.test(
     normalizedQuestion,
   )
 }
@@ -104,7 +104,9 @@ function resolveDiscoveryFocus(normalizedQuestion: string): DiscoveryFocus {
   }
 
   if (
-    /(which sources|what sources|connected sources)/.test(normalizedQuestion)
+    /(which sources|what sources|connected sources|context (?:that )?you have|available context)/.test(
+      normalizedQuestion,
+    )
   ) {
     return "sources"
   }

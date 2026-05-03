@@ -316,6 +316,7 @@ export function presentBuiltInFallback(args: {
   retrievalContext: RetrievalContext
   inputQuestion: string
   interpretation: BuiltInInterpretationSeed
+  isConversational?: boolean
   executionTrace?: ExecutionTrace
   trustContext?: BuiltInTrustContext
 }) {
@@ -324,6 +325,7 @@ export function presentBuiltInFallback(args: {
     sourceMode: args.sourceMode,
     rows: args.weeklyRows,
     executionTrace: args.executionTrace,
+    isConversational: args.isConversational,
   })
 
   return finalizeBuiltInResponse({

@@ -266,7 +266,7 @@ function EvidenceColumn({
       <aside className="flex h-full min-w-0 flex-col items-center border-l border-border bg-muted/10 py-3">
         <Button
           aria-expanded={false}
-          aria-label="Expand truth panel"
+          aria-label="Expand evidence and trust panel"
           className="h-8 w-8 shrink-0"
           onClick={onExpand}
           size="icon"
@@ -276,7 +276,7 @@ function EvidenceColumn({
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="mt-3 text-[10px] font-mono uppercase tracking-[0.22em] text-muted-foreground [writing-mode:vertical-rl]">
-          Truth
+          Evidence
         </span>
       </aside>
     )
@@ -287,7 +287,7 @@ function EvidenceColumn({
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Truth
+            Evidence & Trust
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Grounding, evidence, and trust signals
@@ -299,7 +299,7 @@ function EvidenceColumn({
           </div>
           <Button
             aria-expanded
-            aria-label="Collapse truth panel"
+            aria-label="Collapse evidence and trust panel"
             className="h-8 w-8"
             onClick={onCollapse}
             size="icon"
@@ -349,7 +349,7 @@ function MobileWorkspaceToolbar({
           variant="outline"
         >
           <Shield className="h-4 w-4" />
-          Truth
+          Evidence & Trust
         </Button>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -841,23 +841,23 @@ function AuthenticatedWorkspace({
                 className="gap-0 p-0 [&>button]:hidden"
               >
                 <SheetHeader className="sr-only">
-                  <SheetTitle>Truth</SheetTitle>
+                  <SheetTitle>Evidence and trust</SheetTitle>
                   <SheetDescription>
-                    Grounding, evidence, and trust signals for the active answer.
+                    Grounding evidence and trust signals for the active answer.
                   </SheetDescription>
                 </SheetHeader>
                 <div className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/10">
                   <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
                     <div className="min-w-0">
                       <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        Truth
+                        Evidence & Trust
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Grounding, evidence, and trust signals
                       </p>
                     </div>
                     <Button
-                      aria-label="Close truth panel"
+                      aria-label="Close evidence and trust panel"
                       className="h-8 w-8"
                       onClick={() => setIsMobileTruthOpen(false)}
                       size="icon"

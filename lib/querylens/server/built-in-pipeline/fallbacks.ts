@@ -8,7 +8,34 @@ export function buildBuiltInFallbackResponse(args: {
   sourceMode: Phase1AnalysisResponse["sourceMode"]
   rows: WeeklyMetricRow[]
   executionTrace?: ExecutionTrace
+  isConversational?: boolean
 }): Phase1AnalysisResponse {
+  if (args.isConversational) {
+    return {
+      intent: "what_changed",
+      headline: "Hi - I can help with your portfolio data",
+      summary:
+        "I can answer grounded questions about cashflow health, region or sector stress, comparisons, data coverage, and connected sources. Try one of the suggested prompts to start.",
+      metric: "cashflow_health_score",
+      timeframe: "Conversation",
+      comparisonBasis: "Conversational guidance (no analytical query was run)",
+      confidence: 0,
+      activeScope: "Conversation",
+      drivers: [],
+      evidence: [],
+      assumptions: [],
+      supportedFollowUps: [
+        DEFAULT_FLAGSHIP_QUESTION,
+        "What data is currently stored?",
+        "Which sources are connected right now?",
+        "Compare cashflow health this week vs last week",
+      ],
+      fallback: true,
+      executionTrace: args.executionTrace,
+      sourceMode: args.sourceMode,
+    }
+  }
+
   return {
     intent: "what_changed",
     headline: "QueryLens could not complete that request safely",

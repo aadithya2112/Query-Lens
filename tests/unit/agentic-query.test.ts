@@ -245,4 +245,107 @@ describe("agentic query fallback", () => {
     expect(dataAccess.executeReadOnlySql).not.toHaveBeenCalled()
     expect(response.summary).toContain("Cross-source joins are not allowed")
   })
+
+  it("keeps execution trace ids unique for same-tool parallel requests", async () => {
+    const dataAccess = createMockDataAccess()
+
+    geminiChatSendMock.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          id: "call-a",
+          name: "run_postgres_query",
+          args: {
+            title: "Trend window A",
+            reason: "Need trend window A.",
+            statement:
+              "SELECT week_start, cashflow_health_score FROM weekly_portfolio_metrics WHERE record_type = 'portfolio' ORDER BY week_start LIMIT 2",
+          },
+        },
+        {
+          id: "call-b",
+          name: "run_postgres_query",
+          args: {
+            title: "Trend window B",
+            reason: "Need trend window B.",
+            statement:
+              "SELECT week_start, cashflow_health_score FROM weekly_portfolio_metrics WHERE record_type = 'portfolio' ORDER BY week_start DESC LIMIT 2",
+          },
+        },
+      ],
+    })
+    geminiChatSendMock.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          id: "call-c",
+          name: "reject_agentic_response",
+          args: {
+            reason: "Stopping after sampling two windows.",
+          },
+        },
+      ],
+    })
+
+    const response = await executeAgenticFallback({
+      question: "Hi",
+      dataAccess,
+      sourceCatalog,
+      retrievalContext: {
+        datasetMatches: [],
+        memoryMatches: [],
+        recentMessages: [],
+      },
+    })
+
+    const requestEntryIds =
+      response.executionTrace?.entries
+        .filter((entry) => entry.id.startsWith("tool_call.request.1.run_postgres_query."))
+        .map((entry) => entry.id) ?? []
+
+    expect(requestEntryIds).toHaveLength(2)
+    expect(new Set(requestEntryIds).size).toBe(2)
+  })
+
+  it("returns a partial grounded answer when read budget is reached after completed reads", async () => {
+    const dataAccess = createMockDataAccess()
+    const makeQueryCall = (id: string, title: string) => ({
+      id,
+      name: "run_postgres_query",
+      args: {
+        title,
+        reason: `Need ${title.toLowerCase()} for the custom question.`,
+        statement:
+          "SELECT week_start, cashflow_health_score FROM weekly_portfolio_metrics ORDER BY week_start LIMIT 2",
+      },
+    })
+
+    geminiChatSendMock.mockResolvedValueOnce({
+      functionCalls: [
+        makeQueryCall("call-1", "Read one"),
+        makeQueryCall("call-2", "Read two"),
+        makeQueryCall("call-3", "Read three"),
+        makeQueryCall("call-4", "Read four"),
+      ],
+    })
+    geminiChatSendMock.mockResolvedValueOnce({
+      functionCalls: [makeQueryCall("call-5", "Read five")],
+    })
+
+    const response = await executeAgenticFallback({
+      question: "Give me a broad custom analysis",
+      dataAccess,
+      sourceCatalog,
+      retrievalContext: {
+        datasetMatches: [],
+        memoryMatches: [],
+        recentMessages: [],
+      },
+    })
+
+    expect(response.fallback).not.toBe(true)
+    expect(response.headline).toContain("partial evidence")
+    expect(response.queryRuns).toHaveLength(4)
+    expect(response.resultTable?.rows).toHaveLength(2)
+    expect(response.trust?.limitationNotes.join(" ")).toContain("completed reads only")
+    expect(dataAccess.executeReadOnlySql).toHaveBeenCalledTimes(4)
+  })
 })

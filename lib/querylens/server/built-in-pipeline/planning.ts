@@ -2,6 +2,7 @@ import { canUseGemini } from "@/lib/querylens/server/ai-config"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { getRelativeDateWindow } from "@/lib/querylens/date-windows"
 import { buildBuiltInExecutionPlan } from "@/lib/querylens/server/built-in-pipeline/execution-plan"
+import { isConversationalSmallTalk } from "@/lib/querylens/server/conversational-detection"
 import { getQueryEngineProvider } from "@/lib/querylens/server/query-engine-provider"
 import { planDeterministicQuery } from "@/lib/querylens/server/query-planner"
 import type {
@@ -86,10 +87,14 @@ export async function planBuiltInAnalysis(args: {
     args.input.scope,
     args.retrievalContext,
   )
+  const isConversationalFallback =
+    parseResult.failureKind === "unsupported" &&
+    isConversationalSmallTalk(args.input.question)
   const allowAgenticFallback =
     args.executionContext === "interactive" &&
     canUseGemini(args.executionContext) &&
-    parseResult.failureKind !== "model_unavailable"
+    parseResult.failureKind !== "model_unavailable" &&
+    !isConversationalFallback
 
   let interpretation: BuiltInInterpretationSeed = {
     mode: "direct",
@@ -137,15 +142,19 @@ export async function planBuiltInAnalysis(args: {
     return {
       kind: "failure",
       fallbackReason:
-        resolvedParseResult.fallbackReason ??
-        "The question could not be matched to the phase-1 vertical slice safely.",
+        isConversationalFallback
+          ? "Your message looked conversational rather than analytical. Ask a portfolio question and I can ground the response in live evidence."
+          : resolvedParseResult.fallbackReason ??
+            "The question could not be matched to the phase-1 vertical slice safely.",
       failureKind: resolvedParseResult.failureKind,
       interpretation: {
         mode: "fallback",
-        explanation:
-          "QueryLens could not safely translate that request into one of the currently supported built-in analytics flows.",
+        explanation: isConversationalFallback
+          ? "QueryLens detected a greeting or small-talk message and returned conversational guidance instead of running bounded analytics."
+          : "QueryLens could not safely translate that request into one of the currently supported built-in analytics flows.",
       },
       allowAgenticFallback,
+      isConversationalFallback,
     }
   }
 

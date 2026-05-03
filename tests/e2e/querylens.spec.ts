@@ -16,7 +16,7 @@ test("renders the phase-1 vertical slice and answers the flagship question", asy
   await expect(
     page.getByText("Why did SME cashflow health drop last week?").first(),
   ).toBeVisible()
-  await expect(page.getByText("Evidence and corroboration")).toBeVisible()
+  await expect(page.getByText("Supporting evidence")).toBeVisible()
 
   const input = page.getByPlaceholder("Ask a question...")
   await input.fill("Why did SME cashflow health drop last week?")

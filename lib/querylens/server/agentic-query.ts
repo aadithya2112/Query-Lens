@@ -964,6 +964,86 @@ function buildFallbackResponse(args: BuildFallbackArgs): Phase1AnalysisResponse 
   }
 }
 
+function buildPartialBudgetResponse(args: BuildFallbackArgs): Phase1AnalysisResponse {
+  const orderedQueryRuns = args.queryRuns
+  const sourceAudit = buildSourceAudit({
+    sourceCatalog: args.sourceCatalog,
+    inspectedSourceIds: args.inspectedSourceIds,
+    queryRuns: orderedQueryRuns,
+  })
+  const tableRun = orderedQueryRuns
+    .slice()
+    .sort(
+      (left, right) =>
+        right.result.rowset.totalRows - left.result.rowset.totalRows,
+    )[0]
+  const sourceLabels = sourceAudit.used.map((source) => source.label)
+  const summary = `${args.reason} QueryLens is returning a limited answer from the ${orderedQueryRuns.length} completed read-only ${orderedQueryRuns.length === 1 ? "query" : "queries"} instead of discarding the evidence. Treat this as a partial view based only on the attached results.`
+
+  const responseSeed: Omit<Phase1AnalysisResponse, "confidence" | "trust" | "trustArtifacts"> = {
+    intent: "agentic_query",
+    headline: "QueryLens gathered partial evidence before reaching the read budget",
+    summary,
+    metric: "custom_query_result",
+    timeframe: "Custom question",
+    comparisonBasis: "Partial bounded multi-source analysis over approved QueryLens sources",
+    activeScope: "Custom analysis",
+    drivers: orderedQueryRuns.slice(0, 4).map((queryRun, index) => ({
+      id: `partial-query-${index + 1}`,
+      title: queryRun.run.title,
+      impactLabel: `${queryRun.result.rowset.totalRows} rows`,
+      direction: "positive",
+      description: queryRun.run.summary,
+    })),
+    evidence: buildEvidenceFromQueryRuns(
+      orderedQueryRuns,
+      "Custom question",
+      "Custom analysis",
+    ),
+    assumptions: [
+      "This is a partial answer based only on completed bounded read-only queries.",
+      "The bounded agent did not get another read after the query budget was reached.",
+    ],
+    supportedFollowUps: buildDefaultFollowUps(args.question),
+    resultTable: tableRun?.result.rowset,
+    queryRuns: orderedQueryRuns.map((queryRun) => queryRun.run),
+    sourceAudit,
+    executionTrace: args.executionTrace,
+    sourceMode: args.sourceMode,
+  }
+
+  const trust = buildAgenticTrustModel({
+    response: responseSeed,
+    sourceAudit,
+    queryRuns: orderedQueryRuns,
+    executionTrace: args.executionTrace,
+    uncertaintyNotes: [
+      "The bounded agent did not complete a model-synthesized final answer before the read budget was reached.",
+      ...(sourceLabels.length > 1
+        ? []
+        : ["Only one source family contributed completed reads to this partial answer."]),
+      ...(args.uncertaintyNotes ?? []),
+    ],
+    limitationNotes: [
+      args.reason,
+      "Stopped after the allowed read-only query budget; the answer is based on completed reads only.",
+      ...(args.limitationNotes ?? []),
+    ],
+  })
+
+  return {
+    ...responseSeed,
+    confidence: Math.min(trust.overall.score, 72),
+    trust: {
+      ...trust,
+      overall: {
+        score: Math.min(trust.overall.score, 72),
+        label: Math.min(trust.overall.score, 72) >= 60 ? "medium" : "low",
+      },
+    },
+  }
+}
+
 function formatCsvQuerySummary(args: {
   source: AgenticConnectedCsvSource
   intent: z.infer<typeof uploadedCsvQuerySchema>["intent"]
@@ -1150,7 +1230,7 @@ export async function executeBoundedMultiSourceAgent(
 
     for (const functionCall of turn.functionCalls) {
       executionTrace = appendTrace(executionTrace, {
-        id: `tool_call.request.${step + 1}.${functionCall.name}`,
+        id: `tool_call.request.${step + 1}.${functionCall.name}.${functionCall.id}`,
         stage: "tool_call",
         status: "approved",
         message: `The bounded agent requested ${functionCall.name}.`,
@@ -1197,7 +1277,7 @@ export async function executeBoundedMultiSourceAgent(
                     },
           })
           executionTrace = appendTrace(executionTrace, {
-            id: `tool_call.inspect.${parsedArgs.sourceId}`,
+            id: `tool_call.inspect.${parsedArgs.sourceId}.${functionCall.id}`,
             stage: "tool_call",
             status: "completed",
             message: `QueryLens inspected the schema for ${sourceEntry.label}.`,
@@ -1207,7 +1287,7 @@ export async function executeBoundedMultiSourceAgent(
           })
         } catch (error) {
           executionTrace = appendTrace(executionTrace, {
-            id: `tool_call.inspect_error.${step + 1}`,
+            id: `tool_call.inspect_error.${step + 1}.${functionCall.id}`,
             stage: "tool_call",
             status: "failed",
             message:
@@ -1240,6 +1320,19 @@ export async function executeBoundedMultiSourceAgent(
             message:
               "The bounded multi-source agent hit its read-only query budget before it could finish safely.",
           })
+          if (queryRuns.size > 0) {
+            return buildPartialBudgetResponse({
+              reason:
+                "The bounded multi-source agent hit its read-only query budget before it could finish safely.",
+              question: args.question,
+              sourceMode: args.dataAccess.sourceMode,
+              sourceCatalog: args.sourceCatalog,
+              inspectedSourceIds,
+              queryRuns: Array.from(queryRuns.values()),
+              executionTrace,
+            })
+          }
+
           return buildFallbackResponse({
             reason:
               "The bounded multi-source agent hit its read-only query budget before it could finish safely.",
@@ -1666,6 +1759,19 @@ export async function executeBoundedMultiSourceAgent(
     message:
       "The bounded multi-source agent reached its step limit before it could finish safely.",
   })
+
+  if (queryRuns.size > 0) {
+    return buildPartialBudgetResponse({
+      reason:
+        "The bounded multi-source agent reached its step limit before it could finish safely.",
+      question: args.question,
+      sourceMode: args.dataAccess.sourceMode,
+      sourceCatalog: args.sourceCatalog,
+      inspectedSourceIds,
+      queryRuns: Array.from(queryRuns.values()),
+      executionTrace,
+    })
+  }
 
   return buildFallbackResponse({
     reason:

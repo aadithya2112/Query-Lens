@@ -3,7 +3,9 @@ import { isBuiltInDatasetId } from "@/lib/querylens/datasets"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
 import { buildAgenticSourceCatalog } from "@/lib/querylens/server/agentic-source-catalog"
+import { answerBroadQuestion } from "@/lib/querylens/server/broad-query-responses"
 import { runBuiltInAnalysisPipeline } from "@/lib/querylens/server/built-in-pipeline"
+import { isConversationalSmallTalk } from "@/lib/querylens/server/conversational-detection"
 import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import { analyzeOnboardedDatasetQuery } from "@/lib/querylens/server/onboarded-analysis"
 import { presentBuiltInFallback, enrichPhase1Response } from "@/lib/querylens/server/built-in-pipeline/presentation"
@@ -96,6 +98,62 @@ export async function analyzeQuery(
     })
 
     return leadershipSummary
+  }
+
+  if (isConversationalSmallTalk(input.question)) {
+    const conversationalResponse = presentBuiltInFallback({
+      fallbackReason:
+        "Your message looked conversational rather than analytical. Ask a portfolio question and I can ground the response in live evidence.",
+      sourceMode: dataAccess.sourceMode,
+      weeklyRows,
+      retrievalContext,
+      inputQuestion: input.question,
+      interpretation: {
+        mode: "fallback",
+        explanation:
+          "QueryLens detected a greeting or small-talk message and returned conversational guidance instead of running bounded analytics.",
+      },
+      isConversational: true,
+    })
+
+    await persistConversationIfPossible({
+      chatId: input.chatId,
+      executionContext,
+      question: input.question,
+      response: conversationalResponse,
+      retrievalStore,
+    })
+
+    return conversationalResponse
+  }
+
+  const broadResponse = await answerBroadQuestion({
+    input,
+    profileSnapshot,
+    weeklyRows,
+  })
+
+  if (broadResponse) {
+    const enrichedBroadResponse = enrichPhase1Response({
+      response: broadResponse,
+      retrievalContext,
+      inputQuestion: input.question,
+      interpretation: {
+        mode: "direct",
+        explanation:
+          "QueryLens matched this broad request to a deterministic data-preview, source-catalog, or visual-overview flow before using the bounded custom agent.",
+      },
+    })
+
+    await persistConversationIfPossible({
+      chatId: input.chatId,
+      executionContext,
+      question: input.question,
+      response: enrichedBroadResponse,
+      retrievalStore,
+    })
+
+    return enrichedBroadResponse
   }
 
   const builtInResult = await runBuiltInAnalysisPipeline({

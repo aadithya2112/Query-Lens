@@ -150,6 +150,46 @@ describe("built-in planning stage", () => {
     if (result.kind === "failure") {
       expect(result.allowAgenticFallback).toBe(true)
       expect(result.interpretation.mode).toBe("fallback")
+      expect(result.isConversationalFallback).toBe(false)
+    }
+  })
+
+  it("keeps greetings inside built-in fallback without escalating to agentic", async () => {
+    process.env.QUERYLENS_AI_MODE = "gemini"
+    process.env.GEMINI_API_KEY = "test-key"
+    geminiGenerateMock.mockResolvedValue({
+      functionCalls: [
+        {
+          name: "reject_analytics_query_plan",
+          args: {
+            reason: "Greeting without an analytics question.",
+          },
+        },
+      ],
+    })
+
+    const { planBuiltInAnalysis } = await import(
+      "@/lib/querylens/server/built-in-pipeline/planning"
+    )
+
+    const result = await planBuiltInAnalysis({
+      input: {
+        question: "Hi",
+      },
+      executionContext: "interactive",
+      retrievalContext: {
+        datasetMatches: [],
+        memoryMatches: [],
+        recentMessages: [],
+      },
+      weeklyRows: getSampleDataset().weeklyMetrics,
+      dateCoverage,
+    })
+
+    expect(result.kind).toBe("failure")
+    if (result.kind === "failure") {
+      expect(result.allowAgenticFallback).toBe(false)
+      expect(result.isConversationalFallback).toBe(true)
     }
   })
 })

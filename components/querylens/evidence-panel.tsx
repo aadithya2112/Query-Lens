@@ -17,6 +17,10 @@ interface EvidencePanelProps {
   analysis: Phase1AnalysisResponse
 }
 
+function isConversationalReply(analysis: Phase1AnalysisResponse) {
+  return analysis.fallback === true && analysis.timeframe === "Conversation"
+}
+
 function resolveConfidenceScore(analysis: Phase1AnalysisResponse) {
   return analysis.trust?.overall.score ?? analysis.confidence
 }
@@ -45,6 +49,89 @@ function resolveAssumptions(analysis: Phase1AnalysisResponse) {
   return analysis.trust?.assumptions ??
     analysis.trustArtifacts?.assumptionsUsed ??
     analysis.assumptions
+}
+
+function resolveExecutionStatus(analysis: Phase1AnalysisResponse) {
+  const entries = analysis.executionTrace?.entries ?? []
+  if (entries.length === 0) {
+    return {
+      label: "not recorded",
+      note: "No execution trace was attached to this answer.",
+    }
+  }
+
+  if (entries.some((entry) => entry.status === "failed")) {
+    return {
+      label: "failed step",
+      note: "At least one execution step failed during processing.",
+    }
+  }
+
+  if (
+    entries.some(
+      (entry) => entry.status === "blocked" || entry.status === "fallback",
+    )
+  ) {
+    return {
+      label: "guarded fallback",
+      note: "Guardrails rerouted one or more execution steps.",
+    }
+  }
+
+  if (
+    entries.some(
+      (entry) => entry.status === "completed" || entry.status === "approved",
+    )
+  ) {
+    return {
+      label: "completed",
+      note: "Execution completed within approved guardrails.",
+    }
+  }
+
+  return {
+    label: "in progress",
+    note: "Execution metadata exists but no terminal status was recorded.",
+  }
+}
+
+function buildTrustSnapshotItems(analysis: Phase1AnalysisResponse) {
+  const sourcesUsed = resolveSourcesUsed(analysis)
+  const sourceAudit = resolveSourceAudit(analysis)
+  const executionStatus = resolveExecutionStatus(analysis)
+
+  return [
+    {
+      label: "Trust score",
+      value: `${resolveConfidenceScore(analysis)}%`,
+      note: analysis.trust
+        ? `${analysis.trust.overall.label} trust`
+        : "Derived from confidence fallback",
+    },
+    {
+      label: "Sources used",
+      value: String(sourcesUsed.length),
+      note: sourcesUsed
+        .slice(0, 2)
+        .map((source) => source.sourceName)
+        .join(" · ") || "No sources attached",
+    },
+    {
+      label: "Sources inspected",
+      value: String(sourceAudit?.inspected.length ?? 0),
+      note: "Sources checked before synthesis.",
+    },
+    {
+      label: "Queries executed",
+      value: String(analysis.queryRuns?.length ?? 0),
+      note: "Read-only query runs attached to this answer.",
+    },
+    {
+      label: "Execution status",
+      value: executionStatus.label,
+      note: executionStatus.note,
+    },
+  ]
 }
 
 function formatTableValue(value: string | number | boolean | null) {
@@ -114,6 +201,7 @@ function ComparisonCards({ analysis }: EvidencePanelProps) {
 function TrustBar({ analysis }: EvidencePanelProps) {
   const visibleConfidence = resolveConfidenceScore(analysis)
   const width = `${visibleConfidence}%`
+  const trustSnapshotItems = buildTrustSnapshotItems(analysis)
   const trustComponents: Array<[string, NonNullable<typeof analysis.trust>["components"]["interpretation"]]> = analysis.trust?.components
     ? [
         ["Interpretation", analysis.trust.components.interpretation],
@@ -128,7 +216,7 @@ function TrustBar({ analysis }: EvidencePanelProps) {
       <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-            Trust Layer
+            Trust snapshot
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-foreground">
             {analysis.headline}
@@ -156,6 +244,22 @@ function TrustBar({ analysis }: EvidencePanelProps) {
             </p>
           )}
         </div>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {trustSnapshotItems.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-[20px] border border-border bg-muted/10 px-4 py-4"
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              {item.label}
+            </p>
+            <p className="mt-2 text-lg font-semibold capitalize text-foreground">
+              {item.value}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.note}</p>
+          </div>
+        ))}
       </div>
       {trustComponents.length > 0 && (
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -236,7 +340,7 @@ function HowProducedCard({ analysis }: EvidencePanelProps) {
       <div className="flex items-center gap-2">
         <Shield size={16} className="text-muted-foreground" />
         <h2 className="text-base font-semibold text-foreground">
-          How This Answer Was Produced
+          What ran
         </h2>
       </div>
       <div className="mt-5 space-y-4">
@@ -265,7 +369,7 @@ function SourcesUsedCard({ analysis }: EvidencePanelProps) {
     <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
       <div className="flex items-center gap-2">
         <Shield size={16} className="text-muted-foreground" />
-        <h2 className="text-base font-semibold text-foreground">Sources Used</h2>
+        <h2 className="text-base font-semibold text-foreground">What was used</h2>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {sourcesUsed.map((source) => (
@@ -310,7 +414,9 @@ function SourceAuditCard({ analysis }: EvidencePanelProps) {
     <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
       <div className="flex items-center gap-2">
         <Shield size={16} className="text-muted-foreground" />
-        <h2 className="text-base font-semibold text-foreground">Source audit</h2>
+        <h2 className="text-base font-semibold text-foreground">
+          What was inspected vs used
+        </h2>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <div className="rounded-[22px] border border-border bg-muted/10 px-4 py-4">
@@ -654,7 +760,7 @@ function ExecutedQueries({ analysis }: EvidencePanelProps) {
       <div className="flex items-center gap-2">
         <Shield size={16} className="text-muted-foreground" />
         <h2 className="text-base font-semibold text-foreground">
-          Executed queries
+          What queries ran
         </h2>
       </div>
       <div className="mt-5 space-y-4">
@@ -679,9 +785,14 @@ function ExecutedQueries({ analysis }: EvidencePanelProps) {
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {queryRun.summary}
             </p>
-            <pre className="mt-3 overflow-x-auto rounded-[18px] border border-border bg-black/30 p-3 text-xs leading-6 text-foreground">
-              <code>{queryRun.statement}</code>
-            </pre>
+            <details className="mt-3 rounded-[18px] border border-border bg-background/20 px-3 py-3">
+              <summary className="cursor-pointer list-none font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors">
+                Show query statement
+              </summary>
+              <pre className="mt-3 overflow-x-auto rounded-[14px] border border-border bg-black/30 p-3 text-xs leading-6 text-foreground">
+                <code>{queryRun.statement}</code>
+              </pre>
+            </details>
           </div>
         ))}
       </div>
@@ -689,7 +800,205 @@ function ExecutedQueries({ analysis }: EvidencePanelProps) {
   )
 }
 
+function SupportingEvidenceCard({ analysis }: EvidencePanelProps) {
+  return (
+    <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+      <div className="flex items-center gap-2">
+        <Shield size={16} className="text-muted-foreground" />
+        <h2 className="text-base font-semibold text-foreground">
+          Supporting evidence
+        </h2>
+      </div>
+      <div className="mt-5 flex flex-col gap-4">
+        {analysis.evidence.length > 0 ? (
+          analysis.evidence.map((item) => (
+            <div
+              key={`${item.sourceType}-${item.sourceName}-${item.queryTemplateId}`}
+              className="rounded-[22px] border border-border bg-muted/10 px-4 py-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    {item.sourceType}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">
+                    {item.sourceName}
+                  </p>
+                </div>
+                <span className="rounded-full border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                  {item.scope}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {item.supportingFact}
+              </p>
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <span className="text-xs text-muted-foreground">{item.timeRange}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {item.queryTemplateId}
+                </span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm leading-6 text-muted-foreground">
+            No supporting evidence cards were recorded for this response.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DebugTraceCard({ analysis }: EvidencePanelProps) {
+  const isDiscovery = analysis.intent === "discovery"
+  const isAgentic = analysis.intent === "agentic_query"
+  const isBreakdown = analysis.metric === "at_risk_account_count"
+  const isCompare = Boolean(analysis.comparisonSummary)
+  const hasTrace =
+    Boolean(analysis.retrievalTrace) ||
+    Boolean(analysis.executionTrace) ||
+    analysis.evidence.length > 0
+
+  if (!hasTrace) {
+    return null
+  }
+
+  return (
+    <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+      <details className="rounded-[22px] border border-border px-4 py-4">
+        <summary className="cursor-pointer list-none font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors">
+          Open execution trace and debug details
+        </summary>
+        <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+          <p>
+            {isDiscovery
+              ? "The discovery slice uses pgvector-backed metadata retrieval, source health checks, and conversation memory to answer broad questions safely."
+              : isAgentic
+                ? "The agentic slice uses a provider-backed bounded tool-calling loop with guarded read-only execution across approved sources."
+                : isBreakdown
+                  ? "The breakdown slice uses validated planning, account-level weekly stress rollups, and contextual Mongo evidence."
+                  : isCompare
+                    ? "The compare slice uses validated planning, side-by-side weekly metric rows, and contextual Mongo evidence."
+                    : "The what-changed slice uses validated planning, database weekly metrics, and contextual Mongo evidence."}
+          </p>
+          {analysis.retrievalTrace && (
+            <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Retrieval trace
+              </p>
+              <p className="mt-2">
+                Dataset matches:{" "}
+                {analysis.retrievalTrace.datasetMatches.length
+                  ? analysis.retrievalTrace.datasetMatches.join(", ")
+                  : "none"}
+              </p>
+              <p className="mt-1">
+                Memory matches:{" "}
+                {analysis.retrievalTrace.memoryMatches.length
+                  ? analysis.retrievalTrace.memoryMatches.join(", ")
+                  : "none"}
+              </p>
+              <p className="mt-1">
+                Recent turns used: {analysis.retrievalTrace.recentMessagesCount}
+              </p>
+            </div>
+          )}
+          {analysis.executionTrace && (
+            <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Execution trace ({analysis.executionTrace.planId})
+              </p>
+              <ul className="mt-3 space-y-2">
+                {analysis.executionTrace.entries.map((entry, index) => (
+                  <li
+                    key={`${entry.id}-${index}`}
+                    className="rounded-[14px] border border-border bg-background/30 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                        {entry.stage}
+                      </span>
+                      <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        {entry.status}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {entry.message}
+                    </p>
+                    {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                      <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                        {Object.entries(entry.metadata)
+                          .map(([key, value]) => `${key}: ${String(value)}`)
+                          .join(" · ")}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <ul className="space-y-2">
+            {analysis.evidence.map((item) => (
+              <li
+                key={`${item.queryTemplateId}-trace`}
+                className="flex items-start gap-2"
+              >
+                <ChevronRight
+                  size={14}
+                  className="mt-1 shrink-0 text-muted-foreground"
+                />
+                <span>
+                  <span className="font-mono text-muted-foreground">
+                    {item.queryTemplateId}
+                  </span>{" "}
+                  drove the evidence item sourced from{" "}
+                  <strong className="text-foreground">{item.sourceName}</strong>.
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
+    </div>
+  )
+}
+
 export default function EvidencePanel({ analysis }: EvidencePanelProps) {
+  if (isConversationalReply(analysis)) {
+    return (
+      <section className="px-4 py-4 lg:px-6 lg:py-7 mx-auto max-w-full w-full">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5">
+          <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+            <div className="flex items-center gap-2">
+              <Shield size={16} className="text-muted-foreground" />
+              <h2 className="text-base font-semibold text-foreground">
+                Conversation guidance
+              </h2>
+            </div>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              {analysis.summary}
+            </p>
+            {analysis.supportedFollowUps.length > 0 && (
+              <div className="mt-5">
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Suggested prompts
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {analysis.supportedFollowUps.slice(0, 4).map((question) => (
+                    <li key={question} className="text-sm text-muted-foreground">
+                      {question}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   const isAgentic = analysis.intent === "agentic_query"
   const isBreakdown = analysis.metric === "at_risk_account_count"
   const isCompare = Boolean(analysis.comparisonSummary)
@@ -725,11 +1034,12 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
         {!isDiscovery && <ComparisonCards analysis={analysis} />}
         {analysis.chartSpec && <TrendChart analysis={analysis} />}
         <ResultTableCard analysis={analysis} />
-        <HowProducedCard analysis={analysis} />
+
         <SourcesUsedCard analysis={analysis} />
-        <SourceAuditCard analysis={analysis} />
         <ObservedVsInferred analysis={analysis} />
-        <UncertaintyAndLimitations analysis={analysis} />
+        <ExecutedQueries analysis={analysis} />
+        <HowProducedCard analysis={analysis} />
+        <SourceAuditCard analysis={analysis} />
 
         <div className="flex flex-col gap-5">
           {isDiscovery ? <CatalogSections analysis={analysis} /> : null}
@@ -780,7 +1090,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
             <div className="flex items-center gap-2">
               <Shield size={16} className="text-muted-foreground" />
               <h2 className="text-base font-semibold text-foreground">
-                Assumptions Made
+                Assumptions made
               </h2>
             </div>
             <div className="mt-5 space-y-4">
@@ -805,152 +1115,9 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
           </div>
         </div>
 
-        <ExecutedQueries analysis={analysis} />
-
-        <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <Shield size={16} className="text-muted-foreground" />
-            <h2 className="text-base font-semibold text-foreground">
-              Evidence and corroboration
-            </h2>
-          </div>
-          <div className="mt-5 flex flex-col gap-4">
-            {analysis.evidence.length > 0 ? (
-              analysis.evidence.map((item) => (
-                <div
-                  key={`${item.sourceType}-${item.sourceName}-${item.queryTemplateId}`}
-                  className="rounded-[22px] border border-border bg-muted/10 px-4 py-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        {item.sourceType}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">
-                        {item.sourceName}
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground">
-                      {item.scope}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    {item.supportingFact}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                    <span className="text-xs text-muted-foreground">
-                      {item.timeRange}
-                    </span>
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {item.queryTemplateId}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm leading-6 text-muted-foreground">
-                No supporting evidence cards were recorded for this response.
-              </p>
-            )}
-          </div>
-          <details className="mt-5 rounded-[22px] border border-border px-4 py-4">
-            <summary className="cursor-pointer list-none font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors">
-              Trace / debug view
-            </summary>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>
-                {isDiscovery
-                  ? "The discovery slice uses pgvector-backed metadata retrieval, source health checks, and conversation memory to answer broad questions safely."
-                  : isAgentic
-                    ? "The agentic slice uses a provider-backed bounded tool-calling loop with guarded read-only execution across approved sources."
-                    : isBreakdown
-                      ? "The breakdown slice uses validated planning, account-level weekly stress rollups, and contextual Mongo evidence."
-                      : isCompare
-                        ? "The compare slice uses validated planning, side-by-side weekly metric rows, and contextual Mongo evidence."
-                        : "The what-changed slice uses validated planning, database weekly metrics, and contextual Mongo evidence."}
-              </p>
-              {analysis.retrievalTrace && (
-                <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Retrieval trace
-                  </p>
-                  <p className="mt-2">
-                    Dataset matches:{" "}
-                    {analysis.retrievalTrace.datasetMatches.length
-                      ? analysis.retrievalTrace.datasetMatches.join(", ")
-                      : "none"}
-                  </p>
-                  <p className="mt-1">
-                    Memory matches:{" "}
-                    {analysis.retrievalTrace.memoryMatches.length
-                      ? analysis.retrievalTrace.memoryMatches.join(", ")
-                      : "none"}
-                  </p>
-                  <p className="mt-1">
-                    Recent turns used: {analysis.retrievalTrace.recentMessagesCount}
-                  </p>
-                </div>
-              )}
-              {analysis.executionTrace && (
-                <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Execution trace ({analysis.executionTrace.planId})
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {analysis.executionTrace.entries.map((entry) => (
-                      <li
-                        key={entry.id}
-                        className="rounded-[14px] border border-border bg-background/30 px-3 py-2"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                            {entry.stage}
-                          </span>
-                          <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                            {entry.status}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {entry.message}
-                        </p>
-                        {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-                          <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                            {Object.entries(entry.metadata)
-                              .map(([key, value]) => `${key}: ${String(value)}`)
-                              .join(" · ")}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <ul className="space-y-2">
-                {analysis.evidence.map((item) => (
-                  <li
-                    key={`${item.queryTemplateId}-trace`}
-                    className="flex items-start gap-2"
-                  >
-                    <ChevronRight
-                      size={14}
-                      className="mt-1 shrink-0 text-muted-foreground"
-                    />
-                    <span>
-                      <span className="font-mono text-muted-foreground">
-                        {item.queryTemplateId}
-                      </span>{" "}
-                      drove the evidence item sourced from{" "}
-                      <strong className="text-foreground">
-                        {item.sourceName}
-                      </strong>
-                      .
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </details>
-        </div>
+        <UncertaintyAndLimitations analysis={analysis} />
+        <SupportingEvidenceCard analysis={analysis} />
+        <DebugTraceCard analysis={analysis} />
       </div>
     </section>
   )

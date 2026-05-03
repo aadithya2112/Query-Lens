@@ -122,6 +122,7 @@ export interface BuiltInPlanningFailure {
   failureKind?: QueryPlanFailureKind
   interpretation: BuiltInInterpretationSeed
   allowAgenticFallback: boolean
+  isConversationalFallback?: boolean
 }
 
 export type BuiltInPlanningResult =
