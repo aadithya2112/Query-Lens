@@ -17,7 +17,6 @@ vi.mock("@/lib/querylens/server/reasoning-provider", () => ({
 }))
 
 import {
-  CsvImportError,
   refineSemanticDraft,
 } from "@/lib/querylens/server/csv-onboarding"
 
@@ -70,7 +69,10 @@ describe("csv onboarding refinement", () => {
       columns: [],
     })
 
-    await expect(promise).rejects.toBeInstanceOf(CsvImportError)
+    await expect(promise).resolves.toMatchObject({
+      datasetId: "csv_test",
+      datasetLabel: "Sample",
+    })
     expect(generateStructuredDataMock).toHaveBeenCalledTimes(3)
   })
 

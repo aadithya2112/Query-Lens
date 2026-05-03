@@ -32,7 +32,7 @@ export async function getBootstrapPayload(datasetId?: string): Promise<Bootstrap
         synonyms: metric.synonyms ?? [],
         exampleQuestions: metric.exampleQuestions ?? [],
       })),
-      sourceHealth: [
+      sourceHealth: dataset.profileSnapshot?.sourceHealth ?? [
         {
           id: "postgres",
           name: "Onboarded CSV facts",

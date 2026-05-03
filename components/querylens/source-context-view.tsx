@@ -147,10 +147,16 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
             <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#86868b]">
               QueryLens PRO
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/90">Source context</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/90">
+              Source context
+            </h1>
+            <p className="mt-1 text-sm text-[#86868b]">{payload.datasetLabel}</p>
           </div>
           <Button asChild variant="outline" size="sm" className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white transition-all backdrop-blur-lg">
-            <Link href="/demo" className="flex items-center gap-2">
+            <Link
+              href={`/demo?datasetId=${encodeURIComponent(payload.datasetId)}`}
+              className="flex items-center gap-2"
+            >
               <ArrowLeft className="h-4 w-4" />
               <span className="font-medium">Back to Workspace</span>
             </Link>
@@ -164,7 +170,7 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           <div className="flex flex-wrap items-center gap-4">
             <h2 className="text-xl font-semibold tracking-tight text-white/90">Data Summary</h2>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-400/90 shadow-inner">
-              Live database mode
+              {payload.kind === "built_in" ? "Live database mode" : "Uploaded CSV mode"}
             </span>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -210,7 +216,9 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
             <h2 className="text-xl font-semibold tracking-tight text-white/90">PostgreSQL Objects</h2>
             <p className="mt-2 text-sm text-[#86868b]">
-              Tables that power portfolio facts and metric aggregation.
+              {payload.kind === "built_in"
+                ? "Tables that power portfolio facts and metric aggregation."
+                : "Tables created from the uploaded CSV and used for deterministic analysis."}
             </p>
             <ul className="mt-6 space-y-4">
               {payload.postgresSchema.map((table) => (
@@ -239,7 +247,9 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
             <h2 className="text-xl font-semibold tracking-tight text-white/90">MongoDB Objects</h2>
             <p className="mt-2 text-sm text-[#86868b]">
-              Collections used as qualitative context alongside metric shifts.
+              {payload.kind === "built_in"
+                ? "Collections used as qualitative context alongside metric shifts."
+                : "No MongoDB collections are attached to uploaded CSV datasets in this slice."}
             </p>
             <ul className="mt-6 space-y-4">
               {payload.mongoSchema.map((collection) => (
@@ -269,12 +279,20 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
         <div className="flex flex-col gap-8 mt-4">
           <PreviewTable
             title="PostgreSQL preview"
-            description="A quick sample from weekly portfolio facts used in analysis responses."
+            description={
+              payload.kind === "built_in"
+                ? "A quick sample from weekly portfolio facts used in analysis responses."
+                : "A quick sample from the uploaded CSV rows saved for this dataset."
+            }
             table={payload.postgresPreview}
           />
           <PreviewTable
             title="MongoDB preview"
-            description="A quick sample from contextual event documents used for corroboration."
+            description={
+              payload.kind === "built_in"
+                ? "A quick sample from contextual event documents used for corroboration."
+                : "Uploaded CSV datasets do not yet have MongoDB corroboration in the source context tab."
+            }
             table={payload.mongoPreview}
           />
         </div>

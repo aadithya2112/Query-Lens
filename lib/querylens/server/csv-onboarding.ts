@@ -28,6 +28,7 @@ const MAX_COLUMNS = 200
 const PREVIEW_ROW_LIMIT = 8
 const OPENROUTER_REFINEMENT_MAX_ATTEMPTS = 3
 const OPENROUTER_REFINEMENT_BACKOFF_MS = [500, 1500]
+const SEMANTIC_REFINEMENT_TIMEOUT_MS = 12_000
 
 const refinementSchema = z.object({
   datasetLabel: z.string().min(1).optional(),
@@ -85,6 +86,10 @@ export function isCsvImportError(error: unknown): error is CsvImportError {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError"
 }
 
 function slugify(value: string) {
@@ -500,54 +505,89 @@ ${JSON.stringify(args.draft, null, 2)}
     },
     schemaName: "querylens_csv_semantic_draft",
   } as const
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), SEMANTIC_REFINEMENT_TIMEOUT_MS)
 
   let result
 
-  if (config.reasoningProvider === "openrouter") {
-    let lastError: unknown
+  try {
+    if (config.reasoningProvider === "openrouter") {
+      let lastError: unknown
 
-    for (let attempt = 0; attempt < OPENROUTER_REFINEMENT_MAX_ATTEMPTS; attempt += 1) {
-      try {
-        result = await generateStructuredData(request, refinementSchema)
-        lastError = undefined
-        break
-      } catch (error) {
-        lastError = error
-
-        if (
-          !isReasoningProviderError(error) ||
-          !error.retryable ||
-          attempt === OPENROUTER_REFINEMENT_MAX_ATTEMPTS - 1
-        ) {
+      for (let attempt = 0; attempt < OPENROUTER_REFINEMENT_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          result = await generateStructuredData(
+            {
+              ...request,
+              signal: controller.signal,
+            },
+            refinementSchema
+          )
+          lastError = undefined
           break
+        } catch (error) {
+          lastError = error
+
+          if (isAbortError(error)) {
+            return args.draft
+          }
+
+          if (
+            !isReasoningProviderError(error) ||
+            !error.retryable ||
+            attempt === OPENROUTER_REFINEMENT_MAX_ATTEMPTS - 1
+          ) {
+            break
+          }
+
+          await wait(
+            OPENROUTER_REFINEMENT_BACKOFF_MS[attempt] ??
+              OPENROUTER_REFINEMENT_BACKOFF_MS.at(-1) ??
+              1500
+          )
+        }
+      }
+
+      if (!result && lastError) {
+        if (isReasoningProviderError(lastError)) {
+          if (lastError.retryable) {
+            return args.draft
+          }
+
+          throw new CsvImportError({
+            message:
+              lastError.status === 429
+                ? "OpenRouter is temporarily rate-limiting semantic refinement. Please retry in a moment."
+                : "OpenRouter could not refine the semantic draft right now.",
+            code: mapReasoningProviderErrorToImportCode(lastError),
+            retryable: lastError.retryable,
+            provider: "openrouter",
+            status: lastError.retryable ? 503 : 500,
+          })
         }
 
-        await wait(
-          OPENROUTER_REFINEMENT_BACKOFF_MS[attempt] ??
-            OPENROUTER_REFINEMENT_BACKOFF_MS.at(-1) ??
-            1500
-        )
+        throw lastError
       }
+    } else {
+      result = await Promise.race([
+        generateStructuredData(request, refinementSchema),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("Timed out", "AbortError")),
+            { once: true }
+          )
+        }),
+      ])
+    }
+  } catch (error) {
+    if (isAbortError(error)) {
+      return args.draft
     }
 
-    if (!result && lastError) {
-      if (isReasoningProviderError(lastError)) {
-        throw new CsvImportError({
-          message:
-            lastError.status === 429
-              ? "OpenRouter is temporarily rate-limiting semantic refinement. Please retry in a moment."
-              : "OpenRouter could not refine the semantic draft right now.",
-          code: mapReasoningProviderErrorToImportCode(lastError),
-          retryable: lastError.retryable,
-          provider: "openrouter",
-          status: lastError.retryable ? 503 : 500,
-        })
-      }
-
-      throw lastError
-    }
-  } else {
-    result = await generateStructuredData(request, refinementSchema)
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   if (!result || !result.data) {
@@ -680,6 +720,11 @@ async function createPhysicalTable(args: {
   }
 }
 
+async function dropPhysicalTable(tableName: string) {
+  const pool = getPgPool()
+  await pool.query(`DROP TABLE IF EXISTS ${quoteIdentifier(tableName)}`)
+}
+
 export async function importCsvDataset(args: {
   filename: string
   bytes: Uint8Array
@@ -720,63 +765,74 @@ export async function importCsvDataset(args: {
     rows,
   })
 
-  let startDate: string | undefined
-  let endDate: string | undefined
-  if (primaryTimeField) {
-    const sortedDates = rows
-      .map((row) => row[primaryTimeField] ?? "")
-      .filter(Boolean)
-      .map((value) => new Date(value).toISOString().slice(0, 10))
-      .sort()
+  try {
+    let startDate: string | undefined
+    let endDate: string | undefined
+    if (primaryTimeField) {
+      const sortedDates = rows
+        .map((row) => row[primaryTimeField] ?? "")
+        .filter(Boolean)
+        .map((value) => new Date(value).toISOString().slice(0, 10))
+        .sort()
 
-    startDate = sortedDates[0]
-    endDate = sortedDates.at(-1)
-  }
+      startDate = sortedDates[0]
+      endDate = sortedDates.at(-1)
+    }
 
-  const draft = await refineSemanticDraft({
-    filename: args.filename,
-    draft: buildHeuristicSemanticDraft({
-      datasetId,
-      label: datasetLabel,
-      description: `${datasetLabel} imported from CSV onboarding.`,
+    const draft = await refineSemanticDraft({
+      filename: args.filename,
+      draft: buildHeuristicSemanticDraft({
+        datasetId,
+        label: datasetLabel,
+        description: `${datasetLabel} imported from CSV onboarding.`,
+        columns,
+        rowCount: rows.length,
+        primaryTimeField,
+        startDate,
+        endDate,
+      }),
       columns,
+    })
+
+    const previewRows = buildPreviewRows(headers, rows, columnTypes)
+    const profileSnapshot = buildOnboardedProfileSnapshot({
+      datasetId,
+      label: draft.datasetLabel,
+      description: draft.description,
       rowCount: rows.length,
-      primaryTimeField,
       startDate,
       endDate,
-    }),
-    columns,
-  })
+      primaryTimeField,
+    })
 
-  const previewRows = buildPreviewRows(headers, rows, columnTypes)
-  const profileSnapshot = buildOnboardedProfileSnapshot({
-    datasetId,
-    label: draft.datasetLabel,
-    description: draft.description,
-    rowCount: rows.length,
-    startDate,
-    endDate,
-    primaryTimeField,
-  })
+    await saveOnboardedDataset({
+      id: datasetId,
+      label: draft.datasetLabel,
+      description: draft.description,
+      tableName,
+      rowCount: rows.length,
+      primaryTimeField,
+      grain,
+      semanticDraft: {
+        ...draft,
+        datasetId,
+      },
+      profileSnapshot,
+      columns,
+      previewRows,
+    })
 
-  await saveOnboardedDataset({
-    id: datasetId,
-    label: draft.datasetLabel,
-    description: draft.description,
-    tableName,
-    rowCount: rows.length,
-    primaryTimeField,
-    grain,
-    semanticDraft: draft,
-    profileSnapshot,
-    columns,
-    previewRows,
-  })
+    const stored = await getOnboardedDatasetRecord(datasetId)
+    if (!stored) {
+      throw new Error("QueryLens could not load the imported dataset after saving it.")
+    }
 
-  const stored = await getOnboardedDatasetRecord(datasetId)
-  if (!stored) {
-    throw new Error("QueryLens could not load the imported dataset after saving it.")
+    return stored
+  } catch (error) {
+    await dropPhysicalTable(tableName).catch((cleanupError) => {
+      console.error("QueryLens could not clean up a failed CSV import table.", cleanupError)
+    })
+
+    throw error
   }
-
-  return stored
 }

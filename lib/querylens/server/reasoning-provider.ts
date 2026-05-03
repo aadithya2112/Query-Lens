@@ -8,6 +8,7 @@ export interface StructuredGenerationRequest {
   prompt: string
   responseJsonSchema: unknown
   schemaName: string
+  signal?: AbortSignal
 }
 
 export interface StructuredGenerationResult<T = unknown> {
@@ -120,6 +121,7 @@ async function generateWithOpenRouter<T>(
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
+    signal: request.signal,
     headers: {
       Authorization: `Bearer ${config.openrouterApiKey}`,
       "Content-Type": "application/json",

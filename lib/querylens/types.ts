@@ -672,6 +672,7 @@ export interface OnboardedDatasetRecord {
   createdAt: string
   updatedAt: string
   semanticDraft: DatasetSemanticDraft
+  profileSnapshot?: DatasetProfileSnapshot
   columns: CsvColumnProfile[]
   previewRows: ResultTable
 }

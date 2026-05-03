@@ -11,8 +11,13 @@ export const metadata: Metadata = {
     "Source context for QueryLens, including connected source summaries, schema objects, and quick PostgreSQL and MongoDB record previews.",
 }
 
-export default async function ExplorerPage() {
-  const payload = await getSourceContextPayload()
+export default async function ExplorerPage({
+  searchParams = Promise.resolve({}),
+}: {
+  searchParams?: Promise<{ datasetId?: string }>
+} = {}) {
+  const params = await searchParams
+  const payload = await getSourceContextPayload(params.datasetId)
 
   return <SourceContextView payload={payload} />
 }

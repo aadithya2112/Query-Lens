@@ -489,7 +489,7 @@ function AuthenticatedWorkspace({
     seededChatRef.current = chatId
     void seedInitialMessages({
       chatId,
-      clerkUserId,
+      ...userProfile,
       initialQuestion,
       initialAnswer: initialAnalysis.summary,
       initialAnalysis: sanitizeForConvex(initialAnalysis),
@@ -504,6 +504,7 @@ function AuthenticatedWorkspace({
     initialQuestion,
     seedInitialMessages,
     storedMessages,
+    userProfile,
   ])
 
   useEffect(() => {
@@ -580,7 +581,7 @@ function AuthenticatedWorkspace({
     try {
       await appendMessage({
         chatId,
-        clerkUserId,
+        ...userProfile,
         role: "user",
         text: trimmed,
       })
@@ -610,7 +611,7 @@ function AuthenticatedWorkspace({
       const analysis = (await response.json()) as Phase1AnalysisResponse
       await appendMessage({
         chatId,
-        clerkUserId,
+        ...userProfile,
         role: "assistant",
         text: analysis.summary,
         analysis: sanitizeForConvex(analysis),
@@ -622,7 +623,7 @@ function AuthenticatedWorkspace({
       console.error(error)
       await appendMessage({
         chatId,
-        clerkUserId,
+        ...userProfile,
         role: "assistant",
         text: "QueryLens could not analyze that request right now. The current evidence view is still available while the active slice is rechecked.",
       }).catch((appendError) => {
@@ -772,7 +773,7 @@ function AuthenticatedWorkspace({
           </Button>
           <div className="h-4 w-px bg-border" />
           <Button asChild variant="ghost" size="sm" className="gap-2">
-            <Link href="/explorer">
+            <Link href={`/explorer?datasetId=${encodeURIComponent(datasetId)}`}>
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline-block">Source context</span>
             </Link>

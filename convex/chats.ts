@@ -3,92 +3,13 @@ import { v } from "convex/values"
 import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
+import { getOrCreateCurrentUser, requireClerkUserId } from "./clerkUsers"
 
 const profileArgs = {
   clerkUserId: v.string(),
   name: v.optional(v.string()),
   email: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
-}
-
-function requireClerkUserId(clerkUserId: string) {
-  const trimmed = clerkUserId.trim()
-
-  if (!trimmed) {
-    throw new Error("Missing Clerk user id")
-  }
-
-  return trimmed
-}
-
-async function getOrCreateCurrentUser(
-  ctx: MutationCtx,
-  profile: {
-    clerkUserId: string
-    name?: string
-    email?: string
-    imageUrl?: string
-  },
-) {
-  const clerkUserId = requireClerkUserId(profile.clerkUserId)
-  const now = Date.now()
-  const [existingUser] = await ctx.db
-    .query("users")
-    .withIndex("by_clerkUserId", (q) =>
-      q.eq("clerkUserId", clerkUserId),
-    )
-    .take(1)
-
-  if (existingUser) {
-    const userPatch: {
-      name?: string
-      email?: string
-      imageUrl?: string
-      updatedAt: number
-    } = {
-      updatedAt: now,
-    }
-
-    if (profile.name) {
-      userPatch.name = profile.name
-    }
-    if (profile.email) {
-      userPatch.email = profile.email
-    }
-    if (profile.imageUrl) {
-      userPatch.imageUrl = profile.imageUrl
-    }
-
-    await ctx.db.patch(existingUser._id, userPatch)
-    return existingUser
-  }
-
-  const userDocument: {
-    clerkUserId: string
-    name?: string
-    email?: string
-    imageUrl?: string
-    createdAt: number
-    updatedAt: number
-  } = {
-    clerkUserId,
-    createdAt: now,
-    updatedAt: now,
-  }
-
-  if (profile.name) {
-    userDocument.name = profile.name
-  }
-  if (profile.email) {
-    userDocument.email = profile.email
-  }
-  if (profile.imageUrl) {
-    userDocument.imageUrl = profile.imageUrl
-  }
-
-  const userId = await ctx.db.insert("users", userDocument)
-
-  return await ctx.db.get(userId)
 }
 
 async function findDefaultChat(args: {
@@ -99,9 +20,7 @@ async function findDefaultChat(args: {
   const chats = await args.ctx.db
     .query("chats")
     .withIndex("by_clerkUserId_and_datasetId", (q) =>
-      q
-        .eq("clerkUserId", args.clerkUserId)
-        .eq("datasetId", args.datasetId),
+      q.eq("clerkUserId", args.clerkUserId).eq("datasetId", args.datasetId),
     )
     .take(100)
 
@@ -156,10 +75,6 @@ export const getOrCreateDefaultChat = mutation({
     const clerkUserId = requireClerkUserId(args.clerkUserId)
     const user = await getOrCreateCurrentUser(ctx, args)
 
-    if (!user) {
-      throw new Error("Could not create user")
-    }
-
     const existingChat = await findDefaultChat({
       ctx,
       clerkUserId,
@@ -192,10 +107,6 @@ export const createChat = mutation({
     const clerkUserId = requireClerkUserId(args.clerkUserId)
     const user = await getOrCreateCurrentUser(ctx, args)
 
-    if (!user) {
-      throw new Error("Could not create user")
-    }
-
     const now = Date.now()
     return await ctx.db.insert("chats", {
       userId: user._id,
@@ -219,9 +130,7 @@ export const listChats = query({
     const chats = await ctx.db
       .query("chats")
       .withIndex("by_clerkUserId_and_datasetId", (q) =>
-        q
-          .eq("clerkUserId", clerkUserId)
-          .eq("datasetId", args.datasetId),
+        q.eq("clerkUserId", clerkUserId).eq("datasetId", args.datasetId),
       )
       .take(100)
 
@@ -244,9 +153,7 @@ export const listMessages = query({
 
     return await ctx.db
       .query("messages")
-      .withIndex("by_chatId_and_createdAt", (q) =>
-        q.eq("chatId", args.chatId),
-      )
+      .withIndex("by_chatId_and_createdAt", (q) => q.eq("chatId", args.chatId))
       .order("asc")
       .take(200)
   },
@@ -254,7 +161,7 @@ export const listMessages = query({
 
 export const seedInitialMessages = mutation({
   args: {
-    clerkUserId: v.string(),
+    ...profileArgs,
     chatId: v.id("chats"),
     initialQuestion: v.string(),
     initialAnswer: v.string(),
@@ -262,11 +169,7 @@ export const seedInitialMessages = mutation({
   },
   handler: async (ctx, args): Promise<{ seeded: boolean }> => {
     const clerkUserId = requireClerkUserId(args.clerkUserId)
-    const user = await getOrCreateCurrentUser(ctx, { clerkUserId })
-
-    if (!user) {
-      throw new Error("Could not create user")
-    }
+    const user = await getOrCreateCurrentUser(ctx, args)
 
     await requireOwnedChat({
       ctx,
@@ -276,9 +179,7 @@ export const seedInitialMessages = mutation({
 
     const [existingMessage] = await ctx.db
       .query("messages")
-      .withIndex("by_chatId_and_createdAt", (q) =>
-        q.eq("chatId", args.chatId),
-      )
+      .withIndex("by_chatId_and_createdAt", (q) => q.eq("chatId", args.chatId))
       .take(1)
 
     if (existingMessage) {
@@ -313,7 +214,7 @@ export const seedInitialMessages = mutation({
 
 export const appendMessage = mutation({
   args: {
-    clerkUserId: v.string(),
+    ...profileArgs,
     chatId: v.id("chats"),
     role: v.union(v.literal("user"), v.literal("assistant")),
     text: v.string(),
@@ -321,11 +222,7 @@ export const appendMessage = mutation({
   },
   handler: async (ctx, args): Promise<Id<"messages">> => {
     const clerkUserId = requireClerkUserId(args.clerkUserId)
-    const user = await getOrCreateCurrentUser(ctx, { clerkUserId })
-
-    if (!user) {
-      throw new Error("Could not create user")
-    }
+    const user = await getOrCreateCurrentUser(ctx, args)
 
     await requireOwnedChat({
       ctx,

@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server"
+
 import { isBuiltInDatasetId } from "@/lib/querylens/datasets"
 import { getOnboardedDatasetRecord } from "@/lib/querylens/server/dataset-registry"
 
@@ -6,6 +8,16 @@ export async function GET(
   context: { params: Promise<{ datasetId: string }> }
 ) {
   const { datasetId } = await context.params
+  const { userId } = await auth()
+
+  if (!userId) {
+    return Response.json(
+      {
+        error: "Not authenticated.",
+      },
+      { status: 401 }
+    )
+  }
 
   if (isBuiltInDatasetId(datasetId)) {
     return Response.json({

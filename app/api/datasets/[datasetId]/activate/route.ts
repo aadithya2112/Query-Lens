@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server"
+
 import { activateOnboardedDataset, getOnboardedDatasetRecord } from "@/lib/querylens/server/dataset-registry"
 
 export async function POST(
@@ -5,6 +7,17 @@ export async function POST(
   context: { params: Promise<{ datasetId: string }> }
 ) {
   const { datasetId } = await context.params
+  const { userId } = await auth()
+
+  if (!userId) {
+    return Response.json(
+      {
+        error: "Not authenticated.",
+      },
+      { status: 401 }
+    )
+  }
+
   const dataset = await getOnboardedDatasetRecord(datasetId)
 
   if (!dataset) {
@@ -16,9 +29,7 @@ export async function POST(
     )
   }
 
-  await activateOnboardedDataset(datasetId)
-
   return Response.json({
-    dataset: await getOnboardedDatasetRecord(datasetId),
+    dataset: await activateOnboardedDataset(datasetId),
   })
 }

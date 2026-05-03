@@ -9,6 +9,8 @@
  */
 
 import type * as chats from "../chats.js";
+import type * as clerkUsers from "../clerkUsers.js";
+import type * as datasets from "../datasets.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +20,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   chats: typeof chats;
+  clerkUsers: typeof clerkUsers;
+  datasets: typeof datasets;
 }>;
 
 /**

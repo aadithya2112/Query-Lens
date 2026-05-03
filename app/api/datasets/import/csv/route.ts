@@ -1,8 +1,21 @@
+import { auth } from "@clerk/nextjs/server"
+
 import { importCsvDataset, isCsvImportError } from "@/lib/querylens/server/csv-onboarding"
 import type { DatasetImportErrorPayload } from "@/lib/querylens/types"
 
 export async function POST(request: Request) {
   try {
+    const { userId } = await auth()
+
+    if (!userId) {
+      return Response.json(
+        {
+          error: "Not authenticated.",
+        },
+        { status: 401 }
+      )
+    }
+
     const formData = await request.formData()
     const file = formData.get("file")
 
