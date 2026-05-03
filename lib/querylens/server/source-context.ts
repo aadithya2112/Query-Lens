@@ -1,9 +1,13 @@
 import { isBuiltInDatasetId } from "@/lib/querylens/datasets"
-import { getOnboardedDatasetRecord } from "@/lib/querylens/server/dataset-registry"
+import {
+  getOnboardedDatasetRecord,
+  listOnboardedDatasetRecords,
+} from "@/lib/querylens/server/dataset-registry"
 import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import type { AgenticSchemaObject } from "@/lib/querylens/server/agentic-types"
 import type {
   ContextEvent,
+  OnboardedDatasetRecord,
   ResultTable,
   SourceHealth,
   WeeklyMetricRow,
@@ -14,8 +18,18 @@ interface SourceSummary {
   description: string
 }
 
+export interface SourceContextConnectedUpload {
+  id: string
+  label: string
+  status: "draft" | "active"
+  rowCount: number
+  tableName: string
+  columns: string[]
+  previewRows: ResultTable
+}
+
 export interface SourceContextPayload {
-  kind: "built_in" | "onboarded"
+  kind: "built_in" | "onboarded" | "missing"
   datasetId: string
   datasetLabel: string
   sourceMode: "database"
@@ -25,6 +39,7 @@ export interface SourceContextPayload {
   mongoSchema: AgenticSchemaObject[]
   postgresPreview: ResultTable
   mongoPreview: ResultTable
+  connectedUploads: SourceContextConnectedUpload[]
 }
 
 function buildPostgresPreview(rows: WeeklyMetricRow[]): ResultTable {
@@ -90,6 +105,62 @@ function buildEmptyPreview(): ResultTable {
   }
 }
 
+function buildMissingSourceContextPayload(datasetId: string): SourceContextPayload {
+  return {
+    kind: "missing",
+    datasetId,
+    datasetLabel: "Dataset unavailable",
+    sourceMode: "database",
+    sourceHealth: [],
+    summaries: [
+      {
+        title: "Dataset not found",
+        description:
+          "QueryLens could not find an uploaded CSV dataset with this id for the current signed-in user.",
+      },
+      {
+        title: "What to do next",
+        description:
+          "Return to onboarding to import the CSV again, or open the workspace and choose one of your available datasets.",
+      },
+      {
+        title: "Requested dataset id",
+        description: datasetId,
+      },
+    ],
+    postgresSchema: [],
+    mongoSchema: [],
+    postgresPreview: buildEmptyPreview(),
+    mongoPreview: buildEmptyPreview(),
+    connectedUploads: [],
+  }
+}
+
+function buildConnectedUpload(dataset: OnboardedDatasetRecord): SourceContextConnectedUpload {
+  return {
+    id: dataset.id,
+    label: dataset.label,
+    status: dataset.status,
+    rowCount: dataset.rowCount,
+    tableName: dataset.tableName,
+    columns: dataset.columns.map((column) => column.normalizedName),
+    previewRows: dataset.previewRows,
+  }
+}
+
+function buildConnectedUploadSourceHealth(
+  dataset: SourceContextConnectedUpload,
+): SourceHealth {
+  return {
+    id: `upload:${dataset.id}`,
+    name: dataset.label,
+    type: "csv",
+    status: dataset.status === "active" ? "connected" : "draft",
+    detail: `${dataset.rowCount.toLocaleString()} imported rows available from uploaded CSV context.`,
+    recordCount: dataset.rowCount,
+  }
+}
+
 export async function getSourceContextPayload(
   datasetId?: string,
 ): Promise<SourceContextPayload> {
@@ -138,12 +209,16 @@ export async function getSourceContextPayload(
         mongoSchema: [],
         postgresPreview: dataset.previewRows,
         mongoPreview: buildEmptyPreview(),
+        connectedUploads: [],
       }
     }
+
+    return buildMissingSourceContextPayload(datasetId)
   }
 
   const { dataAccess, profileStore } = await getQueryLensDatasetRuntime()
   const profileSnapshot = await profileStore.getProfileSnapshot()
+  const uploadedDatasets = await listOnboardedDatasetRecords()
 
   const [weeklyMetrics] = await Promise.all([dataAccess.listWeeklyMetrics()])
 
@@ -162,16 +237,22 @@ export async function getSourceContextPayload(
     .map((collection) => collection.name)
     .join(", ")
 
+  const connectedUploads = uploadedDatasets.map(buildConnectedUpload)
+  const uploadCount = connectedUploads.length
+  const uploadSummary =
+    uploadCount > 0
+      ? ` This user also has ${uploadCount} uploaded CSV ${uploadCount === 1 ? "dataset" : "datasets"} connected for chat context.`
+      : ""
+
   return {
     kind: "built_in",
     datasetId: profileSnapshot.datasetId,
     datasetLabel: profileSnapshot.datasetLabel ?? "SME portfolio",
     sourceMode: dataAccess.sourceMode,
-    sourceHealth: profileSnapshot.sourceHealth,
     summaries: [
       {
         title: "What data is present",
-        description: `QueryLens has ${profileSnapshot.schemaSnapshot.postgres.length} PostgreSQL tables and ${profileSnapshot.schemaSnapshot.mongodb.length} MongoDB collections available for analysis.`,
+        description: `QueryLens has ${profileSnapshot.schemaSnapshot.postgres.length} PostgreSQL tables and ${profileSnapshot.schemaSnapshot.mongodb.length} MongoDB collections available for analysis.${uploadSummary}`,
       },
       {
         title: "How data is used",
@@ -180,12 +261,27 @@ export async function getSourceContextPayload(
       {
         title: "Execution mode",
         description:
-          "This workspace is reading from live docker-backed databases in read-only mode.",
+          uploadCount > 0
+            ? "This workspace is reading from live docker-backed databases in read-only mode, alongside user-uploaded CSV datasets that are available as additional context across chats."
+            : "This workspace is reading from live docker-backed databases in read-only mode.",
       },
     ],
-    postgresSchema: profileSnapshot.schemaSnapshot.postgres,
+    sourceHealth: [
+      ...profileSnapshot.sourceHealth,
+      ...connectedUploads.map(buildConnectedUploadSourceHealth),
+    ],
+    postgresSchema: [
+      ...profileSnapshot.schemaSnapshot.postgres,
+      ...connectedUploads.map((dataset) => ({
+        name: dataset.tableName,
+        description: `Uploaded CSV rows for ${dataset.label}.`,
+        columns: dataset.columns,
+        rowCount: dataset.rowCount,
+      })),
+    ],
     mongoSchema: profileSnapshot.schemaSnapshot.mongodb,
     postgresPreview: buildPostgresPreview(weeklyMetrics),
     mongoPreview: buildMongoPreview(contextEvents),
+    connectedUploads,
   }
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 
 import { CheckCircle2, Database, FileUp, Sparkles, Table2 } from "lucide-react"
@@ -34,6 +35,22 @@ export function resolveImportErrorMessage(
   }
 
   return payload?.error ?? "QueryLens could not import that CSV."
+}
+
+export function buildSourceContextHref(datasetId: string) {
+  return `/explorer?datasetId=${encodeURIComponent(datasetId)}`
+}
+
+export function DatasetSourceContextAction({
+  datasetId,
+}: {
+  datasetId: string
+}) {
+  return (
+    <Button asChild variant="outline">
+      <Link href={buildSourceContextHref(datasetId)}>Source context</Link>
+    </Button>
+  )
 }
 
 export default function OnboardingPage() {
@@ -265,7 +282,10 @@ export default function OnboardingPage() {
                     </table>
                   </div>
                 </div>
-                <Button onClick={() => setStepIndex(2)}>Continue to semantic draft</Button>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={() => setStepIndex(2)}>Continue to semantic draft</Button>
+                  <DatasetSourceContextAction datasetId={dataset.id} />
+                </div>
               </div>
             )}
 
@@ -309,9 +329,12 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 </div>
-                <Button onClick={handleActivate} disabled={isSubmitting}>
-                  {isSubmitting ? "Activating dataset..." : "Activate dataset"}
-                </Button>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={handleActivate} disabled={isSubmitting}>
+                    {isSubmitting ? "Activating dataset..." : "Activate dataset"}
+                  </Button>
+                  <DatasetSourceContextAction datasetId={dataset.id} />
+                </div>
               </div>
             )}
 
@@ -330,6 +353,7 @@ export default function OnboardingPage() {
                   <Button onClick={() => window.location.assign(`/demo?datasetId=${encodeURIComponent(dataset.id)}`)}>
                     Open in workspace
                   </Button>
+                  <DatasetSourceContextAction datasetId={dataset.id} />
                   <Button variant="outline" onClick={() => window.location.assign("/onboarding")}>
                     Import another CSV
                   </Button>

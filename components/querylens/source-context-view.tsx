@@ -139,6 +139,67 @@ function PreviewTable({
 }
 
 export default function SourceContextView({ payload }: SourceContextViewProps) {
+  const isBuiltIn = payload.kind === "built_in"
+  const hasConnectedUploads = isBuiltIn && payload.connectedUploads.length > 0
+
+  if (payload.kind === "missing") {
+    return (
+      <div className="min-h-screen bg-black text-white font-sans selection:bg-white/30 pb-20">
+        <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-2xl">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#86868b]">
+                QueryLens PRO
+              </p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white/90">
+                Source context
+              </h1>
+              <p className="mt-1 text-sm text-[#86868b]">{payload.datasetLabel}</p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white transition-all backdrop-blur-lg">
+              <Link
+                href="/demo"
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="font-medium">Back to Workspace</span>
+              </Link>
+            </Button>
+          </div>
+        </header>
+
+        <main className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-10 sm:px-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <section className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+            <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-amber-300 shadow-inner">
+              Uploaded CSV unavailable
+            </span>
+            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white/90">
+              Dataset not found
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-[#86868b]">
+              QueryLens could not load the requested uploaded dataset for this signed-in user, so it did not fall back to the built-in SME source context.
+            </p>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {payload.summaries.map((summary) => (
+                <article
+                  key={summary.title}
+                  className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner"
+                >
+                  <p className="text-sm font-semibold text-white/90 tracking-tight">
+                    {summary.title}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-[#86868b]">
+                    {summary.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-white/30 pb-20">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur-2xl">
@@ -170,7 +231,7 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           <div className="flex flex-wrap items-center gap-4">
             <h2 className="text-xl font-semibold tracking-tight text-white/90">Data Summary</h2>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-400/90 shadow-inner">
-              {payload.kind === "built_in" ? "Live database mode" : "Uploaded CSV mode"}
+              {isBuiltIn ? "Live database mode" : "Uploaded CSV mode"}
             </span>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -212,11 +273,57 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
           </div>
         </section>
 
-        <section className="grid gap-8 lg:grid-cols-2">
+        {hasConnectedUploads ? (
+          <section className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+            <div className="flex flex-wrap items-center gap-4">
+              <h2 className="text-xl font-semibold tracking-tight text-white/90">Uploaded CSV datasets</h2>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-white/70 shadow-inner">
+                {payload.connectedUploads.length} connected
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-[#86868b]">
+              These user-uploaded CSV datasets are also connected and available as context across chats in the current design.
+            </p>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {payload.connectedUploads.map((dataset) => (
+                <article
+                  key={dataset.id}
+                  className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-transform hover:bg-white/10"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold tracking-tight text-white/90">{dataset.label}</p>
+                      <p className="mt-1 text-sm text-[#86868b]">{dataset.tableName}</p>
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] text-white/70">
+                      {dataset.status}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-[#86868b]">
+                    {dataset.rowCount.toLocaleString()} imported rows available from uploaded CSV context.
+                  </p>
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-[#86868b] bg-black/20 p-2 rounded-lg border border-white/5">
+                    {dataset.columns.slice(0, 6).join(", ")}
+                    {dataset.columns.length > 6 ? " ..." : ""}
+                  </p>
+                  <div className="mt-4">
+                    <Button asChild variant="outline" size="sm" className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white">
+                      <Link href={`/explorer?datasetId=${encodeURIComponent(dataset.id)}`}>
+                        Open dataset context
+                      </Link>
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className={`grid gap-8 ${isBuiltIn ? "lg:grid-cols-2" : ""}`}>
           <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
             <h2 className="text-xl font-semibold tracking-tight text-white/90">PostgreSQL Objects</h2>
             <p className="mt-2 text-sm text-[#86868b]">
-              {payload.kind === "built_in"
+              {isBuiltIn
                 ? "Tables that power portfolio facts and metric aggregation."
                 : "Tables created from the uploaded CSV and used for deterministic analysis."}
             </p>
@@ -244,57 +351,65 @@ export default function SourceContextView({ payload }: SourceContextViewProps) {
             </ul>
           </article>
 
-          <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
-            <h2 className="text-xl font-semibold tracking-tight text-white/90">MongoDB Objects</h2>
-            <p className="mt-2 text-sm text-[#86868b]">
-              {payload.kind === "built_in"
-                ? "Collections used as qualitative context alongside metric shifts."
-                : "No MongoDB collections are attached to uploaded CSV datasets in this slice."}
-            </p>
-            <ul className="mt-6 space-y-4">
-              {payload.mongoSchema.map((collection) => (
-                <li
-                  key={collection.name}
-                  className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-colors hover:bg-white/10"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold tracking-tight text-white/90">{collection.name}</p>
-                    <span className="font-mono text-xs text-[#86868b]">
-                      {collection.rowCount.toLocaleString()} docs
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-[#86868b] leading-relaxed">
-                    {collection.description}
-                  </p>
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-[#86868b] bg-black/20 p-2 rounded-lg border border-white/5">
-                    {collection.columns.slice(0, 6).join(", ")}
-                    {collection.columns.length > 6 ? " ..." : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </article>
+          {isBuiltIn ? (
+            <article className="rounded-[32px] border border-white/10 bg-[#1c1c1e]/40 backdrop-blur-xl shadow-2xl p-6 lg:p-8">
+              <h2 className="text-xl font-semibold tracking-tight text-white/90">MongoDB Objects</h2>
+              <p className="mt-2 text-sm text-[#86868b]">
+                Collections used as qualitative context alongside metric shifts.
+              </p>
+              <ul className="mt-6 space-y-4">
+                {payload.mongoSchema.map((collection) => (
+                  <li
+                    key={collection.name}
+                    className="rounded-2xl border border-white/5 bg-white/5 p-5 shadow-inner transition-colors hover:bg-white/10"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold tracking-tight text-white/90">{collection.name}</p>
+                      <span className="font-mono text-xs text-[#86868b]">
+                        {collection.rowCount.toLocaleString()} docs
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-[#86868b] leading-relaxed">
+                      {collection.description}
+                    </p>
+                    <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-[#86868b] bg-black/20 p-2 rounded-lg border border-white/5">
+                      {collection.columns.slice(0, 6).join(", ")}
+                      {collection.columns.length > 6 ? " ..." : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
         </section>
 
         <div className="flex flex-col gap-8 mt-4">
           <PreviewTable
-            title="PostgreSQL preview"
+            title={isBuiltIn ? "PostgreSQL preview" : "CSV sample records"}
             description={
-              payload.kind === "built_in"
+              isBuiltIn
                 ? "A quick sample from weekly portfolio facts used in analysis responses."
                 : "A quick sample from the uploaded CSV rows saved for this dataset."
             }
             table={payload.postgresPreview}
           />
-          <PreviewTable
-            title="MongoDB preview"
-            description={
-              payload.kind === "built_in"
-                ? "A quick sample from contextual event documents used for corroboration."
-                : "Uploaded CSV datasets do not yet have MongoDB corroboration in the source context tab."
-            }
-            table={payload.mongoPreview}
-          />
+          {isBuiltIn ? (
+            <PreviewTable
+              title="MongoDB preview"
+              description="A quick sample from contextual event documents used for corroboration."
+              table={payload.mongoPreview}
+            />
+          ) : null}
+          {hasConnectedUploads
+            ? payload.connectedUploads.map((dataset) => (
+                <PreviewTable
+                  key={dataset.id}
+                  title={`${dataset.label} sample records`}
+                  description="A few saved rows from this uploaded CSV dataset, available as user-scoped context."
+                  table={dataset.previewRows}
+                />
+              ))
+            : null}
         </div>
       </main>
     </div>

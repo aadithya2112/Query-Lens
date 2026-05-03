@@ -91,6 +91,19 @@ export async function getOnboardedDatasetRecord(
   return (dataset as OnboardedDatasetRecord | null | undefined) ?? undefined
 }
 
+export async function listOnboardedDatasetRecords(): Promise<OnboardedDatasetRecord[]> {
+  const datasets = await listRegisteredDatasets()
+  const onboardedDatasets = await Promise.all(
+    datasets
+      .filter((dataset) => dataset.sourceKind === "csv")
+      .map(async (dataset) => getOnboardedDatasetRecord(dataset.id)),
+  )
+
+  return onboardedDatasets.filter(
+    (dataset): dataset is OnboardedDatasetRecord => Boolean(dataset),
+  )
+}
+
 export async function activateOnboardedDataset(datasetId: DatasetId) {
   const { userId } = await auth()
   if (!userId) {

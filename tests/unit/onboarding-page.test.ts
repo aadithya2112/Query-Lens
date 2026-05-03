@@ -1,6 +1,12 @@
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
-import { resolveImportErrorMessage } from "@/app/onboarding/page"
+import {
+  buildSourceContextHref,
+  DatasetSourceContextAction,
+  resolveImportErrorMessage,
+} from "@/app/onboarding/page"
 
 describe("onboarding import error messaging", () => {
   it("renders a targeted message for OpenRouter 429 responses", () => {
@@ -22,5 +28,20 @@ describe("onboarding import error messaging", () => {
         retryable: false,
       })
     ).toBe("Something else failed.")
+  })
+
+  it("builds an explorer link for newly imported CSV datasets", () => {
+    expect(buildSourceContextHref("csv_sales")).toBe(
+      "/explorer?datasetId=csv_sales",
+    )
+  })
+
+  it("renders a source context action for an imported dataset", () => {
+    const html = renderToStaticMarkup(
+      createElement(DatasetSourceContextAction, { datasetId: "csv_sales" }),
+    )
+
+    expect(html).toContain("Source context")
+    expect(html).toContain("/explorer?datasetId=csv_sales")
   })
 })
