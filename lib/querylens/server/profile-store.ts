@@ -144,6 +144,7 @@ async function buildDatabaseSchemaSnapshot(): Promise<AgenticSchemaSnapshot> {
   return {
     postgres: postgresCounts,
     mongodb: mongodbCounts,
+    csv: [],
   }
 }
 

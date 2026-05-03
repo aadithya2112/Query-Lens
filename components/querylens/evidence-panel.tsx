@@ -29,6 +29,10 @@ function resolveSourcesUsed(analysis: Phase1AnalysisResponse) {
   return analysis.trust?.sources ?? analysis.trustArtifacts?.sourcesUsed ?? []
 }
 
+function resolveSourceAudit(analysis: Phase1AnalysisResponse) {
+  return analysis.sourceAudit
+}
+
 function resolveObservedFacts(analysis: Phase1AnalysisResponse) {
   return analysis.trust?.observedFacts ?? analysis.trustArtifacts?.directlyObserved ?? []
 }
@@ -288,6 +292,95 @@ function SourcesUsedCard({ analysis }: EvidencePanelProps) {
             <p className="mt-3 text-xs text-muted-foreground">{source.timeRange}</p>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function SourceAuditCard({ analysis }: EvidencePanelProps) {
+  const sourceAudit = resolveSourceAudit(analysis)
+  if (!sourceAudit) {
+    return null
+  }
+
+  const inspectedIds = new Set(sourceAudit.inspected.map((entry) => entry.sourceId))
+  const usedIds = new Set(sourceAudit.used.map((entry) => entry.sourceId))
+
+  return (
+    <div className="rounded-[28px] border border-border bg-card/50 px-5 py-5 lg:px-7 lg:py-6 backdrop-blur-xl">
+      <div className="flex items-center gap-2">
+        <Shield size={16} className="text-muted-foreground" />
+        <h2 className="text-base font-semibold text-foreground">Source audit</h2>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-[22px] border border-border bg-muted/10 px-4 py-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Available sources
+          </p>
+          <div className="mt-3 space-y-3">
+            {sourceAudit.available.length > 0 ? (
+              sourceAudit.available.map((entry) => (
+                <div key={`available-${entry.sourceId}`} className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">{entry.label}</p>
+                    <span className="rounded-full border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      {usedIds.has(entry.sourceId)
+                        ? "used"
+                        : inspectedIds.has(entry.sourceId)
+                          ? "inspected"
+                          : "available"}
+                    </span>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">{entry.note}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm leading-6 text-muted-foreground">
+                No available sources were recorded for this response.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[22px] border border-border bg-muted/10 px-4 py-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Inspected sources
+          </p>
+          <div className="mt-3 space-y-3">
+            {sourceAudit.inspected.length > 0 ? (
+              sourceAudit.inspected.map((entry) => (
+                <div key={`inspected-${entry.sourceId}`}>
+                  <p className="text-sm font-semibold text-foreground">{entry.label}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{entry.note}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm leading-6 text-muted-foreground">
+                No schema inspections were recorded.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[22px] border border-border bg-muted/10 px-4 py-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Used in answer
+          </p>
+          <div className="mt-3 space-y-3">
+            {sourceAudit.used.length > 0 ? (
+              sourceAudit.used.map((entry) => (
+                <div key={`used-${entry.sourceId}`}>
+                  <p className="text-sm font-semibold text-foreground">{entry.label}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{entry.note}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm leading-6 text-muted-foreground">
+                No source reads were used in the final answer.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -634,6 +727,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
         <ResultTableCard analysis={analysis} />
         <HowProducedCard analysis={analysis} />
         <SourcesUsedCard analysis={analysis} />
+        <SourceAuditCard analysis={analysis} />
         <ObservedVsInferred analysis={analysis} />
         <UncertaintyAndLimitations analysis={analysis} />
 
@@ -768,7 +862,7 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
                 {isDiscovery
                   ? "The discovery slice uses pgvector-backed metadata retrieval, source health checks, and conversation memory to answer broad questions safely."
                   : isAgentic
-                    ? "The agentic slice uses Gemini tool-calling plus guarded read-only database execution to answer unsupported live questions."
+                    ? "The agentic slice uses a provider-backed bounded tool-calling loop with guarded read-only execution across approved sources."
                     : isBreakdown
                       ? "The breakdown slice uses validated planning, account-level weekly stress rollups, and contextual Mongo evidence."
                       : isCompare
@@ -795,6 +889,40 @@ export default function EvidencePanel({ analysis }: EvidencePanelProps) {
                   <p className="mt-1">
                     Recent turns used: {analysis.retrievalTrace.recentMessagesCount}
                   </p>
+                </div>
+              )}
+              {analysis.executionTrace && (
+                <div className="rounded-[18px] border border-border bg-muted/10 px-4 py-4">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Execution trace ({analysis.executionTrace.planId})
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {analysis.executionTrace.entries.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="rounded-[14px] border border-border bg-background/30 px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {entry.stage}
+                          </span>
+                          <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                            {entry.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {entry.message}
+                        </p>
+                        {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                          <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                            {Object.entries(entry.metadata)
+                              .map(([key, value]) => `${key}: ${String(value)}`)
+                              .join(" · ")}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <ul className="space-y-2">

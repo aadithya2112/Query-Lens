@@ -1,7 +1,8 @@
-import { canUseGemini } from "@/lib/querylens/server/ai-config"
+import { canUseReasoningProvider } from "@/lib/querylens/server/ai-config"
 import { isBuiltInDatasetId } from "@/lib/querylens/datasets"
 import type { QueryLensExecutionContext } from "@/lib/querylens/server/ai-config"
 import { executeAgenticFallback } from "@/lib/querylens/server/agentic-query"
+import { buildAgenticSourceCatalog } from "@/lib/querylens/server/agentic-source-catalog"
 import { runBuiltInAnalysisPipeline } from "@/lib/querylens/server/built-in-pipeline"
 import { getQueryLensDatasetRuntime } from "@/lib/querylens/server/dataset-runtime"
 import { analyzeOnboardedDatasetQuery } from "@/lib/querylens/server/onboarded-analysis"
@@ -121,13 +122,22 @@ export async function analyzeQuery(
 
   if (
     executionContext === "interactive" &&
-    canUseGemini(executionContext)
+    canUseReasoningProvider(executionContext)
   ) {
+    const sourceCatalog = await buildAgenticSourceCatalog({
+      profileSnapshot,
+    })
+    const activeDatasetId = input.datasetId ?? profileSnapshot.datasetId
     const agenticResponse = await executeAgenticFallback({
       question: input.question,
       dataAccess,
-      schemaSnapshot: profileSnapshot.schemaSnapshot,
+      sourceCatalog,
       retrievalContext,
+      activeDatasetId,
+      activeDatasetLabel: profileSnapshot.datasetLabel ?? activeDatasetId,
+      fallbackReason:
+        builtInResult.fallbackReason ??
+        "The deterministic route declined the question and handed it to the bounded multi-source agent.",
     })
 
     const enrichedAgenticResponse = enrichPhase1Response({

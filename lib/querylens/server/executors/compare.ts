@@ -363,7 +363,16 @@ export async function executeComparePlan(
     sourceMode: args.dataAccess.sourceMode,
     trustContext: {
       allowedSources: args.context.executionPlan.allowedSources,
-      observedSources: [...new Set(evidence.map((item) => item.sourceType))],
+      observedSources: [
+        ...new Set(
+          evidence
+            .map((item) => item.sourceType)
+            .filter(
+              (sourceType): sourceType is "postgres" | "mongodb" | "manifest" =>
+                sourceType !== "csv",
+            ),
+        ),
+      ],
       coverageKind: "validated_analytics",
       validationStatus: args.context.executionPlan.validation.status,
       validationResults: args.context.executionPlan.validation.results,

@@ -12,30 +12,31 @@ Core demo story:
 
 This is the real priority order for the remaining demo work:
 
-1. Persist uploaded datasets per user.
-2. Persist the active dataset as workspace state.
-3. Persist dataset/source metadata and onboarding context in the same user-scoped layer.
-4. Tighten the trust UI:
+1. Build a bounded multi-source agent that can query all connected user sources. [Completed]
+   - integrate with the current deterministic pipeline instead of replacing it
+   - allow guarded read-only querying across built-in Postgres, built-in Mongo, and uploaded CSV datasets
+   - keep execution bounded, inspectable, and safe for demo use
+2. Tighten the trust UI:
    - show interpreted intent
    - show why the answer is trusted
    - show trust/source trace clearly
    - show the actual SQL or Mongo query when appropriate, including CSV-backed queries
-5. Strengthen semantic governance for safe querying:
+3. Strengthen semantic governance for safe querying:
    - valid filters
    - allowed groupings
    - clearer semantic constraints
-6. Improve execution transparency:
+4. Improve execution transparency:
    - selected metric
    - timeframe
    - scope
    - source used
    - execution path
-7. Build bounded agentic execution with guardrails:
-   - approved capabilities
-   - multi-step investigation
-   - bounded retry/query repair
-   - full execution trace
-8. Fold in the provider-agnostic model interface and OpenRouter wherever onboarding, planning, or explanation still need cleanup.
+5. Fold in the provider-agnostic model interface and OpenRouter wherever onboarding, planning, or explanation still need cleanup.
+
+Completed foundational work:
+
+1. Persist uploaded datasets per user. [Completed]
+2. Keep uploaded context shared across all workspaces for now. [Completed]
 
 ## Product Direction
 
@@ -64,27 +65,26 @@ Goal: every user gets a clean, persistent workspace that survives refreshes and 
 
 - Use Clerk for authentication. [Completed]
 - Use Convex for app-state persistence.
-- Persist uploaded dataset metadata so the user can come back to prior work.
-- Persist the active dataset selection for the user.
+- Persist uploaded dataset metadata so the user can come back to prior work. [Completed]
+- Active dataset selection is not persisted as separate workspace state for now; uploaded context is shared across the user's workspaces. [Completed]
 - Store chat history as `user -> chat -> messages`. [Completed]
 - Link each chat to the active dataset or source when relevant. [Completed]
-- Persist onboarding context needed to resume or inspect a dataset later.
+- Persist onboarding context needed to resume or inspect a dataset later. [Completed]
 
 #### Break this down into concrete work
 
 - Persist `users`. [Completed]
 - Persist `chats`. [Completed]
 - Persist `messages`. [Completed]
-- Persist dataset/source metadata.
-- Persist active dataset state.
-- Persist semantic draft references or semantic manifest records.
+- Persist dataset/source metadata. [Completed]
+- Active dataset state is intentionally not persisted separately yet because uploaded context is shared across the user's workspaces. [Completed]
 
 #### Demo definition of done
 
-- Uploaded datasets are scoped to the signed-in user.
-- Previously uploaded datasets still appear in that user's workspace.
+- Uploaded datasets are scoped to the signed-in user. [Completed]
+- Previously uploaded datasets still appear in that user's workspace. [Completed]
 - Previously created chats still appear.
-- The active dataset is stored explicitly as workspace state.
+- Uploaded context is available across the user's workspaces without a separately persisted active dataset state. [Completed]
 
 ### 2. CSV Onboarding End To End
 
@@ -190,6 +190,8 @@ These should happen right after the core demo path feels real.
 ### 6. Bounded Agentic Execution With Guardrails
 
 Goal: let QueryLens behave agentically during execution without allowing unbounded or opaque behavior.
+
+This is now the top implementation priority for the demo, with special focus on querying all connected user sources through the current system.
 
 #### Why this matters
 

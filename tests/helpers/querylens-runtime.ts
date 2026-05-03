@@ -162,6 +162,7 @@ export function buildMockDatabaseProfileSnapshot(): DatasetProfileSnapshot {
         ...collection,
         rowCount: dataset.contextEvents[collection.name as ContextCollection].length,
       })),
+      csv: [],
     },
     sourceCounts: sourceHealth.map((source) => ({
       sourceId: source.id,

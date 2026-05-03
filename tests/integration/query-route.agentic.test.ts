@@ -88,6 +88,7 @@ vi.mock("@/lib/querylens/server/dataset-runtime", () => ({
             },
           ],
           mongodb: [],
+          csv: [],
         },
         sourceCounts: [],
       })),
@@ -111,6 +112,10 @@ vi.mock("@/lib/querylens/server/retrieval", () => ({
     retrieveContext: retrieveContextMock,
     persistConversation: persistConversationMock,
   })),
+}))
+
+vi.mock("@/lib/querylens/server/dataset-registry", () => ({
+  listOnboardedDatasetRecords: vi.fn(async () => []),
 }))
 
 import { POST } from "@/app/api/query/route"

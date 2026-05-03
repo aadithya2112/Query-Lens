@@ -46,12 +46,12 @@ describe("csv onboarding refinement", () => {
       "openrouter_rate_limited"
     )
     generateStructuredDataMock.mockRejectedValue(rateLimitError)
-    vi.spyOn(globalThis, "setTimeout").mockImplementation(((handler: TimerHandler) => {
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((handler: TimerHandler) => {
       if (typeof handler === "function") {
         handler()
       }
-      return 0 as ReturnType<typeof setTimeout>
-    }) as typeof setTimeout)
+      return 0 as unknown as ReturnType<typeof setTimeout>
+    })
 
     const promise = refineSemanticDraft({
       filename: "sample.csv",

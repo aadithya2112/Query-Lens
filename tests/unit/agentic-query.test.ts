@@ -11,7 +11,7 @@ vi.mock("@/lib/querylens/server/gemini-client", () => ({
 }))
 
 import { executeAgenticFallback, validateMongoPipeline, validateReadOnlySql } from "@/lib/querylens/server/agentic-query"
-import type { AgenticSchemaSnapshot } from "@/lib/querylens/server/agentic-types"
+import type { AgenticSchemaSnapshot, AgenticSourceCatalog } from "@/lib/querylens/server/agentic-types"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 
 function createMockDataAccess(): QueryLensDataAccess {
@@ -65,6 +65,31 @@ const schemaSnapshot: AgenticSchemaSnapshot = {
     },
   ],
   mongodb: [],
+  csv: [],
+}
+
+const sourceCatalog: AgenticSourceCatalog = {
+  entries: [
+    {
+      id: "built_in_postgres",
+      sourceType: "postgres",
+      label: "Built-in Postgres facts",
+      description: "Approved built-in QueryLens Postgres tables.",
+      recordCount: 12,
+      objectCount: schemaSnapshot.postgres.length,
+      queryable: true,
+    },
+    {
+      id: "built_in_mongodb",
+      sourceType: "mongodb",
+      label: "Built-in Mongo context",
+      description: "Approved built-in QueryLens MongoDB collections.",
+      recordCount: 0,
+      objectCount: 0,
+      queryable: true,
+    },
+  ],
+  schema: schemaSnapshot,
 }
 
 describe("agentic query fallback", () => {
@@ -155,7 +180,7 @@ describe("agentic query fallback", () => {
     const response = await executeAgenticFallback({
       question: "How has cashflow health trended over time?",
       dataAccess,
-      schemaSnapshot,
+      sourceCatalog,
       retrievalContext: {
         datasetMatches: [],
         memoryMatches: [],
@@ -173,5 +198,51 @@ describe("agentic query fallback", () => {
       title: "Weekly cashflow trend",
     })
     expect(dataAccess.executeReadOnlySql).toHaveBeenCalledOnce()
+  })
+
+  it("rejects cross-source SQL by blocking non-approved tables", async () => {
+    const dataAccess = createMockDataAccess()
+
+    geminiChatSendMock.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          id: "call-1",
+          name: "run_postgres_query",
+          args: {
+            title: "Join built-in and csv",
+            reason: "Need to combine two source families.",
+            statement:
+              "SELECT * FROM weekly_portfolio_metrics JOIN csv_uploaded_sales ON true",
+          },
+        },
+      ],
+    })
+    geminiChatSendMock.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          id: "call-2",
+          name: "reject_agentic_response",
+          args: {
+            reason:
+              "Cross-source joins are not allowed across built-in and uploaded CSV families.",
+          },
+        },
+      ],
+    })
+
+    const response = await executeAgenticFallback({
+      question: "Combine built-in and uploaded CSV rows in one query",
+      dataAccess,
+      sourceCatalog,
+      retrievalContext: {
+        datasetMatches: [],
+        memoryMatches: [],
+        recentMessages: [],
+      },
+    })
+
+    expect(response.fallback).toBe(true)
+    expect(dataAccess.executeReadOnlySql).not.toHaveBeenCalled()
+    expect(response.summary).toContain("Cross-source joins are not allowed")
   })
 })

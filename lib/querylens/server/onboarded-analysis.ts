@@ -351,6 +351,8 @@ async function runSql(statement: string) {
 function buildQueryRun(args: {
   id: string
   title: string
+  sourceId: string
+  sourceLabel: string
   statement: string
   rowCount: number
   summary: string
@@ -358,6 +360,8 @@ function buildQueryRun(args: {
   return {
     id: args.id,
     title: args.title,
+    sourceId: args.sourceId,
+    sourceLabel: args.sourceLabel,
     sourceType: "postgres",
     language: "sql",
     statement: args.statement,
@@ -571,6 +575,8 @@ export async function analyzeOnboardedDatasetQuery(args: {
         buildQueryRun({
           id: "onboarded-aggregate",
           title: `${aggregation.toUpperCase()} ${metricLabel}`,
+          sourceId: record.id,
+          sourceLabel: record.label,
           statement,
           rowCount: result.table.totalRows,
           summary,
@@ -634,6 +640,8 @@ export async function analyzeOnboardedDatasetQuery(args: {
         buildQueryRun({
           id: "onboarded-grouped-summary",
           title: `${metricColumn.label} by ${dimensionColumn.label}`,
+          sourceId: record.id,
+          sourceLabel: record.label,
           statement,
           rowCount: result.table.totalRows,
           summary,
@@ -693,6 +701,8 @@ export async function analyzeOnboardedDatasetQuery(args: {
         buildQueryRun({
           id: "onboarded-trend",
           title: `${metricColumn.label} over time`,
+          sourceId: record.id,
+          sourceLabel: record.label,
           statement,
           rowCount: result.table.totalRows,
           summary,

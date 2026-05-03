@@ -58,6 +58,7 @@ const csvSalesDataset = {
     schemaSnapshot: {
       postgres: [],
       mongodb: [],
+      csv: [],
     },
     sourceCounts: [],
   },

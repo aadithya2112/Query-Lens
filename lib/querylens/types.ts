@@ -15,6 +15,9 @@ export type ScopeType = "portfolio" | "region" | "sector" | "region_sector"
 export type BreakdownDimension = "region" | "sector" | "region_sector"
 export type CompareMode = "timeframe" | "peer"
 export type CompareDimension = "region" | "sector"
+export type SourceType = "postgres" | "mongodb" | "manifest" | "csv"
+export type QuerySourceType = Exclude<SourceType, "manifest">
+export type EvidenceSourceType = QuerySourceType | "manifest"
 export type DiscoveryFocus =
   | "overview"
   | "metrics"
@@ -78,7 +81,7 @@ export interface SemanticDimensionDefinition {
 export interface SemanticSourceDefinition {
   id: string
   label: string
-  type: "postgres" | "mongodb" | "manifest"
+  type: SourceType
   description: string
 }
 
@@ -246,7 +249,7 @@ export interface StructuredQueryPlan {
   timeframe: PlannedTimeframe
   dateWindow: DateWindow
   scope: ScopeFilter
-  scopeDimensions: ScopeDimension[]
+  scopeDimensions: readonly ScopeDimension[]
   comparisonWindow: ComparisonWindow
   breakdownDimension?: BreakdownDimension
   compareSpec?: CompareSpec
@@ -280,7 +283,7 @@ export interface DriverItem {
 }
 
 export interface EvidenceItem {
-  sourceType: "postgres" | "mongodb"
+  sourceType: EvidenceSourceType
   sourceName: string
   timeRange: string
   scope: string
@@ -325,7 +328,9 @@ export interface ResultTable {
 export interface QueryRun {
   id: string
   title: string
-  sourceType: "postgres" | "mongodb"
+  sourceId: string
+  sourceLabel: string
+  sourceType: QuerySourceType
   language: "sql" | "mongodb"
   statement: string
   status: "completed" | "rejected" | "failed"
@@ -382,11 +387,24 @@ export interface TrustScore {
 }
 
 export interface TrustArtifactSource {
-  sourceType: EvidenceItem["sourceType"] | "manifest" | "csv"
+  sourceType: SourceType
   sourceName: string
   scope: string
   timeRange: string
   note: string
+}
+
+export interface SourceAuditEntry {
+  sourceId: string
+  sourceType: SourceType
+  label: string
+  note: string
+}
+
+export interface SourceAudit {
+  available: SourceAuditEntry[]
+  inspected: SourceAuditEntry[]
+  used: SourceAuditEntry[]
 }
 
 export interface TrustComponentScore extends TrustScore {
@@ -441,6 +459,7 @@ export type ExecutionTraceStage =
   | "planning"
   | "validation"
   | "dispatch"
+  | "tool_call"
   | "source_read"
   | "fallback"
 
@@ -448,6 +467,7 @@ export type ExecutionTraceStatus =
   | "approved"
   | "completed"
   | "blocked"
+  | "failed"
   | "fallback"
 
 export interface ExecutionTraceEntry {
@@ -486,6 +506,7 @@ export interface Phase1AnalysisResponse {
   trustArtifacts?: TrustArtifacts
   resultTable?: ResultTable
   queryRuns?: QueryRun[]
+  sourceAudit?: SourceAudit
   conversationContextUsed?: boolean
   retrievalTrace?: RetrievalTrace
   executionTrace?: ExecutionTrace
@@ -510,7 +531,7 @@ export interface QueryRequestBody {
 export interface SourceHealth {
   id: string
   name: string
-  type: "postgres" | "mongodb" | "manifest" | "csv"
+  type: SourceType
   status: "connected" | "configured" | "draft"
   detail: string
   recordCount?: number
@@ -563,7 +584,7 @@ export interface DatasetSemanticDraft {
   sources: Array<{
     id: string
     label: string
-    type: "postgres" | "mongodb" | "manifest"
+    type: SourceType
     description: string
     recordCount: number
   }>

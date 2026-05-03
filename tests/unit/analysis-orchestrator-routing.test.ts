@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const {
   runBuiltInAnalysisPipelineMock,
   executeAgenticFallbackMock,
+  listOnboardedDatasetRecordsMock,
   retrieveContextMock,
   persistConversationMock,
 } = vi.hoisted(() => ({
   runBuiltInAnalysisPipelineMock: vi.fn(),
   executeAgenticFallbackMock: vi.fn(),
+  listOnboardedDatasetRecordsMock: vi.fn(async () => []),
   retrieveContextMock: vi.fn(async () => ({
     datasetMatches: [],
     memoryMatches: [],
@@ -22,6 +24,10 @@ vi.mock("@/lib/querylens/server/built-in-pipeline", () => ({
 
 vi.mock("@/lib/querylens/server/agentic-query", () => ({
   executeAgenticFallback: executeAgenticFallbackMock,
+}))
+
+vi.mock("@/lib/querylens/server/dataset-registry", () => ({
+  listOnboardedDatasetRecords: listOnboardedDatasetRecordsMock,
 }))
 
 vi.mock("@/lib/querylens/server/dataset-runtime", () => ({
@@ -51,6 +57,7 @@ vi.mock("@/lib/querylens/server/dataset-runtime", () => ({
         schemaSnapshot: {
           postgres: [],
           mongodb: [],
+          csv: [],
         },
         sourceCounts: [],
       })),
@@ -80,8 +87,12 @@ describe("analysis orchestrator routing", () => {
   beforeEach(() => {
     runBuiltInAnalysisPipelineMock.mockReset()
     executeAgenticFallbackMock.mockReset()
+    listOnboardedDatasetRecordsMock.mockReset()
+    listOnboardedDatasetRecordsMock.mockResolvedValue([])
     retrieveContextMock.mockClear()
     persistConversationMock.mockReset()
+    delete process.env.QUERYLENS_MODEL_PROVIDER
+    delete process.env.OPENROUTER_API_KEY
     process.env.QUERYLENS_AI_MODE = "gemini"
     process.env.GEMINI_API_KEY = "test-key"
   })
@@ -151,7 +162,56 @@ describe("analysis orchestrator routing", () => {
 
     expect(runBuiltInAnalysisPipelineMock).toHaveBeenCalledOnce()
     expect(executeAgenticFallbackMock).toHaveBeenCalledOnce()
+    expect(executeAgenticFallbackMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: "How has cashflow health trended over time?",
+        fallbackReason: "This needs a custom live query rather than a built-in intent.",
+        sourceCatalog: expect.objectContaining({
+          entries: expect.arrayContaining([
+            expect.objectContaining({ id: "built_in_postgres" }),
+            expect.objectContaining({ id: "built_in_mongodb" }),
+          ]),
+        }),
+      }),
+    )
     expect(response.intent).toBe("agentic_query")
     expect(persistConversationMock).toHaveBeenCalledOnce()
+  })
+
+  it("routes to the bounded agent when OpenRouter is configured without Gemini", async () => {
+    delete process.env.GEMINI_API_KEY
+    process.env.QUERYLENS_MODEL_PROVIDER = "openrouter"
+    process.env.OPENROUTER_API_KEY = "openrouter-test-key"
+    runBuiltInAnalysisPipelineMock.mockResolvedValue({
+      kind: "needs_agentic",
+      fallbackReason: "Requires bounded multi-source investigation.",
+    })
+    executeAgenticFallbackMock.mockResolvedValue({
+      intent: "agentic_query",
+      headline: "OpenRouter analysis completed",
+      summary: "Returned 1 row.",
+      metric: "custom_query_result",
+      timeframe: "Custom question",
+      comparisonBasis: "Agentic fallback over approved live QueryLens sources",
+      confidence: 88,
+      activeScope: "Custom analysis",
+      drivers: [],
+      evidence: [],
+      assumptions: [],
+      supportedFollowUps: [],
+      sourceMode: "database",
+    })
+
+    const { analyzeQuery } = await import(
+      "@/lib/querylens/server/analysis-orchestrator"
+    )
+
+    const response = await analyzeQuery({
+      question: "Investigate sources",
+      chatId: "openrouter-route",
+    })
+
+    expect(executeAgenticFallbackMock).toHaveBeenCalledOnce()
+    expect(response.intent).toBe("agentic_query")
   })
 })

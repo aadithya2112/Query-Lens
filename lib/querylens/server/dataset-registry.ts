@@ -205,6 +205,7 @@ export function buildOnboardedProfileSnapshot(args: {
         },
       ],
       mongodb: [],
+      csv: [],
     },
     sourceCounts: sourceHealth.map((source) => ({
       sourceId: source.id,

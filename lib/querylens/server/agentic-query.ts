@@ -1,30 +1,35 @@
-import {
-  FunctionCallingConfigMode,
-  createPartFromFunctionResponse,
-  type FunctionDeclaration,
-  type Part,
-} from "@google/genai"
 import { z } from "zod"
 
-import { calculateConfidenceScore } from "@/lib/querylens/scoring"
+import {
+  createAgentModelSession,
+  type AgentFunctionResponse,
+  type AgentToolDefinition,
+} from "@/lib/querylens/server/agent-model-session"
 import type {
+  AgenticConnectedCsvSource,
   AgenticQueryExecutionResult,
-  AgenticSchemaSnapshot,
+  AgenticSourceCatalog,
 } from "@/lib/querylens/server/agentic-types"
-import { createGeminiChatSession } from "@/lib/querylens/server/gemini-client"
 import type { QueryLensDataAccess } from "@/lib/querylens/server/repositories"
 import type {
   ChartDatum,
   ChartSpec,
   ContextCollection,
   EvidenceItem,
+  ExecutionTrace,
+  ExecutionTraceEntry,
   Phase1AnalysisResponse,
   QueryRun,
   RetrievalContext,
+  SourceAudit,
+  SourceAuditEntry,
+  TrustComponentScore,
+  TrustLevel,
+  TrustModel,
 } from "@/lib/querylens/types"
 
-const MAX_AGENTIC_STEPS = 5
-const MAX_AGENTIC_QUERY_RUNS = 3
+const MAX_AGENTIC_STEPS = 8
+const MAX_AGENTIC_QUERY_RUNS = 4
 const MAX_QUERY_RESULT_ROWS = 12
 
 const mongoCollectionSchema = z.enum([
@@ -47,6 +52,21 @@ const mongodbQuerySchema = z.object({
   pipeline: z.array(z.record(z.unknown())).min(1),
 })
 
+const inspectSourceSchemaSchema = z.object({
+  sourceId: z.string().min(1),
+  reason: z.string().min(1),
+})
+
+const uploadedCsvQuerySchema = z.object({
+  datasetId: z.string().min(1),
+  title: z.string().min(1),
+  reason: z.string().min(1),
+  intent: z.enum(["discovery", "aggregate", "group_by", "trend"]),
+  metricId: z.string().optional(),
+  dimensionId: z.string().optional(),
+  aggregation: z.enum(["sum", "avg", "min", "max", "count"]).optional(),
+})
+
 const finishAgenticResponseSchema = z.object({
   headline: z.string().min(1),
   summary: z.string().min(1),
@@ -54,6 +74,8 @@ const finishAgenticResponseSchema = z.object({
   comparisonBasis: z.string().min(1),
   activeScope: z.string().min(1),
   assumptions: z.array(z.string()).default([]),
+  uncertaintyNotes: z.array(z.string()).default([]),
+  limitationNotes: z.array(z.string()).default([]),
   supportedFollowUps: z.array(z.string()).max(4).default([]),
   keyFindings: z
     .array(
@@ -62,7 +84,7 @@ const finishAgenticResponseSchema = z.object({
         impactLabel: z.string().min(1),
         direction: z.enum(["negative", "positive"]),
         description: z.string().min(1),
-      })
+      }),
     )
     .min(1)
     .max(4),
@@ -84,11 +106,35 @@ const rejectAgenticResponseSchema = z.object({
   reason: z.string().min(1),
 })
 
-const agenticTools: FunctionDeclaration[] = [
+const agenticTools: AgentToolDefinition[] = [
+  {
+    name: "list_available_sources",
+    description:
+      "List the approved read-only QueryLens sources that are available for this run.",
+    parametersJsonSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {},
+    },
+  },
+  {
+    name: "inspect_source_schema",
+    description:
+      "Inspect the schema and semantic metadata for one approved source before querying it.",
+    parametersJsonSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["sourceId", "reason"],
+      properties: {
+        sourceId: { type: "string" },
+        reason: { type: "string" },
+      },
+    },
+  },
   {
     name: "run_postgres_query",
     description:
-      "Execute a single read-only SQL query against the approved QueryLens Postgres tables. Use only SELECT or WITH queries.",
+      "Execute a single read-only SQL query against approved built-in QueryLens Postgres tables. Use only SELECT or WITH queries.",
     parametersJsonSchema: {
       type: "object",
       additionalProperties: false,
@@ -103,7 +149,7 @@ const agenticTools: FunctionDeclaration[] = [
   {
     name: "run_mongodb_pipeline",
     description:
-      "Execute a read-only MongoDB aggregation pipeline against one approved QueryLens context collection.",
+      "Execute a read-only MongoDB aggregation pipeline against one approved built-in QueryLens context collection.",
     parametersJsonSchema: {
       type: "object",
       additionalProperties: false,
@@ -120,6 +166,31 @@ const agenticTools: FunctionDeclaration[] = [
           items: {
             type: "object",
           },
+        },
+      },
+    },
+  },
+  {
+    name: "run_uploaded_csv_query",
+    description:
+      "Execute a bounded semantic query against one active uploaded CSV dataset. This tool generates the SQL safely on your behalf.",
+    parametersJsonSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["datasetId", "title", "reason", "intent"],
+      properties: {
+        datasetId: { type: "string" },
+        title: { type: "string" },
+        reason: { type: "string" },
+        intent: {
+          type: "string",
+          enum: ["discovery", "aggregate", "group_by", "trend"],
+        },
+        metricId: { type: "string" },
+        dimensionId: { type: "string" },
+        aggregation: {
+          type: "string",
+          enum: ["sum", "avg", "min", "max", "count"],
         },
       },
     },
@@ -147,6 +218,14 @@ const agenticTools: FunctionDeclaration[] = [
         comparisonBasis: { type: "string" },
         activeScope: { type: "string" },
         assumptions: {
+          type: "array",
+          items: { type: "string" },
+        },
+        uncertaintyNotes: {
+          type: "array",
+          items: { type: "string" },
+        },
+        limitationNotes: {
           type: "array",
           items: { type: "string" },
         },
@@ -192,7 +271,7 @@ const agenticTools: FunctionDeclaration[] = [
   {
     name: "reject_agentic_response",
     description:
-      "Reject the request when the question is too ambiguous or cannot be answered safely from the approved QueryLens sources.",
+      "Reject the request when it cannot be answered safely from separate bounded reads across the approved QueryLens sources.",
     parametersJsonSchema: {
       type: "object",
       additionalProperties: false,
@@ -209,11 +288,50 @@ interface StoredAgenticQueryRun {
   result: AgenticQueryExecutionResult
 }
 
-interface ExecuteAgenticFallbackArgs {
+interface ExecuteBoundedMultiSourceAgentArgs {
   question: string
   dataAccess: QueryLensDataAccess
-  schemaSnapshot: AgenticSchemaSnapshot
   retrievalContext: RetrievalContext
+  sourceCatalog: AgenticSourceCatalog
+  activeDatasetId?: string
+  activeDatasetLabel?: string
+  fallbackReason?: string
+}
+
+interface BuildFallbackArgs {
+  reason: string
+  question: string
+  sourceMode: Phase1AnalysisResponse["sourceMode"]
+  sourceCatalog: AgenticSourceCatalog
+  inspectedSourceIds: Set<string>
+  queryRuns: StoredAgenticQueryRun[]
+  executionTrace: ExecutionTrace
+  uncertaintyNotes?: string[]
+  limitationNotes?: string[]
+}
+
+function quoteIdentifier(value: string) {
+  return `"${value.replace(/"/g, "\"\"")}"`
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function sentenceCase(value: string) {
+  if (!value) {
+    return value
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function buildDefaultFollowUps(question: string) {
+  return [
+    `Show the queries behind "${question}"`,
+    "Compare the source results side by side",
+    "Which sources did you inspect first?",
+  ]
 }
 
 function formatRetrievalContext(retrievalContext: RetrievalContext) {
@@ -236,59 +354,131 @@ function formatRetrievalContext(retrievalContext: RetrievalContext) {
   return `Dataset context:\n${datasetMatches}\n\nConversation memory:\n${memoryMatches}\n\nRecent conversation:\n${recentMessages}`
 }
 
-function formatSchemaSnapshot(schema: AgenticSchemaSnapshot) {
-  const postgres = schema.postgres
+function formatSourceCatalog(catalog: AgenticSourceCatalog) {
+  const availableEntries = catalog.entries
     .map(
-      (table) =>
-        `- ${table.name} (${table.rowCount} rows): ${table.description}. Columns: ${table.columns.join(", ")}`
-    )
-    .join("\n")
-  const mongodb = schema.mongodb
-    .map(
-      (collection) =>
-        `- ${collection.name} (${collection.rowCount} documents): ${collection.description}. Fields: ${collection.columns.join(", ")}`
+      (entry) =>
+        `- ${entry.id} (${entry.sourceType}, ${entry.recordCount} records, ${entry.objectCount} objects): ${entry.description}`,
     )
     .join("\n")
 
-  return `Postgres tables:\n${postgres}\n\nMongoDB collections:\n${mongodb}`
+  const postgres = catalog.schema.postgres.length
+    ? catalog.schema.postgres
+        .map(
+          (table) =>
+            `- ${table.name} (${table.rowCount} rows): ${table.description}. Columns: ${table.columns.join(", ")}`,
+        )
+        .join("\n")
+    : "No approved built-in Postgres tables were registered."
+
+  const mongodb = catalog.schema.mongodb.length
+    ? catalog.schema.mongodb
+        .map(
+          (collection) =>
+            `- ${collection.name} (${collection.rowCount} documents): ${collection.description}. Fields: ${collection.columns.join(", ")}`,
+        )
+        .join("\n")
+    : "No approved built-in MongoDB collections were registered."
+
+  const csvSources = catalog.schema.csv.length
+    ? catalog.schema.csv
+        .map((source) => {
+          const metricLabels = source.metrics.map((metric) => metric.id).join(", ") || "none"
+          const dimensionLabels =
+            source.dimensions.map((dimension) => dimension.id).join(", ") || "none"
+          return `- ${source.datasetId} (${source.rowCount} rows): ${source.label}. Table: ${source.tableName}. Columns: ${source.columns.join(", ")}. Metrics: ${metricLabels}. Dimensions: ${dimensionLabels}. Primary time field: ${source.primaryTimeField ?? "none"}.`
+        })
+        .join("\n")
+    : "No active uploaded CSV datasets were available for querying."
+
+  return `Available sources:\n${availableEntries}\n\nBuilt-in Postgres schema:\n${postgres}\n\nBuilt-in MongoDB schema:\n${mongodb}\n\nUploaded CSV datasets:\n${csvSources}`
 }
 
 function buildAgenticPrompt(args: {
   question: string
   retrievalContext: RetrievalContext
-  schema: AgenticSchemaSnapshot
+  sourceCatalog: AgenticSourceCatalog
+  activeDatasetId?: string
+  activeDatasetLabel?: string
+  fallbackReason?: string
 }) {
   return `
-You are QueryLens' agentic fallback analyst for questions that do not fit the product's built-in discovery, what-changed, breakdown, or compare flows.
+You are QueryLens' bounded multi-source analyst for questions that fall outside the current deterministic built-in or uploaded-CSV slices.
 
-You must work only with the approved QueryLens data sources and only through the provided tools.
+You must work only with the approved QueryLens sources and only through the provided tools.
 
 Rules:
 - Use read-only queries only.
-- Never reference tables or collections outside the provided schema snapshot.
+- Never reference tables, collections, or datasets outside the provided source catalog.
+- You may inspect or query built-in Postgres, built-in MongoDB, and active uploaded CSV datasets.
+- Uploaded CSV datasets must be queried only through run_uploaded_csv_query.
+- Keep cross-source work as separate bounded reads plus synthesis in the final answer.
+- Never invent a cross-database join, cross-dataset join, or union across source families.
 - Prefer the smallest number of queries needed to answer the question well.
-- You may query Postgres and MongoDB separately, but you must not invent a cross-database join.
-- If the request is ambiguous or unsupported even after reviewing context, call reject_agentic_response.
+- Inspect unfamiliar sources before querying them.
+- If the request is ambiguous or unsupported even after inspection, call reject_agentic_response.
 - Once you have enough evidence, call finish_agentic_response.
 - Use chart only when it is clearly helpful. Prefer line for time series, bar for ranked comparisons, and pie only for small composition views.
 - When selecting chart keys, they must exist in the referenced query run rows and the valueKey must be numeric.
 - Reuse queryRunIds exactly as returned by the query tools.
-- Make the final summary slightly fuller than a one-line recap.
-- The final summary should state the main conclusion and include at least one concrete supporting observation from the executed query results.
-- Keep the final summary factual, compact, and grounded only in the returned rows.
+- Keep the final summary factual, compact, and grounded only in the returned rows and documents.
 
-Live schema snapshot:
-${formatSchemaSnapshot(args.schema)}
+Current workspace anchor:
+- activeDatasetId: ${args.activeDatasetId ?? "sme_portfolio"}
+- activeDatasetLabel: ${args.activeDatasetLabel ?? "SME portfolio"}
+- deterministic handoff reason: ${args.fallbackReason ?? "The deterministic route declined the question and handed it to the bounded agent."}
+
+Approved source catalog:
+${formatSourceCatalog(args.sourceCatalog)}
 
 Retrieved context:
 ${formatRetrievalContext(args.retrievalContext)}
 
 User question:
 ${args.question}
-`.trim()
+  `.trim()
 }
 
-export function validateReadOnlySql(statement: string) {
+function extractCteNames(statement: string) {
+  const names = new Set<string>()
+  const ctePattern = /(?:with|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+as\b/gi
+
+  let match = ctePattern.exec(statement)
+  while (match) {
+    names.add(match[1].toLowerCase())
+    match = ctePattern.exec(statement)
+  }
+
+  return names
+}
+
+function normalizeIdentifier(value: string) {
+  return value
+    .trim()
+    .replace(/^[("']+|[)"',]+$/g, "")
+    .split(".")
+    .at(-1)
+    ?.replace(/^"+|"+$/g, "")
+    .toLowerCase()
+}
+
+function extractReferencedTableNames(statement: string) {
+  const names = new Set<string>()
+  const tablePattern = /\b(?:from|join)\s+([a-zA-Z0-9_."-]+)/gi
+
+  let match = tablePattern.exec(statement)
+  while (match) {
+    const normalized = normalizeIdentifier(match[1])
+    if (normalized) {
+      names.add(normalized)
+    }
+    match = tablePattern.exec(statement)
+  }
+
+  return names
+}
+
+export function validateReadOnlySql(statement: string, allowedTables?: readonly string[]) {
   const trimmed = statement.trim().replace(/;+\s*$/g, "")
 
   if (!trimmed) {
@@ -305,7 +495,7 @@ export function validateReadOnlySql(statement: string) {
 
   if (
     /\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|comment|copy|vacuum|analyze|refresh|merge|call|execute|prepare|deallocate|listen|notify|lock|set|reset|show)\b/i.test(
-      trimmed
+      trimmed,
     )
   ) {
     throw new Error("SQL contains a disallowed keyword for read-only execution.")
@@ -313,6 +503,20 @@ export function validateReadOnlySql(statement: string) {
 
   if (/\bfor\s+(update|share|key\s+share|no\s+key\s+update)\b/i.test(trimmed)) {
     throw new Error("SQL row locking is not allowed.")
+  }
+
+  if (allowedTables && allowedTables.length > 0) {
+    const allowed = new Set(allowedTables.map((table) => table.toLowerCase()))
+    const cteNames = extractCteNames(trimmed)
+    const referencedTables = extractReferencedTableNames(trimmed)
+
+    const disallowed = Array.from(referencedTables).find(
+      (table) => !allowed.has(table) && !cteNames.has(table),
+    )
+
+    if (disallowed) {
+      throw new Error(`SQL references a table that is not approved for this tool: ${disallowed}.`)
+    }
   }
 
   return trimmed
@@ -361,47 +565,282 @@ export function validateMongoPipeline(pipeline: Record<string, unknown>[]) {
   return pipeline
 }
 
-function buildDefaultFollowUps(question: string) {
+function buildEmptyTrace(args: {
+  question: string
+  activeDatasetId?: string
+  fallbackReason?: string
+}): ExecutionTrace {
+  const entries: ExecutionTraceEntry[] = [
+    {
+      id: "planning.agentic_entry",
+      stage: "planning",
+      status: "approved",
+      message:
+        "QueryLens entered the bounded multi-source agent after deterministic execution declined the request.",
+      metadata: {
+        datasetId: args.activeDatasetId ?? "sme_portfolio",
+      },
+    },
+  ]
+
+  if (args.fallbackReason) {
+    entries.push({
+      id: "planning.agentic_reason",
+      stage: "planning",
+      status: "approved",
+      message: args.fallbackReason,
+    })
+  }
+
+  return {
+    planId: `agentic:${args.question}`,
+    entries,
+  }
+}
+
+function appendTrace(trace: ExecutionTrace, entry: ExecutionTraceEntry): ExecutionTrace {
+  return {
+    planId: trace.planId,
+    entries: [...trace.entries, entry],
+  }
+}
+
+function buildSourceAudit(args: {
+  sourceCatalog: AgenticSourceCatalog
+  inspectedSourceIds: Set<string>
+  queryRuns: StoredAgenticQueryRun[]
+}): SourceAudit {
+  const sourceById = new Map<string, SourceAuditEntry>()
+  args.sourceCatalog.entries.forEach((entry) => {
+    sourceById.set(entry.id, {
+      sourceId: entry.id,
+      sourceType: entry.sourceType,
+      label: entry.label,
+      note: entry.description,
+    })
+  })
+
+  const usedSourceIds = new Set(args.queryRuns.map((queryRun) => queryRun.run.sourceId))
+  usedSourceIds.forEach((sourceId) => args.inspectedSourceIds.add(sourceId))
+
+  const buildEntries = (
+    sourceIds: Iterable<string>,
+    note: (entry: SourceAuditEntry) => string,
+  ): SourceAuditEntry[] => {
+    const entries: SourceAuditEntry[] = []
+    for (const sourceId of sourceIds) {
+      const entry = sourceById.get(sourceId)
+      if (!entry) {
+        continue
+      }
+
+      entries.push({
+        ...entry,
+        note: note(entry),
+      })
+    }
+    return entries
+  }
+
+  return {
+    available: args.sourceCatalog.entries.map((entry) => ({
+      sourceId: entry.id,
+      sourceType: entry.sourceType,
+      label: entry.label,
+      note: entry.description,
+    })),
+    inspected: buildEntries(
+      args.inspectedSourceIds,
+      (entry) => `Schema or source metadata was inspected for ${entry.label}.`,
+    ),
+    used: buildEntries(
+      usedSourceIds,
+      (entry) => `Executed query results from ${entry.label} contributed to this answer.`,
+    ),
+  }
+}
+
+function createScore(score: number) {
+  const normalizedScore = clamp(Math.round(score), 0, 100)
+
+  return {
+    score: normalizedScore,
+    label:
+      normalizedScore >= 85 ? ("high" as TrustLevel) : normalizedScore >= 60 ? ("medium" as TrustLevel) : ("low" as TrustLevel),
+  }
+}
+
+function createComponent(score: number, reason: string): TrustComponentScore {
+  return {
+    ...createScore(score),
+    reason,
+  }
+}
+
+function buildTrustTrace(components: TrustModel["components"]) {
   return [
-    `Show the query behind "${question}"`,
-    "Break this down by region",
-    "Show the trend over time",
+    {
+      id: "trust.interpretation",
+      component: "interpretation" as const,
+      score: components.interpretation.score,
+      label: components.interpretation.label,
+      message: components.interpretation.reason,
+    },
+    {
+      id: "trust.data_coverage",
+      component: "dataCoverage" as const,
+      score: components.dataCoverage.score,
+      label: components.dataCoverage.label,
+      message: components.dataCoverage.reason,
+    },
+    {
+      id: "trust.source_corroboration",
+      component: "sourceCorroboration" as const,
+      score: components.sourceCorroboration.score,
+      label: components.sourceCorroboration.label,
+      message: components.sourceCorroboration.reason,
+    },
+    {
+      id: "trust.execution",
+      component: "execution" as const,
+      score: components.execution.score,
+      label: components.execution.label,
+      message: components.execution.reason,
+    },
   ]
 }
 
-function buildAgenticFallbackResponse(
-  reason: string,
-  sourceMode: Phase1AnalysisResponse["sourceMode"],
-  question: string
-): Phase1AnalysisResponse {
+function buildAgenticTrustModel(args: {
+  response: Omit<Phase1AnalysisResponse, "confidence" | "trustArtifacts" | "trust">
+  sourceAudit: SourceAudit
+  queryRuns: StoredAgenticQueryRun[]
+  executionTrace: ExecutionTrace
+  uncertaintyNotes?: string[]
+  limitationNotes?: string[]
+}): TrustModel {
+  const queryRuns = args.queryRuns
+  const sourceTypes = new Set(queryRuns.map((queryRun) => queryRun.run.sourceType))
+  const hasFailedStep = args.executionTrace.entries.some((entry) => entry.status === "failed")
+  const isFallback = args.response.fallback === true
+  const usedCsv = queryRuns.some((queryRun) => queryRun.run.sourceType === "csv")
+  const hasTruncatedRun = queryRuns.some((queryRun) => queryRun.result.rowset.truncated)
+
+  const interpretation = createComponent(
+    isFallback ? 24 : 72,
+    isFallback
+      ? "The bounded agent could not finish a grounded answer safely."
+      : "The question required the bounded multi-source agent after deterministic execution declined it.",
+  )
+  const dataCoverage = createComponent(
+    isFallback
+      ? 24
+      : queryRuns.length === 0
+        ? 36
+        : hasTruncatedRun
+          ? 78
+          : 88,
+    isFallback
+      ? "The run stopped before it completed a grounded answer."
+      : queryRuns.length === 0
+        ? "No grounded query results were attached to the response."
+        : hasTruncatedRun
+          ? "Grounded query results were returned, but at least one result set was truncated to stay inside bounds."
+          : "Grounded query results were attached for each source used in the final answer.",
+  )
+  const sourceCorroboration = createComponent(
+    isFallback
+      ? 24
+      : sourceTypes.size > 1
+        ? 88
+        : sourceTypes.size === 1
+          ? 68
+          : 24,
+    isFallback
+      ? "Cross-source corroboration was not completed because the run fell back."
+      : sourceTypes.size > 1
+        ? "The answer synthesizes separate bounded reads from more than one approved source type."
+        : sourceTypes.size === 1
+          ? "The answer is grounded in one approved source type without cross-source corroboration."
+          : "No approved source contributed executed results to the answer.",
+  )
+  const execution = createComponent(
+    isFallback ? 24 : hasFailedStep ? 62 : queryRuns.length > 0 ? 88 : 40,
+    isFallback
+      ? "The execution path returned a guarded fallback instead of a completed answer."
+      : hasFailedStep
+        ? "The bounded execution path completed, but it encountered at least one recoverable tool failure along the way."
+        : queryRuns.length > 0
+          ? "All executed reads stayed inside the approved bounded tool surface."
+          : "The execution path finished without a grounded query result.",
+  )
+
+  const components = {
+    interpretation,
+    dataCoverage,
+    sourceCorroboration,
+    execution,
+  }
+  const overall = createScore(
+    interpretation.score * 0.2 +
+      dataCoverage.score * 0.3 +
+      sourceCorroboration.score * 0.25 +
+      execution.score * 0.25,
+  )
+
+  const limitationNotes = [
+    ...(args.limitationNotes ?? []),
+    ...(usedCsv && sourceTypes.size > 1
+      ? [
+          "Cross-source synthesis compared separate bounded reads; QueryLens did not perform row-level joins across built-in and uploaded sources.",
+        ]
+      : []),
+    ...(hasTruncatedRun
+      ? ["At least one result set was truncated to stay inside the row limit."]
+      : []),
+  ]
+
   return {
-    intent: "agentic_query",
-    headline: "QueryLens could not complete that custom analysis safely",
-    summary: reason,
-    metric: "custom_query_result",
-    timeframe: "Custom question",
-    comparisonBasis: "Agentic fallback over approved live QueryLens sources",
-    confidence: calculateConfidenceScore({
-      evidenceCount: 0,
-      driverCount: 0,
-      hasCrossSourceEvidence: false,
-      fallback: true,
-    }),
-    activeScope: "Custom analysis",
-    drivers: [],
-    evidence: [],
-    assumptions: [
-      "The agentic fallback stays within the approved live QueryLens Postgres and MongoDB sources.",
+    overall,
+    components,
+    trace: buildTrustTrace(components),
+    howProduced: [
+      "QueryLens routed the request into the bounded multi-source agent after deterministic execution declined it.",
+      "The agent inspected only approved sources and executed only read-only built-in or semantic CSV tools.",
+      isFallback
+        ? "The run stopped before a fully grounded answer could be completed safely."
+        : "The final answer was synthesized only from returned rows and documents.",
     ],
-    supportedFollowUps: buildDefaultFollowUps(question),
-    fallback: true,
-    sourceMode,
+    uncertaintyNotes: [
+      ...(args.uncertaintyNotes ?? []),
+      ...(usedCsv
+        ? [
+            "Uploaded CSV semantics were inferred during onboarding and may be less governed than the built-in sample dataset.",
+          ]
+        : []),
+    ],
+    limitationNotes,
+    sources: args.sourceAudit.used.map((entry) => ({
+      sourceType: entry.sourceType,
+      sourceName: entry.label,
+      scope: args.response.activeScope,
+      timeRange: args.response.timeframe,
+      note: entry.note,
+    })),
+    observedFacts:
+      queryRuns.length > 0
+        ? queryRuns.slice(0, 3).map((queryRun) => sentenceCase(queryRun.run.summary))
+        : [sentenceCase(args.response.summary)],
+    inferredFindings:
+      args.response.drivers.length > 0
+        ? args.response.drivers.slice(0, 3).map((driver) => sentenceCase(driver.description))
+        : [sentenceCase(args.response.headline)],
+    assumptions: args.response.assumptions,
   }
 }
 
 function buildChartSpecFromQueryRun(
   queryRun: StoredAgenticQueryRun,
-  chartConfig: z.infer<typeof finishAgenticResponseSchema>["chart"]
+  chartConfig: z.infer<typeof finishAgenticResponseSchema>["chart"],
 ): ChartSpec | undefined {
   if (!chartConfig) {
     return undefined
@@ -420,10 +859,7 @@ function buildChartSpecFromQueryRun(
       const label = row[labelKey]
       const value = row[valueKey]
 
-      if (
-        typeof label !== "string" &&
-        typeof label !== "number"
-      ) {
+      if (typeof label !== "string" && typeof label !== "number") {
         return undefined
       }
 
@@ -435,10 +871,8 @@ function buildChartSpecFromQueryRun(
         ...Object.fromEntries(
           Object.entries(row).map(([key, entryValue]) => [
             key,
-            typeof entryValue === "boolean"
-              ? String(entryValue)
-              : (entryValue ?? undefined),
-          ])
+            typeof entryValue === "boolean" ? String(entryValue) : (entryValue ?? undefined),
+          ]),
         ),
         [labelKey]: String(label),
         [valueKey]: value,
@@ -474,11 +908,11 @@ function buildChartSpecFromQueryRun(
 function buildEvidenceFromQueryRuns(
   queryRuns: StoredAgenticQueryRun[],
   timeframe: string,
-  activeScope: string
+  activeScope: string,
 ): EvidenceItem[] {
   return queryRuns.map(({ run }) => ({
     sourceType: run.sourceType,
-    sourceName: run.title,
+    sourceName: run.sourceLabel,
     timeRange: timeframe,
     scope: activeScope,
     supportingFact: run.summary,
@@ -486,62 +920,343 @@ function buildEvidenceFromQueryRuns(
   }))
 }
 
-export async function executeAgenticFallback(
-  args: ExecuteAgenticFallbackArgs
-): Promise<Phase1AnalysisResponse> {
-  const chat = createGeminiChatSession({
-    temperature: 0,
-    tools: [{ functionDeclarations: agenticTools }],
-    toolConfig: {
-      functionCallingConfig: {
-        mode: FunctionCallingConfigMode.ANY,
-        allowedFunctionNames: agenticTools
-          .map((tool) => tool.name)
-          .filter((name): name is string => Boolean(name)),
-      },
-    },
+function buildFallbackResponse(args: BuildFallbackArgs): Phase1AnalysisResponse {
+  const sourceAudit = buildSourceAudit({
+    sourceCatalog: args.sourceCatalog,
+    inspectedSourceIds: args.inspectedSourceIds,
+    queryRuns: args.queryRuns,
   })
 
-  const queryRuns = new Map<string, StoredAgenticQueryRun>()
+  const responseSeed: Omit<Phase1AnalysisResponse, "confidence" | "trust" | "trustArtifacts"> = {
+    intent: "agentic_query",
+    headline: "QueryLens could not complete that bounded multi-source analysis safely",
+    summary: args.reason,
+    metric: "custom_query_result",
+    timeframe: "Custom question",
+    comparisonBasis: "Bounded multi-source analysis over approved QueryLens sources",
+    activeScope: "Custom analysis",
+    drivers: [],
+    evidence: [],
+    assumptions: [
+      "The bounded agent stayed inside approved built-in sources and active uploaded CSV datasets.",
+    ],
+    supportedFollowUps: buildDefaultFollowUps(args.question),
+    queryRuns: args.queryRuns.map((queryRun) => queryRun.run),
+    sourceAudit,
+    executionTrace: args.executionTrace,
+    fallback: true,
+    sourceMode: args.sourceMode,
+  }
 
-  let response = await chat.sendMessage({
-    message: buildAgenticPrompt({
-      question: args.question,
-      retrievalContext: args.retrievalContext,
-      schema: args.schemaSnapshot,
-    }),
+  const trust = buildAgenticTrustModel({
+    response: responseSeed,
+    sourceAudit,
+    queryRuns: args.queryRuns,
+    executionTrace: args.executionTrace,
+    uncertaintyNotes: args.uncertaintyNotes,
+    limitationNotes: [args.reason, ...(args.limitationNotes ?? [])],
   })
 
-  for (let step = 0; step < MAX_AGENTIC_STEPS; step += 1) {
-    const functionCalls = response.functionCalls ?? []
+  return {
+    ...responseSeed,
+    confidence: trust.overall.score,
+    trust,
+  }
+}
 
-    if (!functionCalls.length) {
-      return buildAgenticFallbackResponse(
-        "Gemini did not return a valid tool action for that custom analysis.",
-        args.dataAccess.sourceMode,
-        args.question
-      )
+function formatCsvQuerySummary(args: {
+  source: AgenticConnectedCsvSource
+  intent: z.infer<typeof uploadedCsvQuerySchema>["intent"]
+  aggregation: "sum" | "avg" | "min" | "max" | "count"
+  metricLabel?: string
+  dimensionLabel?: string
+  execution: AgenticQueryExecutionResult
+}) {
+  switch (args.intent) {
+    case "discovery":
+      return `${args.source.label} preview returned ${args.execution.rowset.totalRows} row${args.execution.rowset.totalRows === 1 ? "" : "s"} inside the bounded preview window.`
+    case "aggregate":
+      return `${args.aggregation.toUpperCase()} ${args.metricLabel?.toLowerCase() ?? "row count"} was computed for ${args.source.label}.`
+    case "group_by":
+      return `${args.metricLabel?.toLowerCase() ?? "row count"} was grouped by ${args.dimensionLabel?.toLowerCase() ?? "the selected dimension"} for ${args.source.label}.`
+    case "trend":
+      return `${args.metricLabel?.toLowerCase() ?? "row count"} was trended over ${args.source.primaryTimeField ?? "time"} for ${args.source.label}.`
+  }
+}
+
+async function executeUploadedCsvQuery(args: {
+  dataAccess: QueryLensDataAccess
+  source: AgenticConnectedCsvSource
+  request: z.infer<typeof uploadedCsvQuerySchema>
+}): Promise<StoredAgenticQueryRun> {
+  const aggregation = args.request.aggregation ?? "sum"
+  const metric = args.request.metricId
+    ? args.source.metrics.find((candidate) => candidate.id === args.request.metricId)
+    : undefined
+  const dimension = args.request.dimensionId
+    ? args.source.dimensions.find((candidate) => candidate.id === args.request.dimensionId)
+    : undefined
+  const canUseCount = aggregation === "count"
+  const metricColumn = metric?.id
+
+  let statement = ""
+
+  if (args.request.intent === "discovery") {
+    statement = `SELECT * FROM ${quoteIdentifier(args.source.tableName)} LIMIT ${Math.max(MAX_QUERY_RESULT_ROWS + 1, 2)}`
+  } else if (args.request.intent === "aggregate") {
+    if (!metricColumn && !canUseCount) {
+      throw new Error("CSV aggregate queries require a supported metricId or count aggregation.")
     }
 
-    const functionResponses: Part[] = []
+    const expression = canUseCount
+      ? "COUNT(*)::double precision"
+      : `${aggregation.toUpperCase()}(${quoteIdentifier(metricColumn ?? "id")})::double precision`
+    statement = `SELECT ${expression} AS value FROM ${quoteIdentifier(args.source.tableName)}`
+  } else if (args.request.intent === "group_by") {
+    if (!dimension) {
+      throw new Error("CSV grouped queries require a supported dimensionId.")
+    }
 
-    for (const functionCall of functionCalls) {
-      if (!functionCall.name) {
+    const expression = canUseCount
+      ? "COUNT(*)::double precision"
+      : metricColumn
+        ? `${aggregation.toUpperCase()}(${quoteIdentifier(metricColumn)})::double precision`
+        : undefined
+
+    if (!expression) {
+      throw new Error("CSV grouped queries require a supported metricId or count aggregation.")
+    }
+
+    statement = `
+      SELECT
+        ${quoteIdentifier(dimension.id)} AS label,
+        ${expression} AS value
+      FROM ${quoteIdentifier(args.source.tableName)}
+      GROUP BY 1
+      ORDER BY 2 DESC NULLS LAST
+      LIMIT ${Math.max(MAX_QUERY_RESULT_ROWS + 1, 2)}
+    `.trim()
+  } else {
+    if (!args.source.primaryTimeField) {
+      throw new Error("This uploaded dataset does not have a primary time field for trend analysis.")
+    }
+
+    const expression = canUseCount
+      ? "COUNT(*)::double precision"
+      : metricColumn
+        ? `SUM(${quoteIdentifier(metricColumn)})::double precision`
+        : undefined
+
+    if (!expression) {
+      throw new Error("CSV trend queries require a supported metricId or count aggregation.")
+    }
+
+    statement = `
+      SELECT
+        ${quoteIdentifier(args.source.primaryTimeField)} AS period,
+        ${expression} AS value
+      FROM ${quoteIdentifier(args.source.tableName)}
+      WHERE ${quoteIdentifier(args.source.primaryTimeField)} IS NOT NULL
+      GROUP BY 1
+      ORDER BY 1 ASC
+      LIMIT ${Math.max(MAX_QUERY_RESULT_ROWS + 1, 2)}
+    `.trim()
+  }
+
+  const execution = await args.dataAccess.executeReadOnlySql({
+    statement,
+    maxRows: MAX_QUERY_RESULT_ROWS,
+  })
+  const summary = `${args.request.reason} ${formatCsvQuerySummary({
+    source: args.source,
+    intent: args.request.intent,
+    aggregation,
+    metricLabel: metric?.label,
+    dimensionLabel: dimension?.label,
+    execution,
+  })}`.trim()
+
+  return {
+    run: {
+      id: `query-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: args.request.title,
+      sourceId: args.source.id,
+      sourceLabel: args.source.label,
+      sourceType: "csv",
+      language: "sql",
+      statement,
+      status: "completed",
+      rowCount: execution.rowset.totalRows,
+      summary,
+    },
+    result: execution,
+  }
+}
+
+export async function executeBoundedMultiSourceAgent(
+  args: ExecuteBoundedMultiSourceAgentArgs,
+): Promise<Phase1AnalysisResponse> {
+  const session = createAgentModelSession(agenticTools)
+  const queryRuns = new Map<string, StoredAgenticQueryRun>()
+  const inspectedSourceIds = new Set<string>()
+  const sourceCatalogEntryById = new Map(
+    args.sourceCatalog.entries.map((entry) => [entry.id, entry]),
+  )
+  const builtInPostgresSource = sourceCatalogEntryById.get("built_in_postgres")
+  const builtInMongoSource = sourceCatalogEntryById.get("built_in_mongodb")
+  const csvSourceById = new Map(
+    args.sourceCatalog.schema.csv.map((source) => [source.datasetId, source]),
+  )
+  const allowedBuiltInTables = args.sourceCatalog.schema.postgres.map((table) => table.name)
+  let executionTrace = buildEmptyTrace({
+    question: args.question,
+    activeDatasetId: args.activeDatasetId,
+    fallbackReason: args.fallbackReason,
+  })
+
+  let turn = await session.sendPrompt(
+    buildAgenticPrompt({
+      question: args.question,
+      retrievalContext: args.retrievalContext,
+      sourceCatalog: args.sourceCatalog,
+      activeDatasetId: args.activeDatasetId,
+      activeDatasetLabel: args.activeDatasetLabel,
+      fallbackReason: args.fallbackReason,
+    }),
+  )
+
+  for (let step = 0; step < MAX_AGENTIC_STEPS; step += 1) {
+    if (!turn.functionCalls.length) {
+      executionTrace = appendTrace(executionTrace, {
+        id: `tool_call.empty_${step + 1}`,
+        stage: "tool_call",
+        status: "failed",
+        message:
+          "The bounded agent did not return a valid tool action for the current step.",
+      })
+
+      return buildFallbackResponse({
+        reason: "The bounded multi-source agent did not produce a valid executable action.",
+        question: args.question,
+        sourceMode: args.dataAccess.sourceMode,
+        sourceCatalog: args.sourceCatalog,
+        inspectedSourceIds,
+        queryRuns: Array.from(queryRuns.values()),
+        executionTrace,
+      })
+    }
+
+    const functionResponses: AgentFunctionResponse[] = []
+
+    for (const functionCall of turn.functionCalls) {
+      executionTrace = appendTrace(executionTrace, {
+        id: `tool_call.request.${step + 1}.${functionCall.name}`,
+        stage: "tool_call",
+        status: "approved",
+        message: `The bounded agent requested ${functionCall.name}.`,
+      })
+
+      if (functionCall.name === "list_available_sources") {
+        functionResponses.push({
+          callId: functionCall.id,
+          name: functionCall.name,
+          payload: {
+            sources: args.sourceCatalog.entries,
+          },
+        })
         continue
       }
 
-      if (functionCall.name === "run_postgres_query") {
-        if (queryRuns.size >= MAX_AGENTIC_QUERY_RUNS) {
-          return buildAgenticFallbackResponse(
-            "The agentic fallback hit its read-only query budget before it could finish safely.",
-            args.dataAccess.sourceMode,
-            args.question
-          )
-        }
+      if (functionCall.name === "inspect_source_schema") {
+        try {
+          const parsedArgs = inspectSourceSchemaSchema.parse(functionCall.args)
+          const sourceEntry = sourceCatalogEntryById.get(parsedArgs.sourceId)
+          if (!sourceEntry) {
+            throw new Error(`Unknown sourceId: ${parsedArgs.sourceId}.`)
+          }
 
+          inspectedSourceIds.add(parsedArgs.sourceId)
+
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload:
+              parsedArgs.sourceId === "built_in_postgres"
+                ? {
+                    source: sourceEntry,
+                    schema: args.sourceCatalog.schema.postgres,
+                  }
+                : parsedArgs.sourceId === "built_in_mongodb"
+                  ? {
+                      source: sourceEntry,
+                      schema: args.sourceCatalog.schema.mongodb,
+                    }
+                  : {
+                      source: sourceEntry,
+                      schema: csvSourceById.get(parsedArgs.sourceId),
+                    },
+          })
+          executionTrace = appendTrace(executionTrace, {
+            id: `tool_call.inspect.${parsedArgs.sourceId}`,
+            stage: "tool_call",
+            status: "completed",
+            message: `QueryLens inspected the schema for ${sourceEntry.label}.`,
+            metadata: {
+              sourceId: parsedArgs.sourceId,
+            },
+          })
+        } catch (error) {
+          executionTrace = appendTrace(executionTrace, {
+            id: `tool_call.inspect_error.${step + 1}`,
+            stage: "tool_call",
+            status: "failed",
+            message:
+              error instanceof Error ? error.message : "QueryLens could not inspect that source safely.",
+          })
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "QueryLens could not inspect that source safely.",
+            },
+          })
+        }
+        continue
+      }
+
+      if (
+        functionCall.name === "run_postgres_query" ||
+        functionCall.name === "run_mongodb_pipeline" ||
+        functionCall.name === "run_uploaded_csv_query"
+      ) {
+        if (queryRuns.size >= MAX_AGENTIC_QUERY_RUNS) {
+          executionTrace = appendTrace(executionTrace, {
+            id: `fallback.query_budget.${step + 1}`,
+            stage: "fallback",
+            status: "fallback",
+            message:
+              "The bounded multi-source agent hit its read-only query budget before it could finish safely.",
+          })
+          return buildFallbackResponse({
+            reason:
+              "The bounded multi-source agent hit its read-only query budget before it could finish safely.",
+            question: args.question,
+            sourceMode: args.dataAccess.sourceMode,
+            sourceCatalog: args.sourceCatalog,
+            inspectedSourceIds,
+            queryRuns: Array.from(queryRuns.values()),
+            executionTrace,
+          })
+        }
+      }
+
+      if (functionCall.name === "run_postgres_query") {
         try {
           const parsedArgs = postgresQuerySchema.parse(functionCall.args)
-          const statement = validateReadOnlySql(parsedArgs.statement)
+          const statement = validateReadOnlySql(parsedArgs.statement, allowedBuiltInTables)
           const execution = await args.dataAccess.executeReadOnlySql({
             statement,
             maxRows: MAX_QUERY_RESULT_ROWS,
@@ -550,6 +1265,8 @@ export async function executeAgenticFallback(
           const queryRun: QueryRun = {
             id: queryRunId,
             title: parsedArgs.title,
+            sourceId: "built_in_postgres",
+            sourceLabel: builtInPostgresSource?.label ?? "Built-in Postgres facts",
             sourceType: "postgres",
             language: "sql",
             statement,
@@ -562,52 +1279,61 @@ export async function executeAgenticFallback(
             run: queryRun,
             result: execution,
           })
+          inspectedSourceIds.add("built_in_postgres")
+          executionTrace = appendTrace(executionTrace, {
+            id: `source_read.postgres.${queryRunId}`,
+            stage: "source_read",
+            status: "completed",
+            message: `QueryLens executed a read-only built-in Postgres query for ${parsedArgs.title}.`,
+            metadata: {
+              sourceId: "built_in_postgres",
+              rows: execution.rowset.totalRows,
+            },
+          })
 
-          functionResponses.push(
-            createPartFromFunctionResponse(
-              functionCall.id ?? queryRunId,
-              functionCall.name,
-              {
-                queryRunId,
-                title: parsedArgs.title,
-                sourceType: "postgres",
-                language: "sql",
-                statement,
-                summary: execution.summary,
-                rowCount: execution.rowset.totalRows,
-                truncated: execution.rowset.truncated,
-                columns: execution.rowset.columns,
-                rows: execution.rowset.rows,
-              }
-            )
-          )
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              queryRunId,
+              title: parsedArgs.title,
+              sourceId: queryRun.sourceId,
+              sourceLabel: queryRun.sourceLabel,
+              sourceType: queryRun.sourceType,
+              language: queryRun.language,
+              statement,
+              summary: execution.summary,
+              rowCount: execution.rowset.totalRows,
+              truncated: execution.rowset.truncated,
+              columns: execution.rowset.columns,
+              rows: execution.rowset.rows,
+            },
+          })
         } catch (error) {
-          functionResponses.push(
-            createPartFromFunctionResponse(
-              functionCall.id ?? `postgres-error-${step}`,
-              functionCall.name,
-              {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "QueryLens could not execute that SQL safely.",
-              }
-            )
-          )
+          executionTrace = appendTrace(executionTrace, {
+            id: `source_read.postgres_error.${step + 1}`,
+            stage: "source_read",
+            status: "failed",
+            message:
+              error instanceof Error
+                ? error.message
+                : "QueryLens could not execute that Postgres query safely.",
+          })
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "QueryLens could not execute that Postgres query safely.",
+            },
+          })
         }
-
         continue
       }
 
       if (functionCall.name === "run_mongodb_pipeline") {
-        if (queryRuns.size >= MAX_AGENTIC_QUERY_RUNS) {
-          return buildAgenticFallbackResponse(
-            "The agentic fallback hit its read-only query budget before it could finish safely.",
-            args.dataAccess.sourceMode,
-            args.question
-          )
-        }
-
         try {
           const parsedArgs = mongodbQuerySchema.parse(functionCall.args)
           const pipeline = validateMongoPipeline(parsedArgs.pipeline)
@@ -620,6 +1346,8 @@ export async function executeAgenticFallback(
           const queryRun: QueryRun = {
             id: queryRunId,
             title: parsedArgs.title,
+            sourceId: "built_in_mongodb",
+            sourceLabel: builtInMongoSource?.label ?? "Built-in Mongo context",
             sourceType: "mongodb",
             language: "mongodb",
             statement: `${parsedArgs.collection}.aggregate(${JSON.stringify(pipeline, null, 2)})`,
@@ -632,98 +1360,233 @@ export async function executeAgenticFallback(
             run: queryRun,
             result: execution,
           })
+          inspectedSourceIds.add("built_in_mongodb")
+          executionTrace = appendTrace(executionTrace, {
+            id: `source_read.mongodb.${queryRunId}`,
+            stage: "source_read",
+            status: "completed",
+            message: `QueryLens executed a read-only built-in MongoDB pipeline for ${parsedArgs.title}.`,
+            metadata: {
+              sourceId: "built_in_mongodb",
+              rows: execution.rowset.totalRows,
+            },
+          })
 
-          functionResponses.push(
-            createPartFromFunctionResponse(
-              functionCall.id ?? queryRunId,
-              functionCall.name,
-              {
-                queryRunId,
-                title: parsedArgs.title,
-                sourceType: "mongodb",
-                language: "mongodb",
-                collection: parsedArgs.collection,
-                summary: execution.summary,
-                rowCount: execution.rowset.totalRows,
-                truncated: execution.rowset.truncated,
-                columns: execution.rowset.columns,
-                rows: execution.rowset.rows,
-              }
-            )
-          )
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              queryRunId,
+              title: parsedArgs.title,
+              sourceId: queryRun.sourceId,
+              sourceLabel: queryRun.sourceLabel,
+              sourceType: queryRun.sourceType,
+              language: queryRun.language,
+              collection: parsedArgs.collection,
+              summary: execution.summary,
+              rowCount: execution.rowset.totalRows,
+              truncated: execution.rowset.truncated,
+              columns: execution.rowset.columns,
+              rows: execution.rowset.rows,
+            },
+          })
         } catch (error) {
-          functionResponses.push(
-            createPartFromFunctionResponse(
-              functionCall.id ?? `mongo-error-${step}`,
-              functionCall.name,
-              {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "QueryLens could not execute that MongoDB pipeline safely.",
-              }
-            )
-          )
+          executionTrace = appendTrace(executionTrace, {
+            id: `source_read.mongodb_error.${step + 1}`,
+            stage: "source_read",
+            status: "failed",
+            message:
+              error instanceof Error
+                ? error.message
+                : "QueryLens could not execute that MongoDB pipeline safely.",
+          })
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "QueryLens could not execute that MongoDB pipeline safely.",
+            },
+          })
         }
+        continue
+      }
 
+      if (functionCall.name === "run_uploaded_csv_query") {
+        try {
+          const parsedArgs = uploadedCsvQuerySchema.parse(functionCall.args)
+          const source = csvSourceById.get(parsedArgs.datasetId)
+          if (!source) {
+            throw new Error(`Unknown or inactive uploaded dataset: ${parsedArgs.datasetId}.`)
+          }
+
+          const queryRun = await executeUploadedCsvQuery({
+            dataAccess: args.dataAccess,
+            source,
+            request: parsedArgs,
+          })
+          const queryRunId = `query-run-${queryRuns.size + 1}`
+          queryRuns.set(queryRunId, {
+            run: {
+              ...queryRun.run,
+              id: queryRunId,
+            },
+            result: queryRun.result,
+          })
+          inspectedSourceIds.add(source.id)
+          executionTrace = appendTrace(executionTrace, {
+            id: `source_read.csv.${queryRunId}`,
+            stage: "source_read",
+            status: "completed",
+            message: `QueryLens executed a bounded uploaded-CSV query for ${source.label}.`,
+            metadata: {
+              sourceId: source.id,
+              rows: queryRun.result.rowset.totalRows,
+            },
+          })
+
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              queryRunId,
+              title: parsedArgs.title,
+              sourceId: source.id,
+              sourceLabel: source.label,
+              sourceType: "csv",
+              language: "sql",
+              statement: queryRun.run.statement,
+              summary: queryRun.result.summary,
+              rowCount: queryRun.result.rowset.totalRows,
+              truncated: queryRun.result.rowset.truncated,
+              columns: queryRun.result.rowset.columns,
+              rows: queryRun.result.rowset.rows,
+            },
+          })
+        } catch (error) {
+          executionTrace = appendTrace(executionTrace, {
+            id: `source_read.csv_error.${step + 1}`,
+            stage: "source_read",
+            status: "failed",
+            message:
+              error instanceof Error
+                ? error.message
+                : "QueryLens could not execute that uploaded CSV query safely.",
+          })
+          functionResponses.push({
+            callId: functionCall.id,
+            name: functionCall.name,
+            payload: {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "QueryLens could not execute that uploaded CSV query safely.",
+            },
+          })
+        }
         continue
       }
 
       if (functionCall.name === "reject_agentic_response") {
         const parsedArgs = rejectAgenticResponseSchema.safeParse(functionCall.args)
+        executionTrace = appendTrace(executionTrace, {
+          id: `fallback.reject.${step + 1}`,
+          stage: "fallback",
+          status: "fallback",
+          message:
+            parsedArgs.success
+              ? parsedArgs.data.reason
+              : "The question was too ambiguous for a safe bounded multi-source query.",
+        })
 
-        return buildAgenticFallbackResponse(
-          parsedArgs.success
+        return buildFallbackResponse({
+          reason: parsedArgs.success
             ? parsedArgs.data.reason
-            : "The question was too ambiguous for a safe custom query.",
-          args.dataAccess.sourceMode,
-          args.question
-        )
+            : "The question was too ambiguous for a safe bounded multi-source query.",
+          question: args.question,
+          sourceMode: args.dataAccess.sourceMode,
+          sourceCatalog: args.sourceCatalog,
+          inspectedSourceIds,
+          queryRuns: Array.from(queryRuns.values()),
+          executionTrace,
+        })
       }
 
       if (functionCall.name === "finish_agentic_response") {
         const parsedArgs = finishAgenticResponseSchema.safeParse(functionCall.args)
-
         if (!parsedArgs.success) {
-          return buildAgenticFallbackResponse(
-            "Gemini produced an invalid structured answer for that custom analysis.",
-            args.dataAccess.sourceMode,
-            args.question
-          )
+          executionTrace = appendTrace(executionTrace, {
+            id: `fallback.invalid_finish.${step + 1}`,
+            stage: "fallback",
+            status: "fallback",
+            message:
+              "The bounded multi-source agent produced an invalid structured final answer.",
+          })
+
+          return buildFallbackResponse({
+            reason:
+              "The bounded multi-source agent produced an invalid structured final answer.",
+            question: args.question,
+            sourceMode: args.dataAccess.sourceMode,
+            sourceCatalog: args.sourceCatalog,
+            inspectedSourceIds,
+            queryRuns: Array.from(queryRuns.values()),
+            executionTrace,
+          })
         }
 
         const primaryRun = queryRuns.get(parsedArgs.data.primaryQueryRunId)
         const tableRun = queryRuns.get(
-          parsedArgs.data.tableQueryRunId ?? parsedArgs.data.primaryQueryRunId
+          parsedArgs.data.tableQueryRunId ?? parsedArgs.data.primaryQueryRunId,
         )
         const chartRun = parsedArgs.data.chart
           ? queryRuns.get(parsedArgs.data.chart.queryRunId)
           : undefined
 
         if (!primaryRun || !tableRun || (parsedArgs.data.chart && !chartRun)) {
-          return buildAgenticFallbackResponse(
-            "Gemini referenced a query run that was never completed.",
-            args.dataAccess.sourceMode,
-            args.question
-          )
+          executionTrace = appendTrace(executionTrace, {
+            id: `fallback.unknown_query_run.${step + 1}`,
+            stage: "fallback",
+            status: "fallback",
+            message:
+              "The bounded multi-source agent referenced a query run that was never completed.",
+          })
+
+          return buildFallbackResponse({
+            reason:
+              "The bounded multi-source agent referenced a query run that was never completed.",
+            question: args.question,
+            sourceMode: args.dataAccess.sourceMode,
+            sourceCatalog: args.sourceCatalog,
+            inspectedSourceIds,
+            queryRuns: Array.from(queryRuns.values()),
+            executionTrace,
+          })
         }
 
         const orderedQueryRuns = Array.from(queryRuns.values())
-        const confidence = calculateConfidenceScore({
-          evidenceCount: orderedQueryRuns.length,
-          driverCount: parsedArgs.data.keyFindings.length,
-          hasCrossSourceEvidence:
-            new Set(orderedQueryRuns.map((queryRun) => queryRun.run.sourceType)).size > 1,
+        const sourceAudit = buildSourceAudit({
+          sourceCatalog: args.sourceCatalog,
+          inspectedSourceIds,
+          queryRuns: orderedQueryRuns,
+        })
+        executionTrace = appendTrace(executionTrace, {
+          id: `dispatch.agentic_finish.${step + 1}`,
+          stage: "dispatch",
+          status: "completed",
+          message:
+            "The bounded multi-source agent completed a grounded answer from approved read-only query results.",
         })
 
-        return {
+        const responseSeed: Omit<Phase1AnalysisResponse, "confidence" | "trust" | "trustArtifacts"> = {
           intent: "agentic_query",
           headline: parsedArgs.data.headline,
           summary: parsedArgs.data.summary,
           metric: "custom_query_result",
           timeframe: parsedArgs.data.timeframe,
           comparisonBasis: parsedArgs.data.comparisonBasis,
-          confidence,
           activeScope: parsedArgs.data.activeScope,
           drivers: parsedArgs.data.keyFindings.map((finding, index) => ({
             id: `agentic-finding-${index + 1}`,
@@ -739,13 +1602,13 @@ export async function executeAgenticFallback(
           evidence: buildEvidenceFromQueryRuns(
             orderedQueryRuns,
             parsedArgs.data.timeframe,
-            parsedArgs.data.activeScope
+            parsedArgs.data.activeScope,
           ),
           assumptions:
             parsedArgs.data.assumptions.length > 0
               ? parsedArgs.data.assumptions
               : [
-                  "The answer is grounded only in the approved live QueryLens Postgres and MongoDB sources.",
+                  "The bounded agent stayed inside approved built-in sources and active uploaded CSV datasets.",
                 ],
           supportedFollowUps:
             parsedArgs.data.supportedFollowUps.length > 0
@@ -753,27 +1616,67 @@ export async function executeAgenticFallback(
               : buildDefaultFollowUps(args.question),
           resultTable: tableRun.result.rowset,
           queryRuns: orderedQueryRuns.map((queryRun) => queryRun.run),
+          sourceAudit,
+          executionTrace,
           sourceMode: args.dataAccess.sourceMode,
+        }
+        const trust = buildAgenticTrustModel({
+          response: responseSeed,
+          sourceAudit,
+          queryRuns: orderedQueryRuns,
+          executionTrace,
+          uncertaintyNotes: parsedArgs.data.uncertaintyNotes,
+          limitationNotes: parsedArgs.data.limitationNotes,
+        })
+
+        return {
+          ...responseSeed,
+          confidence: trust.overall.score,
+          trust,
         }
       }
     }
 
     if (!functionResponses.length) {
-      return buildAgenticFallbackResponse(
-        "Gemini did not return any executable custom-query action.",
-        args.dataAccess.sourceMode,
-        args.question
-      )
+      executionTrace = appendTrace(executionTrace, {
+        id: `fallback.no_function_responses.${step + 1}`,
+        stage: "fallback",
+        status: "fallback",
+        message: "The bounded multi-source agent produced no executable tool results.",
+      })
+
+      return buildFallbackResponse({
+        reason: "The bounded multi-source agent produced no executable tool results.",
+        question: args.question,
+        sourceMode: args.dataAccess.sourceMode,
+        sourceCatalog: args.sourceCatalog,
+        inspectedSourceIds,
+        queryRuns: Array.from(queryRuns.values()),
+        executionTrace,
+      })
     }
 
-    response = await chat.sendMessage({
-      message: functionResponses,
-    })
+    turn = await session.sendFunctionResponses(functionResponses)
   }
 
-  return buildAgenticFallbackResponse(
-    "The agentic fallback reached its step limit before it could finish safely.",
-    args.dataAccess.sourceMode,
-    args.question
-  )
+  executionTrace = appendTrace(executionTrace, {
+    id: "fallback.step_limit",
+    stage: "fallback",
+    status: "fallback",
+    message:
+      "The bounded multi-source agent reached its step limit before it could finish safely.",
+  })
+
+  return buildFallbackResponse({
+    reason:
+      "The bounded multi-source agent reached its step limit before it could finish safely.",
+    question: args.question,
+    sourceMode: args.dataAccess.sourceMode,
+    sourceCatalog: args.sourceCatalog,
+    inspectedSourceIds,
+    queryRuns: Array.from(queryRuns.values()),
+    executionTrace,
+  })
 }
+
+export const executeAgenticFallback = executeBoundedMultiSourceAgent
