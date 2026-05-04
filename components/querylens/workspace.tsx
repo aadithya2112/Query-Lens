@@ -10,8 +10,10 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  FileDown,
   Github,
   Home,
+  Link2,
   MessageSquareText,
   Plus,
   Settings2,
@@ -406,6 +408,8 @@ function AuthenticatedWorkspace({
   const [isEvidenceCollapsed, setIsEvidenceCollapsed] = useState(true)
   const [isMobileChatsOpen, setIsMobileChatsOpen] = useState(false)
   const [isMobileTruthOpen, setIsMobileTruthOpen] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [lastExportUrl, setLastExportUrl] = useState<string | null>(null)
   const isMobile = useIsMobile()
   const chatSidebarPanelRef = useRef<ImperativePanelHandle>(null)
   const evidencePanelRef = useRef<ImperativePanelHandle>(null)
@@ -654,6 +658,46 @@ function AuthenticatedWorkspace({
     }
   }
 
+  const handleExportPdf = async () => {
+    if (!chatId || isExportingPdf || isChatBootstrapping) {
+      return
+    }
+
+    setIsExportingPdf(true)
+
+    try {
+      const response = await fetch("/api/chats/export-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chatId,
+          datasetId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Export request failed.")
+      }
+
+      const payload = (await response.json()) as {
+        url: string
+      }
+      setLastExportUrl(payload.url)
+
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(payload.url).catch(() => undefined)
+      }
+
+      window.open(payload.url, "_blank", "noopener,noreferrer")
+    } catch (error) {
+      console.error("QueryLens could not export this chat.", error)
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
+
   const centerChatColumn = shouldCenterChatColumn({
     isMobile,
     isChatSidebarCollapsed,
@@ -778,6 +822,35 @@ function AuthenticatedWorkspace({
               <span className="hidden sm:inline-block">Source context</span>
             </Link>
           </Button>
+          <Button
+            className="gap-2"
+            disabled={!chatId || isChatBootstrapping || isExportingPdf}
+            onClick={() => void handleExportPdf()}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            <FileDown className="h-4 w-4" />
+            <span className="hidden sm:inline-block">
+              {isExportingPdf ? "Exporting..." : "Export PDF"}
+            </span>
+          </Button>
+          {lastExportUrl && (
+            <Button
+              className="gap-2"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  void navigator.clipboard.writeText(lastExportUrl)
+                }
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <Link2 className="h-4 w-4" />
+              <span className="hidden sm:inline-block">Copy link</span>
+            </Button>
+          )}
           <div className="ml-2 flex h-8 w-8 items-center justify-center">
             <UserButton />
           </div>
