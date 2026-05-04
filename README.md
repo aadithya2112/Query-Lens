@@ -33,6 +33,7 @@ The product is built around the three pillars of the hackathon brief:
 - [Overview](#overview)
 - [Working Features](#working-features)
 - [Tech Stack](#tech-stack)
+- [Environment variables](#environment-variables)
 - [Recommended Local Demo Path](#recommended-local-demo-path)
   - [1. Install dependencies](#1-install-dependencies)
   - [2. Create local environment config](#2-create-local-environment-config)
@@ -98,6 +99,27 @@ The four use cases from the hackathon spec are all represented:
 - `Playwright`
 - `Bun`
 - `Gemini API` via `@google/genai` for required interactive planning, embeddings, and narrative generation
+- `Clerk` (`@clerk/nextjs`) for authentication and `clerkMiddleware` in `proxy.ts`
+- `Convex` for user-scoped data (datasets, chats) and server calls from Next.js via `convex/nextjs`
+
+---
+
+## Environment variables
+
+Use **`.env.example` as the template** and copy it to **`.env`** (gitignored) for local development. Next.js also reads **`.env.local`**; the Convex CLI often writes `NEXT_PUBLIC_CONVEX_URL` there when you run `npx convex dev`.
+
+| Variable | Where it is used | Notes |
+| -------- | ---------------- | ----- |
+| `POSTGRES_URL` | Sample data seeding, `/api/query` facts | Default in `.env.example` matches local Docker. |
+| `MONGODB_URL` | Sample data seeding, `/api/query` context | Default in `.env.example` matches local Docker. |
+| `GEMINI_API_KEY` | Interactive query planning and narratives | Required for `/api/query`. |
+| `QUERYLENS_GEMINI_MODEL` | Gemini model id | Optional; defaults to `gemini-2.5-flash`. |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser SDK | From the [Clerk dashboard](https://dashboard.clerk.com). |
+| `CLERK_SECRET_KEY` | Clerk server / `auth()` in API routes | From the Clerk dashboard; keep server-only. |
+| `NEXT_PUBLIC_CONVEX_URL` | `ConvexReactClient` and `convex/nextjs` | From the [Convex dashboard](https://dashboard.convex.dev) or after `npx convex dev`. |
+| `CLERK_JWT_ISSUER_DOMAIN` | `convex/auth.config.ts` | Set on the **Convex** deployment (e.g. `npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://…clerk.accounts.dev"`). See [Convex + Clerk](https://docs.convex.dev/auth/clerk). |
+
+Your personal **`.env`** is not committed; keep secrets there and treat **`.env.example`** as the documented checklist.
 
 ---
 
@@ -117,15 +139,13 @@ npm install
 cp .env.example .env
 ```
 
-The default values in `.env.example` are already set for the local Docker stack:
+Edit `.env` (and optionally `.env.local` for overrides):
 
-- local `POSTGRES_URL`
-- local `MONGODB_URL`
-
-Interactive `/api/query` requests now require Gemini. Set:
-
-- `GEMINI_API_KEY=...`
-- optionally override `QUERYLENS_GEMINI_MODEL` if you do not want the default `gemini-2.5-flash`
+- **Databases:** `.env.example` defaults match the local Docker stack (`POSTGRES_URL`, `MONGODB_URL`).
+- **Gemini:** set `GEMINI_API_KEY` (required for `/api/query`). Optionally set `QUERYLENS_GEMINI_MODEL` if you do not want the default `gemini-2.5-flash`.
+- **Clerk:** set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk dashboard so sign-in and server `auth()` work.
+- **Convex:** set `NEXT_PUBLIC_CONVEX_URL` from your Convex project, or run `npx convex dev` in another terminal so the CLI can provision the project and sync env (often into `.env.local`).
+- **Convex + Clerk JWT:** configure `CLERK_JWT_ISSUER_DOMAIN` on your Convex deployment so `convex/auth.config.ts` can validate Clerk-issued tokens (see the [Convex Clerk guide](https://docs.convex.dev/auth/clerk)).
 
 ### 3. Start the databases
 
@@ -147,7 +167,7 @@ npm run seed
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+For a **development Convex backend**, run `npx convex dev` in a separate terminal (keeps functions deployed and env in sync). Then open [http://localhost:3000](http://localhost:3000).
 
 ### 6. Run the flagship questions
 
@@ -233,7 +253,7 @@ npm run test:e2e
 
 ## Architecture 
 
-QueryLens is a single `Next.js` application with an integrated server layer.
+QueryLens is a single `Next.js` application with an integrated server layer and **Convex** for user-scoped persistence (for example datasets and chats), gated by **Clerk** identity on the client and in Convex.
 
 - `POST /api/query` interprets the question, validates it against the current dataset and manifest, reads weekly facts from `Postgres`, reads corroborating context from `MongoDB`, and assembles a grounded narrative response.
 - The server routes requests through a built-in dataset definition, a structured query-plan model, `pgvector` retrieval for metadata and conversation memory, and a generic analysis orchestrator before executing the current `discovery`, `what changed`, `breakdown`, or `compare` intent.
@@ -254,6 +274,7 @@ For the fuller details and request lifecycle, see [Architecture.md](./Architectu
 ├─ components/querylens/ # Active QueryLens UI
 ├─ data/                 # Metric manifest
 ├─ lib/querylens/        # Domain logic, analysis, scoring, sample dataset
+├─ convex/               # Convex functions, schema, and Clerk JWT auth config
 ├─ scripts/              # Local sample-data load script
 ├─ tests/                # Unit, integration, and e2e tests
 ├─ docker-compose.yml
